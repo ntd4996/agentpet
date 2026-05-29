@@ -23,13 +23,9 @@ final class SettingsWindowController {
         // A non-activating, floating panel: shows on top and stays interactive
         // without stealing focus from the app the user is working in.
         let panel = NSPanel(contentViewController: hosting)
-        panel.styleMask = [.titled, .closable, .nonactivatingPanel, .fullSizeContentView]
+        panel.styleMask = [.titled, .closable, .nonactivatingPanel]
         panel.title = "AgentPet"
-        panel.titleVisibility = .hidden
-        panel.titlebarAppearsTransparent = true
-        panel.isMovableByWindowBackground = true
-        panel.isFloatingPanel = true
-        panel.level = .floating
+        panel.isFloatingPanel = false
         panel.hidesOnDeactivate = false
         panel.becomesKeyOnlyIfNeeded = true
         panel.isReleasedWhenClosed = false
