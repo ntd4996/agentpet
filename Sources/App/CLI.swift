@@ -2,10 +2,16 @@ import AgentPetCore
 import Foundation
 
 /// CLI helper invoked by agent hooks: `agentpet hook --event ... --session ...`.
-/// Fully implemented in issue #4; stubbed here so the entry point compiles.
 enum HookCLI {
     static func run(arguments: [String]) -> Never {
-        FileHandle.standardError.write(Data("agentpet hook: not implemented yet (issue #4)\n".utf8))
+        let parsed = HookArguments.parse(arguments)
+        guard let event = parsed.makeEvent(now: Date()) else {
+            FileHandle.standardError.write(Data(
+                "usage: agentpet hook --event <name> --session <id> [--project <path>] [--agent <kind>] [--message <text>]\n".utf8
+            ))
+            exit(2)
+        }
+        EventSender.send(event, socketPath: AgentPetPaths.socketPath, queueDir: AgentPetPaths.queueDir)
         exit(0)
     }
 }

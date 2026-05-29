@@ -73,7 +73,7 @@ final class EventSocketServerTests: XCTestCase {
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, size) }
         }
         XCTAssertEqual(connected, 0, "connect failed errno=\(errno)")
-        try data.withUnsafeBytes { raw in
+        data.withUnsafeBytes { raw in
             let written = write(fd, raw.baseAddress, raw.count)
             XCTAssertEqual(written, raw.count)
         }
