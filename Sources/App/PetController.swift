@@ -31,8 +31,6 @@ final class PetController: ObservableObject {
         applyMood(.idle)
     }
 
-    var availablePackNames: [String] { PetPackLoader.loadBuiltins().map(\.name) }
-
     func selectPack(named name: String) {
         guard let p = PetPackLoader.loadBuiltins().first(where: { $0.name == name }) else { return }
         pack = p

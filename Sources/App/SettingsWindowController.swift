@@ -13,23 +13,26 @@ final class SettingsWindowController {
         SettingsModel.shared.refresh()
 
         if let window {
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
+            window.orderFrontRegardless()
             return
         }
 
         let hosting = NSHostingController(rootView: SetupView(onClose: { [weak self] in
             self?.window?.close()
         }))
-        let window = NSWindow(contentViewController: hosting)
-        window.title = "AgentPet"
-        window.styleMask = [.titled, .closable]
-        window.isReleasedWhenClosed = false
-        window.center()
-        self.window = window
+        // A non-activating, floating panel: shows on top and stays interactive
+        // without stealing focus from the app the user is working in.
+        let panel = NSPanel(contentViewController: hosting)
+        panel.styleMask = [.titled, .closable, .nonactivatingPanel]
+        panel.title = "AgentPet"
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.hidesOnDeactivate = false
+        panel.isReleasedWhenClosed = false
+        panel.center()
+        self.window = panel
 
-        window.makeKeyAndOrderFront(nil)
-        NSApp.activate(ignoringOtherApps: true)
+        panel.orderFrontRegardless()
     }
 
     /// Shows onboarding only the first time the app is ever launched.
