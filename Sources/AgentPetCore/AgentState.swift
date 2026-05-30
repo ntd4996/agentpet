@@ -20,6 +20,8 @@ public enum AgentKind: String, Codable, Sendable {
     case claude
     case codex
     case gemini
+    /// Any CLI agent launched via the `agentpet run` wrapper.
+    case cli
     case unknown
 }
 

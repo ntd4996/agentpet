@@ -16,6 +16,12 @@ final class StateMapperTests: XCTestCase {
         XCTAssertNil(StateMapper.state(for: .claude, eventName: "Bogus"))
         XCTAssertNil(StateMapper.state(for: .codex, eventName: "Stop"))
     }
+
+    func testDirectStateNameMapsForAnyKind() {
+        XCTAssertEqual(StateMapper.state(for: .cli, eventName: "working"), .working)
+        XCTAssertEqual(StateMapper.state(for: .cli, eventName: "done"), .done)
+        XCTAssertEqual(StateMapper.state(for: .unknown, eventName: "waiting"), .waiting)
+    }
 }
 
 final class SessionStoreTests: XCTestCase {

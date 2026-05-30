@@ -7,9 +7,12 @@ import Foundation
 struct AgentPetMain {
     static func main() {
         let args = Array(CommandLine.arguments.dropFirst())
-        if args.first == "hook" {
+        switch args.first {
+        case "hook":
             HookCLI.run(arguments: Array(args.dropFirst()))
-        } else {
+        case "run":
+            RunCLI.run(arguments: Array(args.dropFirst()))
+        default:
             AgentPetApp.main()
         }
     }

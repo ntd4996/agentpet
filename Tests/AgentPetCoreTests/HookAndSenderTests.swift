@@ -32,6 +32,23 @@ final class HookArgumentsTests: XCTestCase {
     }
 }
 
+final class RunArgumentsTests: XCTestCase {
+    func testParsesFlagsThenCommand() {
+        let parsed = RunArguments.parse(["--session", "s1", "--project", "/p", "--agent", "cli", "--", "aider", "--model", "gpt"])
+        XCTAssertEqual(parsed, RunArguments(session: "s1", project: "/p", agent: "cli", command: ["aider", "--model", "gpt"]))
+    }
+
+    func testNoFlagsJustCommand() {
+        let parsed = RunArguments.parse(["--", "claude"])
+        XCTAssertEqual(parsed.command, ["claude"])
+        XCTAssertNil(parsed.session)
+    }
+
+    func testNoCommand() {
+        XCTAssertTrue(RunArguments.parse(["--session", "x"]).command.isEmpty)
+    }
+}
+
 final class EventSenderTests: XCTestCase {
     func testSenderDeliversOverSocket() throws {
         let path = "/tmp/agentpet-\(UUID().uuidString).sock"

@@ -6,6 +6,10 @@ import Foundation
 /// irrelevant events are ignored rather than treated as an error).
 public enum StateMapper {
     public static func state(for kind: AgentKind, eventName: String) -> AgentState? {
+        // Generic: any caller (e.g. the `agentpet run` wrapper) can send a
+        // normalised state name directly.
+        if let direct = AgentState(rawValue: eventName) { return direct }
+
         switch kind {
         case .claude:
             switch eventName {
@@ -20,7 +24,7 @@ public enum StateMapper {
             default:
                 return nil
             }
-        case .codex, .gemini, .unknown:
+        case .codex, .gemini, .cli, .unknown:
             // v2: Codex/Gemini mappings added when their hook support lands.
             return nil
         }
