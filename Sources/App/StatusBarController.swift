@@ -36,4 +36,11 @@ final class StatusBarController: NSObject {
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
         }
     }
+
+    /// Shows the same popover anchored to an arbitrary view (e.g. the floating
+    /// pet on right-click).
+    func showPopover(relativeTo rect: NSRect, of view: NSView, edge: NSRectEdge) {
+        if popover.isShown { popover.performClose(nil) }
+        popover.show(relativeTo: rect, of: view, preferredEdge: edge)
+    }
 }

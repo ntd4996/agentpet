@@ -14,6 +14,7 @@ final class PetWindowController: ObservableObject {
 
     private var panel: NSPanel?
     private var sizeCancellable: AnyCancellable?
+    private var rightClickMonitor: Any?
 
     func start() {
         let size = PetController.shared.windowSize
@@ -38,6 +39,20 @@ final class PetWindowController: ObservableObject {
 
         sizeCancellable = PetController.shared.$petPoint.sink { [weak self] point in
             self?.applyFrame(size: PetController.windowSize(forPoint: point))
+        }
+
+        // Right-click the pet to open the popover anchored at the pet.
+        rightClickMonitor = NSEvent.addLocalMonitorForEvents(matching: .rightMouseDown) { [weak self] event in
+            let handled = MainActor.assumeIsolated { () -> Bool in
+                guard let self, let panel = self.panel, event.window === panel,
+                      let content = panel.contentView else { return false }
+                let petPoint = PetController.shared.petPoint
+                let rect = NSRect(x: (content.bounds.width - petPoint) / 2, y: 0,
+                                  width: petPoint, height: petPoint)
+                StatusBarController.shared.showPopover(relativeTo: rect, of: content, edge: .maxY)
+                return true
+            }
+            return handled ? nil : event
         }
     }
 

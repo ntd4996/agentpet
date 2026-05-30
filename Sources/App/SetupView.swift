@@ -122,6 +122,8 @@ private struct GeneralTab: View {
                             ), axis: .vertical)
                             .lineLimit(2...5)
                             .textFieldStyle(.roundedBorder)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                     Text("One message per line; a random one is shown.")
