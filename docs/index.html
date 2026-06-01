@@ -8,70 +8,123 @@
 <meta property="og:title" content="AgentPet" />
 <meta property="og:description" content="A desktop pet that watches your AI coding agents." />
 <meta property="og:image" content="https://raw.githubusercontent.com/ntd4996/agentpet/main/assets/banner.png" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="icon" href="icon.png" />
 <style>
-  :root { --bg:#0b1020; --bg2:#160d2c; --accent:#7468fb; --card:rgba(255,255,255,.05); --stroke:rgba(255,255,255,.1); --muted:#a0a3d2; }
-  * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif; color:#fff;
-         background:radial-gradient(900px 500px at 80% -5%, rgba(116,104,251,.28), transparent), linear-gradient(160deg,var(--bg),var(--bg2)); min-height:100vh; }
-  .wrap { max-width:960px; margin:0 auto; padding:0 24px; }
-  header { padding:80px 0 48px; text-align:center; }
-  .icon { width:96px; height:96px; border-radius:24px; box-shadow:0 12px 40px rgba(116,104,251,.45); }
-  h1 { font-size:56px; letter-spacing:-.02em; margin:20px 0 10px; }
-  .tag { font-size:20px; color:var(--muted); max-width:620px; margin:0 auto 28px; }
-  .cta { display:flex; gap:12px; justify-content:center; flex-wrap:wrap; }
-  .btn { display:inline-flex; align-items:center; gap:8px; padding:12px 22px; border-radius:12px; font-weight:600; text-decoration:none; font-size:15px; }
-  .btn.primary { background:var(--accent); color:#fff; }
-  .btn.ghost { background:var(--card); color:#fff; border:1px solid var(--stroke); }
-  code, .brew { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
-  .brew { display:inline-block; margin-top:22px; background:#0008; border:1px solid var(--stroke); padding:12px 18px; border-radius:10px; color:#cfd2ff; font-size:14px; }
-  section { padding:40px 0; }
-  .shot { width:100%; border-radius:16px; border:1px solid var(--stroke); box-shadow:0 20px 60px rgba(0,0,0,.4); }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; margin-top:24px; }
-  .feature { background:var(--card); border:1px solid var(--stroke); border-radius:14px; padding:20px; }
-  .feature h3 { font-size:17px; margin-bottom:6px; }
-  .feature p { color:var(--muted); font-size:14px; line-height:1.5; }
-  h2 { font-size:30px; text-align:center; letter-spacing:-.01em; }
-  .shots { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:24px; }
-  .shots img { width:100%; border-radius:14px; border:1px solid var(--stroke); }
-  footer { text-align:center; color:var(--muted); padding:48px 0 64px; font-size:14px; }
-  footer a { color:#bdbfff; }
-  .note { color:var(--muted); font-size:13px; margin-top:10px; }
-  @media (max-width:640px){ h1{font-size:40px} .shots{grid-template-columns:1fr} }
+  :root{
+    --bg:#0a0e1c; --bg2:#140a26; --accent:#7c6cff; --accent2:#a78bfa;
+    --card:rgba(255,255,255,.045); --stroke:rgba(255,255,255,.09); --muted:#9aa0cf; --text:#eef0ff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;color:var(--text);
+       background:var(--bg);line-height:1.55;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  .bg{position:fixed;inset:0;z-index:-1;
+      background:
+        radial-gradient(800px 420px at 78% -8%, rgba(124,108,255,.30), transparent 60%),
+        radial-gradient(700px 500px at 12% 8%, rgba(167,139,250,.16), transparent 55%),
+        linear-gradient(165deg,var(--bg),var(--bg2));}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 24px}
+  .nav{display:flex;align-items:center;justify-content:space-between;padding:22px 0}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:17px}
+  .brand img{width:30px;height:30px;border-radius:8px}
+  .nav a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:500;margin-left:20px}
+  .nav a:hover{color:#fff}
+  .pill{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border-radius:999px;
+        background:var(--card);border:1px solid var(--stroke);font-size:13px;color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:50%;background:#3ddc84;box-shadow:0 0 8px #3ddc84}
+  header{text-align:center;padding:64px 0 36px}
+  .hero-icon{width:104px;height:104px;border-radius:26px;box-shadow:0 18px 60px rgba(124,108,255,.5);margin-bottom:22px}
+  h1{font-size:clamp(40px,6vw,68px);font-weight:800;letter-spacing:-.03em;line-height:1.04;
+     background:linear-gradient(180deg,#fff,#c9c8ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .tag{font-size:clamp(17px,2.4vw,21px);color:var(--muted);max-width:640px;margin:18px auto 30px}
+  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:13px 24px;border-radius:13px;font-weight:600;
+       text-decoration:none;font-size:15px;transition:transform .15s,box-shadow .15s}
+  .btn:hover{transform:translateY(-2px)}
+  .btn.primary{background:linear-gradient(180deg,var(--accent2),var(--accent));color:#fff;box-shadow:0 10px 30px rgba(124,108,255,.45)}
+  .btn.ghost{background:var(--card);color:#fff;border:1px solid var(--stroke)}
+  .brew{display:inline-flex;align-items:center;gap:10px;margin-top:24px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+        background:#060814;border:1px solid var(--stroke);padding:12px 16px;border-radius:11px;color:#cfd2ff;font-size:14px}
+  .brew button{background:none;border:0;color:var(--accent2);cursor:pointer;font:inherit;font-weight:600}
+  .meta{color:var(--muted);font-size:13px;margin-top:14px}
+  .frame{position:relative;margin:44px auto 0;max-width:880px;border-radius:18px;overflow:hidden;
+         border:1px solid var(--stroke);box-shadow:0 40px 120px rgba(0,0,0,.55), 0 0 0 1px rgba(124,108,255,.12)}
+  .frame video,.frame img{display:block;width:100%}
+  section{padding:64px 0}
+  .eyebrow{text-align:center;color:var(--accent2);font-weight:700;font-size:13px;letter-spacing:.12em;text-transform:uppercase}
+  h2{text-align:center;font-size:clamp(28px,4vw,40px);font-weight:800;letter-spacing:-.02em;margin:10px 0 8px}
+  .sub{text-align:center;color:var(--muted);max-width:560px;margin:0 auto 36px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+  .feature{background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:24px;transition:border-color .2s,transform .2s}
+  .feature:hover{border-color:rgba(124,108,255,.4);transform:translateY(-3px)}
+  .feature .ic{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;
+               font-size:20px;background:rgba(124,108,255,.16);margin-bottom:14px}
+  .feature h3{font-size:17px;margin-bottom:6px}
+  .feature p{color:var(--muted);font-size:14px}
+  .shots{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:8px}
+  .shots img{width:100%;border-radius:14px;border:1px solid var(--stroke);background:#0c1024}
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .step{background:var(--card);border:1px solid var(--stroke);border-radius:16px;padding:24px}
+  .step .n{width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;
+           justify-content:center;font-weight:700;margin-bottom:12px}
+  .step code{background:#060814;border:1px solid var(--stroke);padding:2px 7px;border-radius:6px;font-size:13px;color:#cfd2ff}
+  .cta-box{text-align:center;background:linear-gradient(180deg,rgba(124,108,255,.14),rgba(124,108,255,.04));
+           border:1px solid rgba(124,108,255,.3);border-radius:22px;padding:56px 24px;margin-top:24px}
+  footer{text-align:center;color:var(--muted);padding:48px 0 64px;font-size:14px;border-top:1px solid var(--stroke)}
+  footer a{color:#bdbfff;text-decoration:none}
+  footer a:hover{text-decoration:underline}
+  @media (max-width:720px){ .shots,.steps{grid-template-columns:1fr} .nav .links{display:none} }
 </style>
 </head>
 <body>
+  <div class="bg"></div>
   <div class="wrap">
+
+    <nav class="nav">
+      <div class="brand"><img src="icon.png" alt=""/> AgentPet</div>
+      <div class="links">
+        <a href="#features">Features</a>
+        <a href="#install">Install</a>
+        <a href="https://github.com/ntd4996/agentpet">GitHub</a>
+      </div>
+    </nav>
+
     <header>
-      <img class="icon" src="icon.png" alt="AgentPet" />
-      <h1>AgentPet</h1>
-      <p class="tag">A native macOS menu bar app with a desktop pet that watches your AI coding agents (Claude Code, Codex, Gemini CLI) in real time.</p>
+      <img class="hero-icon" src="icon.png" alt="AgentPet" />
+      <div class="pill"><span class="dot"></span> Works with Claude Code · Codex · Gemini CLI</div>
+      <h1>Watch your AI agents<br/>without leaving your work</h1>
+      <p class="tag">A native macOS menu bar app with a desktop pet that shows, at a glance, which agent is working, done, or waiting for you.</p>
       <div class="cta">
         <a class="btn primary" href="https://github.com/ntd4996/agentpet/releases/latest">Download for macOS</a>
         <a class="btn ghost" href="https://github.com/ntd4996/agentpet">⭐ Star on GitHub</a>
       </div>
-      <div class="brew">brew install --cask ntd4996/tap/agentpet</div>
-      <p class="note">macOS 13+ · Apple Silicon &amp; Intel · MIT licensed</p>
+      <div class="brew"><span>$ brew install --cask ntd4996/tap/agentpet</span><button onclick="navigator.clipboard.writeText('brew install --cask ntd4996/tap/agentpet');this.textContent='Copied'">Copy</button></div>
+      <p class="meta">macOS 13+ · Apple Silicon &amp; Intel · MIT licensed · Free</p>
+
+      <div class="frame">
+        <video src="demo.mp4" autoplay loop muted playsinline poster="https://raw.githubusercontent.com/ntd4996/agentpet/main/assets/screenshot-menubar.png"></video>
+      </div>
     </header>
 
-    <section>
-      <video class="shot" src="demo.mp4" autoplay loop muted playsinline></video>
-    </section>
-
-    <section>
+    <section id="features">
+      <p class="eyebrow">Why AgentPet</p>
       <h2>Stop tab-hunting across terminals</h2>
+      <p class="sub">Run several agents in parallel and let AgentPet surface who needs you.</p>
       <div class="grid">
-        <div class="feature"><h3>Multi-agent monitor</h3><p>A live menu bar list of every agent: state, what it's doing, and a real-time timer.</p></div>
-        <div class="feature"><h3>At a glance</h3><p>The menu bar icon shows how many agents run, and turns orange when one needs your input.</p></div>
-        <div class="feature"><h3>Desktop pet</h3><p>A pet reacts to agent activity — working, waiting, done, celebrate — with optional chat bubbles.</p></div>
-        <div class="feature"><h3>Claude Code · Codex · Gemini</h3><p>One-tap hook install for precise working / waiting / done detection. Any CLI agent via <code>agentpet run</code>.</p></div>
-        <div class="feature"><h3>Native notifications &amp; sounds</h3><p>Get alerted (and hear it) when an agent finishes or needs you.</p></div>
-        <div class="feature"><h3>Bring your own pet</h3><p>Browse an online pet library and download with one click. Map animations to states.</p></div>
+        <div class="feature"><div class="ic">📊</div><h3>Multi-agent monitor</h3><p>A live menu bar list of every agent: its state, what it's doing, and a real-time timer.</p></div>
+        <div class="feature"><div class="ic">🟠</div><h3>At a glance</h3><p>The menu bar icon shows how many agents run, and turns orange when one needs your input.</p></div>
+        <div class="feature"><div class="ic">🐾</div><h3>Desktop pet</h3><p>A pet reacts to agent activity — working, waiting, done, celebrate — with optional chat bubbles.</p></div>
+        <div class="feature"><div class="ic">🔌</div><h3>Claude · Codex · Gemini</h3><p>One-tap hook install for precise state detection. Any CLI agent via <code>agentpet&nbsp;run</code>.</p></div>
+        <div class="feature"><div class="ic">🔔</div><h3>Notifications &amp; sounds</h3><p>Get alerted, and hear it, the moment an agent finishes or needs you.</p></div>
+        <div class="feature"><div class="ic">✨</div><h3>Bring your own pet</h3><p>Browse an online pet library, download in one click, and map animations to states.</p></div>
       </div>
     </section>
 
     <section>
-      <h2>See it</h2>
-      <div class="shots">
+      <p class="eyebrow">A look inside</p>
+      <h2>See it in action</h2>
+      <div class="shots" style="margin-top:36px">
         <img src="https://raw.githubusercontent.com/ntd4996/agentpet/main/assets/screenshot-menubar.png" alt="Menu bar monitor" />
         <img src="https://raw.githubusercontent.com/ntd4996/agentpet/main/assets/screenshot-settings.png" alt="Settings" />
         <img src="https://raw.githubusercontent.com/ntd4996/agentpet/main/assets/screenshot-pet.png" alt="Pet" />
@@ -79,11 +132,29 @@
       </div>
     </section>
 
+    <section id="install">
+      <p class="eyebrow">Get started</p>
+      <h2>Up and running in a minute</h2>
+      <div class="steps" style="margin-top:36px">
+        <div class="step"><div class="n">1</div><h3>Install</h3><p>Run <code>brew install --cask ntd4996/tap/agentpet</code> or download the DMG.</p></div>
+        <div class="step"><div class="n">2</div><h3>Connect</h3><p>Open Settings and one-tap install the hook for Claude Code, Codex, or Gemini CLI.</p></div>
+        <div class="step"><div class="n">3</div><h3>Code</h3><p>Run your agents. The menu bar and your pet now react to everything in real time.</p></div>
+      </div>
+
+      <div class="cta-box">
+        <h2 style="margin-bottom:14px">Give your agents a companion</h2>
+        <div class="cta">
+          <a class="btn primary" href="https://github.com/ntd4996/agentpet/releases/latest">Download for macOS</a>
+          <a class="btn ghost" href="https://github.com/ntd4996/agentpet">⭐ Star on GitHub</a>
+        </div>
+      </div>
+    </section>
+
     <footer>
       Built by <a href="https://github.com/ntd4996">@ntd4996</a> ·
       <a href="https://github.com/ntd4996/agentpet">GitHub</a> ·
       <a href="https://buymeacoffee.com/ntd4996">Buy me a coffee</a><br/>
-      Pet format &amp; library by <a href="https://github.com/crafter-station/petdex">Petdex</a>.
+      <span style="opacity:.7">Pet format &amp; library by <a href="https://github.com/crafter-station/petdex">Petdex</a> · MIT licensed</span>
     </footer>
   </div>
 </body>

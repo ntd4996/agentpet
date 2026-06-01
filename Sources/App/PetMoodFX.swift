@@ -33,7 +33,6 @@ struct MoodAccessories: View {
     let mood: PetMood
     let t: Double
     let size: CGFloat
-    var bubbleTint: Color = .accentColor
 
     var body: some View {
         ZStack {
@@ -47,14 +46,6 @@ struct MoodAccessories: View {
                         .opacity(twinkle)
                         .offset(x: cos(angle) * size * 0.34, y: -abs(sin(angle)) * size * 0.34 - size * 0.06)
                 }
-            }
-            if mood == .waiting {
-                Text("?")
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
-                    .foregroundStyle(bubbleTint)
-                    .frame(width: 24, height: 24)
-                    .background(Circle().fill(.white).shadow(color: .black.opacity(0.15), radius: 3, y: 1))
-                    .offset(x: size * 0.28, y: -size * 0.34 + sin(t * 2.5) * 2)
             }
         }
     }
