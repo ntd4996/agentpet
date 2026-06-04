@@ -47,6 +47,7 @@ final class StatusBarController: NSObject, ObservableObject {
 
         popover.behavior = .transient
         popover.animates = true
+        popover.delegate = self
         popover.appearance = NSAppearance(named: .darkAqua)
         let host = NSHostingController(rootView: MenuContentView(dismiss: { [weak self] in
             self?.popover.performClose(nil)
@@ -54,6 +55,11 @@ final class StatusBarController: NSObject, ObservableObject {
         host.sizingOptions = [.preferredContentSize]
         popover.contentViewController = host
     }
+
+    /// Closes the popover when the user clicks anywhere outside it (including
+    /// other apps / the desktop), which a transient popover can miss for a
+    /// non-activating menu bar app.
+    private var outsideClickMonitor: Any?
 
     @objc private func toggle() {
         guard let button = statusItem?.button else { return }
@@ -182,5 +188,20 @@ final class StatusBarController: NSObject, ObservableObject {
     func showPopover(relativeTo rect: NSRect, of view: NSView, edge: NSRectEdge) {
         if popover.isShown { popover.performClose(nil) }
         popover.show(relativeTo: rect, of: view, preferredEdge: edge)
+    }
+}
+
+extension StatusBarController: NSPopoverDelegate {
+    func popoverDidShow(_ notification: Notification) {
+        outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            self?.popover.performClose(nil)
+        }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        if let monitor = outsideClickMonitor {
+            NSEvent.removeMonitor(monitor)
+            outsideClickMonitor = nil
+        }
     }
 }
