@@ -17,8 +17,27 @@ public enum HookInstaller {
         NSHomeDirectory() + "/.claude/settings.json"
     }
 
+    /// True when a hook command is one AgentPet installed: the invoked binary
+    /// is named `agentpet` (any path, any case) and its first argument is the
+    /// `hook` subcommand. A plain substring check would also claim a user's own
+    /// hook whose path merely mentions agentpet (e.g.
+    /// `/Users/me/agentpet-experiments/my-hook.sh`) and delete it on uninstall.
     static func isOurs(_ command: String) -> Bool {
-        command.contains("agentpet") && command.contains("hook")
+        let trimmed = command.trimmingCharacters(in: .whitespaces)
+        let binary: String
+        let rest: String
+        if trimmed.hasPrefix("\"") {
+            let afterQuote = trimmed.dropFirst()
+            guard let close = afterQuote.firstIndex(of: "\"") else { return false }
+            binary = String(afterQuote[..<close])
+            rest = String(afterQuote[afterQuote.index(after: close)...])
+        } else {
+            let parts = trimmed.split(separator: " ", maxSplits: 1)
+            binary = parts.first.map(String.init) ?? ""
+            rest = parts.count > 1 ? String(parts[1]) : ""
+        }
+        guard (binary as NSString).lastPathComponent.lowercased() == "agentpet" else { return false }
+        return rest.split(separator: " ").first == "hook"
     }
 
     // MARK: - Claude-nested shape (Claude / Codex / Gemini)
@@ -200,8 +219,10 @@ public enum HookInstaller {
         case .cursorFlat, .windsurfFlat:
             return isInstalledFlat(in: readSettings(path: path), events: events)
         case .opencodePlugin:
+            // The generated plugin always declares AGENTPET_BIN; a user's own
+            // plugin file won't, so it is never mistaken for ours (and deleted).
             guard let s = try? String(contentsOfFile: path, encoding: .utf8) else { return false }
-            return isOurs(s)
+            return s.contains("AGENTPET_BIN")
         }
     }
 }

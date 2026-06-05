@@ -19,6 +19,10 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var notificationState: NotificationState = .notDetermined
     @Published private(set) var installedKinds: Set<AgentKind> = []
 
+    /// Why the last install/uninstall failed (e.g. an unwritable or corrupt
+    /// settings file), shown next to the agent list. Cleared on success.
+    @Published private(set) var lastHookError: String?
+
     /// In-app notification toggle: lets users mute alerts even after granting
     /// the macOS permission. Defaults to on.
     @Published var notificationsEnabled: Bool {
@@ -72,10 +76,15 @@ final class SettingsModel: ObservableObject {
 
     func toggleInstall(_ kind: AgentKind) {
         guard let spec = AgentHooks.spec(for: kind) else { return }
-        if installedKinds.contains(kind) {
-            try? HookInstaller.uninstallFromDisk(path: spec.settingsPath, events: spec.events, style: spec.style)
-        } else {
-            try? HookInstaller.installToDisk(command: hookCommand(for: kind), path: spec.settingsPath, events: spec.events, style: spec.style)
+        do {
+            if installedKinds.contains(kind) {
+                try HookInstaller.uninstallFromDisk(path: spec.settingsPath, events: spec.events, style: spec.style)
+            } else {
+                try HookInstaller.installToDisk(command: hookCommand(for: kind), path: spec.settingsPath, events: spec.events, style: spec.style)
+            }
+            lastHookError = nil
+        } catch {
+            lastHookError = error.localizedDescription
         }
         refresh()
     }

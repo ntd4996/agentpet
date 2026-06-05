@@ -49,6 +49,29 @@ final class HookInstallerTests: XCTestCase {
         XCTAssertNil(removed["hooks"])
     }
 
+    // MARK: - Ownership matching
+
+    func testIsOursMatchesInstalledCommandShapes() {
+        // Quoted bundle path, with and without the v1-era missing --agent flag.
+        XCTAssertTrue(HookInstaller.isOurs("\"/Applications/AgentPet.app/Contents/MacOS/agentpet\" hook"))
+        XCTAssertTrue(HookInstaller.isOurs("\"/Applications/AgentPet.app/Contents/MacOS/AgentPet\" hook --agent codex"))
+        // Unquoted binary on PATH.
+        XCTAssertTrue(HookInstaller.isOurs("/usr/local/bin/agentpet hook --agent claude"))
+        XCTAssertTrue(HookInstaller.isOurs("agentpet hook"))
+    }
+
+    func testIsOursRejectsForeignCommands() {
+        // A user's own hook whose path merely mentions agentpet.
+        XCTAssertFalse(HookInstaller.isOurs("/Users/me/agentpet-experiments/my-hook.sh"))
+        XCTAssertFalse(HookInstaller.isOurs("\"/Users/me/agentpet-tools/run-hooks.sh\" hook"))
+        // Right words, wrong binary.
+        XCTAssertFalse(HookInstaller.isOurs("echo agentpet hook done"))
+        // Our binary, different subcommand.
+        XCTAssertFalse(HookInstaller.isOurs("\"/Applications/AgentPet.app/Contents/MacOS/agentpet\" run -- make"))
+        XCTAssertFalse(HookInstaller.isOurs("agentpet"))
+        XCTAssertFalse(HookInstaller.isOurs(""))
+    }
+
     func testDiskRoundTrip() throws {
         let path = NSTemporaryDirectory() + "settings-\(UUID().uuidString).json"
         defer { try? FileManager.default.removeItem(atPath: path) }

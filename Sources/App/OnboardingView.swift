@@ -104,6 +104,9 @@ struct OnboardingView: View {
                     .disabled(model.isInstalled(agent.kind))
                 }
             }
+            if let error = model.lastHookError {
+                Text(error).font(.caption).foregroundStyle(.red)
+            }
         }
         .themedCard()
     }

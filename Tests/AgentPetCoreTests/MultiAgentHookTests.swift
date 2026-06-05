@@ -58,7 +58,9 @@ final class MultiAgentHookTests: XCTestCase {
         XCTAssertTrue(js.contains("session.created"))
         XCTAssertTrue(js.contains("--agent"))
         XCTAssertTrue(js.contains("opencode"))
-        XCTAssertTrue(HookInstaller.isOurs(js.replacingOccurrences(of: "\n", with: " ")))
+        // On-disk detection keys off the generated AGENTPET_BIN marker (a JS
+        // file is not a hook command, so isOurs does not apply to it).
+        XCTAssertTrue(js.contains("AGENTPET_BIN"))
     }
 
     // MARK: - Payload parsing

@@ -283,6 +283,9 @@ private struct GeneralTab: View {
                         }
                     }
                 }
+                if let error = model.lastHookError {
+                    Text(error).font(.caption).foregroundStyle(.red)
+                }
             }
 
             Section("About") {
