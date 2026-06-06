@@ -9,6 +9,9 @@ public struct AgentEvent: Codable, Sendable, Equatable {
     public var eventName: String
     public var project: String?
     public var message: String?
+    /// Path to the agent's conversation transcript file (e.g. Claude Code JSONL).
+    /// Used to derive a human-readable title for the session.
+    public var transcriptPath: String?
     public var timestamp: Date
 
     public init(
@@ -17,6 +20,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         eventName: String,
         project: String? = nil,
         message: String? = nil,
+        transcriptPath: String? = nil,
         timestamp: Date
     ) {
         self.sessionId = sessionId
@@ -24,6 +28,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         self.eventName = eventName
         self.project = project
         self.message = message
+        self.transcriptPath = transcriptPath
         self.timestamp = timestamp
     }
 }

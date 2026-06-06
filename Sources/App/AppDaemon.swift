@@ -55,8 +55,23 @@ final class AppDaemon: ObservableObject {
         let before = store.session(id: event.sessionId)?.state
         if let updated = store.apply(event, now: Date()) {
             notifyIfNeeded(before: before, session: updated)
+            resolveTitle(for: event)
         }
         refresh()
+    }
+
+    private func resolveTitle(for event: AgentEvent) {
+        let sessionId = event.sessionId
+        let path: String? = event.transcriptPath
+            ?? event.project.map { TranscriptReader.inferredPath(sessionId: sessionId, cwd: $0) }
+        guard let path else { return }
+        Task.detached(priority: .utility) { [weak self] in
+            guard let title = TranscriptReader.title(at: path) else { return }
+            await MainActor.run { [weak self] in
+                self?.store.updateTitle(id: sessionId, title: title)
+                self?.refresh()
+            }
+        }
     }
 
     private func notifyIfNeeded(before: AgentState?, session: AgentSession) {

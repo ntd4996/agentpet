@@ -103,6 +103,7 @@ struct MenuContentView: View {
             controlRow(icon: "pawprint", label: "Show pet", isOn: $petWindow.isVisible)
             controlRow(icon: "number", label: "Show count on menu bar", isOn: $statusBar.showCount)
             controlRow(icon: "bubble.left", label: "Show chat on menu bar", isOn: $statusBar.showChatOnMenuBar)
+            controlRow(icon: "list.bullet.rectangle", label: "Show bubble on menu bar", isOn: $statusBar.showBubbleOnMenuBar)
             sizeRow
         }
     }
@@ -131,19 +132,23 @@ struct MenuContentView: View {
 
     // MARK: Footer
 
+    @ObservedObject private var updater = UpdaterController.shared
+
     private var footer: some View {
         HStack {
             FooterButton(icon: "gearshape", label: "Settings") {
-                dismiss()
-                // Open after the popover finishes closing so the window
-                // reliably comes to the front.
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                // Use closeAndThen so the window appears only after the popover
+                // animation fully completes — no race, no overlap.
+                StatusBarController.shared.closeAndThen {
                     SettingsWindowController.shared.show()
                 }
             }
-            FooterButton(icon: "arrow.triangle.2.circlepath", label: "Updates") {
-                dismiss()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            FooterButton(
+                icon: "arrow.triangle.2.circlepath",
+                label: "Updates",
+                badge: updater.updatePending
+            ) {
+                StatusBarController.shared.closeAndThen {
                     UpdaterController.shared.checkForUpdates()
                 }
             }
@@ -156,15 +161,37 @@ struct MenuContentView: View {
     }
 }
 
+// MARK: - Menu bar hanging bubble
+
+/// Thin wrapper so the agent bubble shown below the menu bar icon
+/// auto-refreshes via @ObservedObject without re-creating the NSPanel.
+struct MenuBarBubbleView: View {
+    @ObservedObject private var pet = PetController.shared
+
+    var body: some View {
+        AgentBubble(sessions: pet.activeAgentSessions, tailEdge: .top)
+            .environment(\.colorScheme, .dark)
+    }
+}
+
 private struct FooterButton: View {
     let icon: String
     let label: String
+    var badge: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                Image(systemName: icon)
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: icon)
+                    if badge {
+                        Circle()
+                            .fill(Color.orange)
+                            .frame(width: 6, height: 6)
+                            .offset(x: 4, y: -4)
+                    }
+                }
                 Text(label)
             }
             .font(.system(size: 12, weight: .medium))

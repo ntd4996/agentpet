@@ -22,5 +22,10 @@ let package = Package(
             dependencies: ["AgentPetCore"],
             path: "Tests/AgentPetCoreTests"
         ),
+        .testTarget(
+            name: "AgentPetAppTests",
+            dependencies: ["agentpet"],
+            path: "Tests/AgentPetAppTests"
+        ),
     ]
 )

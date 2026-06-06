@@ -27,10 +27,19 @@ final class StatusBarController: NSObject, ObservableObject {
             updateStatus(lastSessions)
         }
     }
+    /// Whether to show the agent bubble (same as the floating pet) hanging below
+    /// the menu bar icon.
+    @Published var showBubbleOnMenuBar: Bool {
+        didSet {
+            UserDefaults.standard.set(showBubbleOnMenuBar, forKey: "agentpet.showBubbleMenuBar")
+            refreshAgentBubble()
+        }
+    }
 
     override init() {
         showCount = (UserDefaults.standard.object(forKey: "agentpet.showCount") as? Bool) ?? true
         showChatOnMenuBar = (UserDefaults.standard.object(forKey: "agentpet.showChatMenuBar") as? Bool) ?? false
+        showBubbleOnMenuBar = (UserDefaults.standard.object(forKey: "agentpet.showBubbleMenuBar") as? Bool) ?? false
         super.init()
     }
 
@@ -92,6 +101,7 @@ final class StatusBarController: NSObject, ObservableObject {
         }
 
         refreshChatBubble()
+        refreshAgentBubble()
     }
 
     /// Builds the menu bar image: the paw alone, or the paw plus a count laid out
@@ -183,11 +193,97 @@ final class StatusBarController: NSObject, ObservableObject {
         lastShownChat = ""
     }
 
+    // MARK: - Agent bubble hanging from menu bar
+
+    private var agentBubblePanel: NSPanel?
+    /// Holds the hosting controller so SwiftUI's @ObservedObject subscriptions
+    /// stay alive and the view auto-updates without recreating the panel.
+    private var agentBubbleHost: NSHostingView<AnyView>?
+
+    private func refreshAgentBubble() {
+        guard showBubbleOnMenuBar, !popover.isShown else {
+            hideAgentBubble()
+            return
+        }
+        let sessions = PetController.shared.activeAgentSessions
+        guard !sessions.isEmpty else {
+            hideAgentBubble()
+            return
+        }
+        positionAgentBubble()
+    }
+
+    private func positionAgentBubble() {
+        guard let button = statusItem?.button,
+              let buttonWindow = button.window else { return }
+
+        // Create the panel and a self-updating SwiftUI view once; reuse forever.
+        if agentBubblePanel == nil {
+            let panel = NSPanel(
+                contentRect: .zero,
+                styleMask: [.borderless, .nonactivatingPanel],
+                backing: .buffered,
+                defer: false
+            )
+            panel.level = .popUpMenu
+            panel.isOpaque = false
+            panel.backgroundColor = .clear
+            panel.hasShadow = false
+            panel.ignoresMouseEvents = true
+            panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+
+            // MenuBarBubbleView observes PetController directly so it refreshes
+            // automatically whenever sessions change.
+            let host = NSHostingView(rootView: AnyView(MenuBarBubbleView()))
+            agentBubbleHost = host
+            panel.contentView = host
+            agentBubblePanel = panel
+        }
+
+        // Re-fit and reposition on every call (window could have moved).
+        if let host = agentBubbleHost {
+            host.setFrameSize(host.fittingSize)
+        }
+        let size = agentBubbleHost?.fittingSize ?? CGSize(width: 300, height: 60)
+        agentBubblePanel?.setContentSize(size)
+
+        let btnFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let originX = btnFrame.midX - size.width / 2
+        let originY = btnFrame.minY - size.height - 4
+        agentBubblePanel?.setFrameOrigin(NSPoint(x: originX, y: originY))
+        agentBubblePanel?.orderFrontRegardless()
+    }
+
+    private func hideAgentBubble() {
+        agentBubblePanel?.orderOut(nil)
+    }
+
     /// Shows the same popover anchored to an arbitrary view (e.g. the floating
     /// pet on right-click).
     func showPopover(relativeTo rect: NSRect, of view: NSView, edge: NSRectEdge) {
         if popover.isShown { popover.performClose(nil) }
         popover.show(relativeTo: rect, of: view, preferredEdge: edge)
+    }
+
+    // MARK: - Deferred close actions
+
+    /// Action to run once the popover finishes its close animation.
+    /// Use this instead of `DispatchQueue.main.asyncAfter` so the action fires
+    /// at the exact moment the popover delegate confirms it is closed.
+    private var pendingCloseAction: (() -> Void)?
+
+    /// Closes the popover and invokes `action` only after the close animation
+    /// has fully completed (via `NSPopoverDelegate.popoverDidClose`).
+    func closeAndThen(_ action: @escaping () -> Void) {
+        pendingCloseAction = action
+        if popover.isShown {
+            popover.performClose(nil)
+        } else {
+            // Already closed — fire immediately.
+            let pending = pendingCloseAction
+            pendingCloseAction = nil
+            pending?()
+        }
     }
 }
 
@@ -196,6 +292,8 @@ extension StatusBarController: NSPopoverDelegate {
         outsideClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
             self?.popover.performClose(nil)
         }
+        // Hide the bubble while the full popover is open — they'd overlap.
+        hideAgentBubble()
     }
 
     func popoverDidClose(_ notification: Notification) {
@@ -203,5 +301,11 @@ extension StatusBarController: NSPopoverDelegate {
             NSEvent.removeMonitor(monitor)
             outsideClickMonitor = nil
         }
+        // Restore bubble after popover closes.
+        refreshAgentBubble()
+        // Fire any deferred action now that the close animation has finished.
+        let pending = pendingCloseAction
+        pendingCloseAction = nil
+        pending?()
     }
 }

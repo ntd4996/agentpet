@@ -68,6 +68,46 @@ final class SettingsModel: ObservableObject {
         }
     }
 
+    /// Repairs hook entries whose embedded binary path no longer matches the
+    /// current executable location. Runs on every launch so hooks stay valid
+    /// after the app is moved, re-downloaded, or updated via a different channel
+    /// (e.g. Homebrew vs DMG).  Idempotent — only rewrites when the path differs.
+    func repairStaleHookPathsIfNeeded() {
+        let currentPath = Bundle.main.executablePath ?? ""
+        guard !currentPath.isEmpty else { return }
+        let expectedCommand = "\"\(currentPath)\" hook"
+        for agent in agents where agent.isSupported {
+            guard let spec = AgentHooks.spec(for: agent.kind) else { continue }
+            guard let settings = try? HookInstaller.readSettings(path: spec.settingsPath) else { continue }
+            guard HookInstaller.isInstalledOnDisk(path: spec.settingsPath,
+                                                  events: spec.events,
+                                                  style: spec.style) else { continue }
+            // Check if any stored hook command references a different binary path.
+            let needsRepair: Bool = {
+                guard let hooks = settings["hooks"] as? [String: Any] else { return false }
+                for event in spec.events {
+                    guard let groups = hooks[event] as? [[String: Any]] else { continue }
+                    for group in groups {
+                        guard let inner = group["hooks"] as? [[String: Any]] else { continue }
+                        for entry in inner {
+                            if let cmd = entry["command"] as? String,
+                               cmd.contains("agentpet") && cmd.contains("hook"),
+                               !cmd.hasPrefix(expectedCommand) {
+                                return true
+                            }
+                        }
+                    }
+                }
+                return false
+            }()
+            guard needsRepair else { continue }
+            try? HookInstaller.installToDisk(command: hookCommand(for: agent.kind),
+                                             path: spec.settingsPath,
+                                             events: spec.events,
+                                             style: spec.style)
+        }
+    }
+
     private func hookCommand(for kind: AgentKind) -> String {
         let path = Bundle.main.executablePath ?? CommandLine.arguments.first ?? "agentpet"
         return "\"\(path)\" hook --agent \(kind.rawValue)"

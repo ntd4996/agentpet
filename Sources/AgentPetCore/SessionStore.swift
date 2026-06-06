@@ -40,6 +40,13 @@ public final class SessionStore {
         byID.removeValue(forKey: id)
     }
 
+    /// Updates the display title for a session. Called asynchronously after
+    /// transcript title resolution completes off the main thread.
+    public func updateTitle(id: String, title: String) {
+        guard byID[id] != nil else { return }
+        byID[id]?.title = title
+    }
+
     /// Applies an event, creating or updating the matching session.
     /// Returns the updated session, or `nil` if the event maps to no state.
     @discardableResult
@@ -53,6 +60,7 @@ public final class SessionStore {
         guard let state = StateMapper.state(for: event.agentKind, eventName: event.eventName) else {
             return nil
         }
+
         if var existing = byID[event.sessionId] {
             if existing.state != state { existing.stateSince = now }
             existing.state = state
