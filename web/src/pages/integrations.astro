@@ -1,0 +1,108 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/Icon.astro";
+import Hero from "../components/Hero.astro";
+
+// AgentPet installs lifecycle hooks for each tool from Settings with one tap, and
+// removes them cleanly on uninstall. All of these ship today.
+const agents = [
+  { name: "Claude Code", icon: "/agent-icons/claude-code.svg", kind: "Lifecycle hooks", body: "One-tap hook install for Claude Code. Your pet reacts to thinking, editing, running, and finishing.", status: "Active" },
+  { name: "Codex", icon: "/agent-icons/codex.svg", kind: "Lifecycle hooks", body: "Connect OpenAI Codex with managed hooks and the Codex feature flag enabled for you.", status: "Active" },
+  { name: "Cursor", icon: "/agent-icons/cursor.svg", kind: "Editor hooks", body: "Cursor drives your pet while it edits, runs, and reviews across your project.", status: "Active" },
+  { name: "Gemini CLI", icon: "/agent-icons/gemini.svg", kind: "Lifecycle hooks", body: "Hook Google's Gemini CLI so the pet mirrors each run right from your terminal.", status: "Active" },
+  { name: "opencode", icon: "/agent-icons/opencode.svg", kind: "Lifecycle hooks", body: "The open-source coding agent connects with managed hooks, no manual config.", status: "Active" },
+  { name: "Windsurf", icon: "/agent-icons/windsurf.svg", kind: "Editor hooks", body: "Windsurf sessions update the pet as Cascade works through your tasks.", status: "Active" },
+  { name: "Antigravity", icon: "/agent-icons/antigravity.svg", kind: "Lifecycle hooks", body: "Antigravity hooks keep the pet in sync with every agent run.", status: "Active" },
+];
+---
+<Base title="Integrations — AgentPet" description="Connect AgentPet to your AI coding agents." active="integrations">
+  <Hero
+    eyebrow="AI assistant setup"
+    icon="bolt"
+    title="Connect AgentPet to"
+    accent="your agent"
+    lead="AgentPet is a cross-platform desktop pet for AI coding agents. Pick your tool, connect it in one tap, and let your pet react while the agents work."
+  >
+    <a href="/install" class="btn-primary !px-6 !py-3"><Icon name="download" class="h-5 w-5" /> Get the app</a>
+    <a href="/docs#agents" class="btn-ghost !px-6 !py-3"><Icon name="book" class="h-5 w-5" /> How it works</a>
+  </Hero>
+
+  <section class="px-4 pt-8">
+    <div class="mx-auto max-w-6xl">
+      <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {agents.map((a) => (
+          <div class="card group flex flex-col p-6 transition hover:-translate-y-1">
+            <div class="flex items-start justify-between">
+              <span class="grid h-16 w-16 place-items-center rounded-2xl border border-line bg-white p-2 shadow-soft">
+                <img src={a.icon} alt={`${a.name} logo`} class="h-full w-full object-contain" />
+              </span>
+              <span class="inline-flex items-center gap-1.5 rounded-full bg-mint-400/15 px-3 py-1 text-xs font-semibold text-emerald-600">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>{a.status}
+              </span>
+            </div>
+            <div class="mt-5 font-pixel text-[11px] uppercase tracking-wide text-brand-500">{a.kind}</div>
+            <h3 class="mt-1 font-display text-xl font-semibold text-ink">{a.name}</h3>
+            <p class="mt-2 flex-1 text-sm text-muted">{a.body}</p>
+            <a href="#setup" class="mt-5 inline-flex items-center gap-1 font-semibold text-brand-600 transition group-hover:text-brand-700">
+              Setup guide <Icon name="arrow" class="h-4 w-4 transition group-hover:translate-x-1" />
+            </a>
+          </div>
+        ))}
+
+        <!-- request -->
+        <div class="relative flex flex-col items-start overflow-hidden rounded-card bg-gradient-to-br from-brand-500 to-brand-600 p-6 text-white shadow-card">
+          <span class="grid h-12 w-12 place-items-center rounded-2xl bg-white/20 ring-1 ring-white/30"><Icon name="sparkles" class="h-6 w-6 text-white" /></span>
+          <div class="mt-5 font-pixel text-[11px] uppercase tracking-wide text-brand-100">More on the way</div>
+          <h3 class="mt-1 font-display text-xl font-semibold text-white">Missing your tool?</h3>
+          <p class="mt-2 flex-1 text-sm text-brand-100">Any MCP-capable assistant can connect over a local socket. Ask for a first-class integration on Discord.</p>
+          <a href="https://discord.gg/kzFJKsZav" target="_blank" rel="noopener" class="mt-5 inline-flex items-center gap-1 font-semibold text-white">
+            <Icon name="discord" class="h-4 w-4" /> Request on Discord
+          </a>
+        </div>
+      </div>
+
+      <!-- how connect works -->
+      <div class="mt-10 grid gap-5 md:grid-cols-3">
+        {[
+          { icon: "download", t: "Install AgentPet", b: "Grab the app for macOS, Windows, or Linux. One command, free forever." },
+          { icon: "bolt", t: "Connect in one tap", b: "Open Settings, toggle your tools on. Hooks are written for you, no config files to edit." },
+          { icon: "sparkles", t: "Watch it react", b: "Your pet thinks, works, and celebrates in step with every agent run." },
+        ].map((s, i) => (
+          <div class="card p-7">
+            <div class="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Icon name={s.icon} class="h-6 w-6" /></div>
+            <div class="mt-4 font-display text-xs font-bold uppercase tracking-wide text-brand-500">Step {i + 1}</div>
+            <h3 class="mt-1 font-display text-xl font-semibold text-ink">{s.t}</h3>
+            <p class="mt-2 text-muted">{s.b}</p>
+          </div>
+        ))}
+      </div>
+
+      <!-- live demo -->
+      <div id="setup" class="mt-12 scroll-mt-28 text-center">
+        <div class="font-pixel text-[11px] uppercase tracking-wide text-brand-500">See it in action</div>
+        <h2 class="mt-2 font-display text-3xl font-bold text-ink">One-tap setup, start to finish</h2>
+        <p class="mx-auto mt-3 max-w-2xl text-muted">Open Settings, toggle each agent on, and AgentPet writes the hooks for you. No config files, no terminal.</p>
+      </div>
+      <div class="mx-auto mt-7 max-w-4xl overflow-hidden rounded-card border border-line bg-white shadow-card">
+        <div class="flex items-center gap-1.5 border-b border-line bg-brand-50/60 px-4 py-3">
+          <span class="h-3 w-3 rounded-full bg-red-400"></span>
+          <span class="h-3 w-3 rounded-full bg-amber-400"></span>
+          <span class="h-3 w-3 rounded-full bg-emerald-400"></span>
+          <span class="ml-2 font-pixel text-[10px] uppercase tracking-wide text-faint">AgentPet · Settings</span>
+        </div>
+        <video
+          autoplay
+          muted
+          loop
+          playsinline
+          preload="metadata"
+          poster="/media/connect-setup.jpg"
+          class="block w-full"
+        >
+          <source src="/media/connect-setup.webm" type="video/webm" />
+          <source src="/media/connect-setup.mp4" type="video/mp4" />
+        </video>
+      </div>
+    </div>
+  </section>
+</Base>
