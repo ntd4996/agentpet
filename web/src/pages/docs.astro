@@ -19,21 +19,23 @@ const toc = [
   ]},
   { group: "Make pets", items: [
     { id: "format", label: "Pet format" },
-    { id: "reactions", label: "Reactions" },
+    { id: "reactions", label: "Pet states" },
   ]},
   { group: "Connect agents", items: [
+    { id: "monitor", label: "Menu bar monitor" },
     { id: "agents", label: "Supported agents" },
     { id: "privacy", label: "Local-first" },
     { id: "contribute", label: "Contributing" },
   ]},
 ];
-const reactions = ["idle", "thinking", "working", "editing", "running", "testing", "waiting", "waving", "success", "error", "celebrating"];
-const agents = ["Claude Code", "Codex", "Cursor", "Gemini CLI", "opencode", "Windsurf", "Antigravity"];
+// Aggregate states the app surfaces, and the nine animation rows in a pet pack.
+const states = ["working", "waiting for input", "done", "idle", "celebrate"];
+const animations = ["Idle", "Run Right", "Run Left", "Waving", "Jumping", "Failed", "Waiting", "Running", "Review"];
+const agents = ["Claude Code", "Codex", "Gemini CLI", "opencode", "Cursor", "Windsurf", "Antigravity"];
 const petJson = `{
   "id": "capybara",
   "displayName": "Capybara",
-  "description": "A chill little capybara.",
-  "spritesheetPath": "spritesheet.webp"
+  "description": "A chill little capybara."
 }`;
 ---
 <Base title="Docs — AgentPet" description="How AgentPet works, the pet format, and how to contribute." active="docs">
@@ -65,8 +67,8 @@ const petJson = `{
         <div class="min-w-0 space-y-10">
           <article id="overview" class="card p-7">
             <h2 class="font-display text-2xl font-bold text-ink">What AgentPet is</h2>
-            <p class="mt-3 text-muted">AgentPet is a tiny desktop pet that reacts while your AI coding agents work. It runs natively in your menu bar, watches the agents you connect, and shows a pixel companion that thinks, works, and celebrates alongside them, so you can tell at a glance which agent needs you.</p>
-            <p class="mt-3 text-muted">Pets come from an open community library. You can adopt any of them with one click, or make and share your own.</p>
+            <p class="mt-3 text-muted">AgentPet keeps an eye on several AI coding agents at once. It lives in your macOS menu bar and shows, at a glance, which agent is <b class="text-ink">working</b>, which is <b class="text-ink">done</b>, and which is <b class="text-ink">waiting for your input</b>, with a live per-agent timer, so you stop tab-hunting across terminals.</p>
+            <p class="mt-3 text-muted">A desktop pet mirrors the overall state for an ambient signal you can read without breaking focus, plus optional notifications when an agent finishes or needs you. Pets come from an open community library and are fully swappable.</p>
           </article>
 
           <article id="install" class="card p-7">
@@ -88,35 +90,48 @@ const petJson = `{
 
           <article id="adopt" class="card p-7">
             <h2 class="font-display text-2xl font-bold text-ink">Adopt a pet</h2>
-            <p class="mt-3 text-muted">Open <b class="text-ink">Browse</b> in the app, or find one in the web <a href="/gallery" class="font-semibold text-brand-600 hover:text-brand-700">gallery</a> and adopt it with one click. The pack downloads to your machine and your pet appears on the desktop straight away.</p>
+            <p class="mt-3 text-muted">A starter pet is installed automatically on first launch. To change it, open <b class="text-ink">Settings → Pet → Browse pets</b> inside the app: browse the community library and download any pet with one click, then map its animations and tweak its chat lines.</p>
+            <p class="mt-3 text-muted">This web <a href="/gallery" class="font-semibold text-brand-600 hover:text-brand-700">gallery</a> is a preview of that library, browsing, adopting, and managing pets all happen inside the app.</p>
           </article>
 
           <article id="format" class="card p-7">
             <h2 class="font-display text-2xl font-bold text-ink">Pet format</h2>
-            <p class="mt-3 text-muted">A pet is a single transparent spritesheet plus a small manifest. Each <b class="text-ink">row</b> in the sheet is one animation, each <b class="text-ink">column</b> a frame, with transparent gaps between frames. AgentPet detects the rows automatically.</p>
+            <p class="mt-3 text-muted">A pet is a small <code class="rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs">pet.json</code> manifest plus one transparent spritesheet laid out <b class="text-ink">8×9</b>: eight frames across, nine animation rows down. Each row is one animation, and AgentPet lets you map any animation to a state.</p>
             <pre class="mt-4 overflow-x-auto rounded-2xl bg-brand-50/70 p-4 font-mono text-sm text-ink">{petJson}</pre>
+            <p class="mt-4 text-sm font-semibold text-ink">The nine animation rows</p>
+            <div class="mt-2 flex flex-wrap gap-2">
+              {animations.map((a) => <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700"><span class="h-1.5 w-1.5 rounded-full bg-brand-500"></span>{a}</span>)}
+            </div>
             <p class="mt-3 text-sm text-muted">Pack the <code class="rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs">pet.json</code> and the spritesheet together. PNG or WebP both work.</p>
           </article>
 
           <article id="reactions" class="card p-7">
-            <h2 class="font-display text-2xl font-bold text-ink">Reactions</h2>
-            <p class="mt-3 text-muted">Agents drive the pet through a fixed set of reactions. A pet only needs frames for the ones it cares about, everything else falls back to <code class="rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs">idle</code>.</p>
+            <h2 class="font-display text-2xl font-bold text-ink">Pet states</h2>
+            <p class="mt-3 text-muted">AgentPet reduces everything your agents are doing into a single aggregate state, and your pet plays the matching animation:</p>
             <div class="mt-4 flex flex-wrap gap-2">
-              {reactions.map((r) => <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700"><span class="h-1.5 w-1.5 rounded-full bg-brand-500"></span>{r}</span>)}
+              {states.map((s) => <span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700"><span class="h-1.5 w-1.5 rounded-full bg-brand-500"></span>{s}</span>)}
             </div>
+            <p class="mt-3 text-sm text-muted">You choose which sheet animation maps to each state in <b class="text-ink">Settings → Pet</b>, so the same pet can show its own personality.</p>
+          </article>
+
+          <article id="monitor" class="card p-7">
+            <h2 class="font-display text-2xl font-bold text-ink">Menu bar monitor</h2>
+            <p class="mt-3 text-muted">The menu bar lists every running agent with a colored status dot, its project, what it's doing (the tool it's running or why it's waiting), and a per-state timer that counts in real time.</p>
+            <p class="mt-3 text-muted">The menu bar icon shows how many agents are running, and turns <b class="text-ink">orange with a count</b> the moment one needs your input, so you never miss a prompt.</p>
           </article>
 
           <article id="agents" class="card p-7">
             <h2 class="font-display text-2xl font-bold text-ink">Supported agents</h2>
-            <p class="mt-3 text-muted">Connect your tools from Settings with one tap, hooks are installed for you and removed cleanly when you uninstall.</p>
+            <p class="mt-3 text-muted">Connect your tools from Settings with one tap, hooks are written for you and removed cleanly when you uninstall.</p>
             <div class="mt-4 flex flex-wrap gap-2">
               {agents.map((a) => <span class="rounded-full border border-line bg-white px-4 py-2 text-sm font-medium text-ink">{a}</span>)}
             </div>
+            <p class="mt-4 text-sm text-muted">Claude Code, Codex, Gemini CLI and opencode report precise working / waiting / done states (including "needs your input"). Cursor, Windsurf and Antigravity report working / done. GLM (Z.AI) works through Claude Code. For anything else, wrap it with <code class="rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs">agentpet run -- &lt;command&gt;</code> to monitor any CLI agent.</p>
           </article>
 
           <article id="privacy" class="card p-7">
             <h2 class="font-display text-2xl font-bold text-ink">Local-first</h2>
-            <p class="mt-3 text-muted">The app, your agents, and your pets all talk over a local socket on your machine. Network access is only used to download pets and check for updates. No telemetry, no accounts required.</p>
+            <p class="mt-3 text-muted">The app, your agents, and your pets all talk over a local Unix socket on your machine. Network access is only used to download pets and check for updates. No telemetry, no accounts required.</p>
           </article>
 
           <article id="contribute" class="card p-7">
