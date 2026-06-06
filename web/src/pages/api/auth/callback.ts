@@ -53,11 +53,6 @@ export const GET: APIRoute = async ({ request, cookies }) => {
   };
   const token = await signSession(user, secret);
   cookies.set(SESSION_COOKIE, token, { httpOnly: true, secure, sameSite: "lax", path: "/", maxAge: THIRTY_DAYS });
-  // Readable (non-HttpOnly) companion cookie with just public profile bits, so the
-  // nav can render the avatar without an /api/me request on every page load.
-  cookies.set("ap_user", JSON.stringify({ login: user.login, avatar: user.avatar }), {
-    httpOnly: false, secure, sameSite: "lax", path: "/", maxAge: THIRTY_DAYS,
-  });
 
   const returnTo = cookies.get("ap_oauth_return")?.value || "/";
   cookies.delete("ap_oauth_return", { path: "/" });

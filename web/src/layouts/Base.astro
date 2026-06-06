@@ -159,41 +159,32 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
   </script>
 
   <script>
-    // Auth nav: read the public `ap_user` cookie (set at login) so we render the
-    // avatar without an /api/me request on every page load.
-    function apReadUser(): { login: string; avatar: string } | null {
-      const m = document.cookie.match(/(?:^|; )ap_user=([^;]*)/);
-      if (!m) return null;
-      try { return JSON.parse(decodeURIComponent(m[1])); } catch { return null; }
-    }
+    // Auth + likes from ONE authoritative call (/api/me.json => {user, mine}) so the
+    // nav and like buttons never drift out of sync. Counts come from cached stats.json.
     (() => {
-      const slot = document.getElementById("ap-auth");
-      if (!slot) return;
-      const user = apReadUser();
-      if (!user) return;
-      const login = String(user.login).replace(/[^a-zA-Z0-9-]/g, "");
-      slot.innerHTML = `
-        <div class="relative">
-          <button id="ap-avatar" type="button" class="flex items-center gap-2 rounded-full border border-line bg-white py-1 pl-1 pr-3 shadow-soft transition hover:border-brand-300">
-            <img src="${user.avatar}" alt="" class="h-7 w-7 rounded-full" />
-            <span class="hidden text-sm font-semibold text-ink sm:inline">${login}</span>
-          </button>
-          <div id="ap-menu" class="absolute right-0 z-50 mt-2 hidden w-48 rounded-2xl border border-line bg-white p-2 shadow-card">
-            <div class="px-3 py-2 text-xs text-faint">Signed in as <b class="text-ink">${login}</b></div>
-            <a href="/api/auth/logout" class="block rounded-xl px-3 py-2 text-sm font-medium text-muted transition hover:bg-brand-50 hover:text-brand-700">Sign out</a>
-          </div>
-        </div>`;
-      const btn = document.getElementById("ap-avatar");
-      const menu = document.getElementById("ap-menu");
-      btn?.addEventListener("click", (e) => { e.stopPropagation(); menu?.classList.toggle("hidden"); });
-      document.addEventListener("click", () => menu?.classList.add("hidden"));
-    })();
-  </script>
+      let mineSet = new Set<string>();
 
-  <script>
-    // Real like counts + like buttons. Counts come from /api/stats.json; liking
-    // requires a session (POST /api/like), otherwise we send the user to sign in.
-    (() => {
+      function renderAvatar(user: { login: string; avatar: string }) {
+        const slot = document.getElementById("ap-auth");
+        if (!slot) return;
+        const login = String(user.login).replace(/[^a-zA-Z0-9-]/g, "");
+        slot.innerHTML = `
+          <div class="relative">
+            <button id="ap-avatar" type="button" class="flex items-center gap-2 rounded-full border border-line bg-white py-1 pl-1 pr-3 shadow-soft transition hover:border-brand-300">
+              <img src="${user.avatar}" alt="" class="h-7 w-7 rounded-full" />
+              <span class="hidden text-sm font-semibold text-ink sm:inline">${login}</span>
+            </button>
+            <div id="ap-menu" class="absolute right-0 z-50 mt-2 hidden w-48 rounded-2xl border border-line bg-white p-2 shadow-card">
+              <div class="px-3 py-2 text-xs text-faint">Signed in as <b class="text-ink">${login}</b></div>
+              <a href="/api/auth/logout" class="block rounded-xl px-3 py-2 text-sm font-medium text-muted transition hover:bg-brand-50 hover:text-brand-700">Sign out</a>
+            </div>
+          </div>`;
+        const btn = document.getElementById("ap-avatar");
+        const menu = document.getElementById("ap-menu");
+        btn?.addEventListener("click", (e) => { e.stopPropagation(); menu?.classList.toggle("hidden"); });
+        document.addEventListener("click", () => menu?.classList.add("hidden"));
+      }
+
       function setLiked(btn: Element, liked: boolean) {
         const b = btn as HTMLElement;
         b.setAttribute("aria-pressed", liked ? "true" : "false");
@@ -205,21 +196,17 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
       function setCount(slug: string, n: number) {
         document.querySelectorAll(`[data-like-count][data-slug="${slug}"]`).forEach((el) => { el.textContent = String(n); });
       }
-      async function refresh() {
-        const loggedIn = /(?:^|; )ap_user=/.test(document.cookie);
-        const [s, m] = await Promise.all([
-          fetch("/api/stats.json").then((r) => r.json()).catch(() => ({})),
-          loggedIn ? fetch("/api/my-likes.json", { cache: "no-store" }).then((r) => r.json()).catch(() => ({})) : Promise.resolve({ mine: [] }),
-        ]);
-        const likes = (s as any).likes || {};
-        const mine = new Set((m as any).mine || []);
+      // Fill counts (cached) + liked state (from mineSet). Re-runnable for lazy lists.
+      async function fillLikes() {
+        const s: any = await fetch("/api/stats.json").then((r) => r.json()).catch(() => ({}));
+        const likes = s.likes || {};
         document.querySelectorAll("[data-like-count][data-slug]").forEach((el) => {
           el.textContent = String(likes[el.getAttribute("data-slug")!] || 0);
         });
-        document.querySelectorAll("[data-like-btn][data-slug]").forEach((btn) => {
-          setLiked(btn, mine.has(btn.getAttribute("data-slug")));
-        });
+        document.querySelectorAll("[data-like-btn][data-slug]").forEach((btn) => setLiked(btn, mineSet.has(btn.getAttribute("data-slug")!)));
       }
+      (window as any).apRefreshLikes = fillLikes;
+
       document.addEventListener("click", async (e) => {
         const btn = (e.target as HTMLElement).closest("[data-like-btn][data-slug]") as HTMLElement | null;
         if (!btn) return;
@@ -231,12 +218,18 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
           if (res.status === 401) { location.href = "/api/auth/login?returnTo=" + encodeURIComponent(location.pathname); return; }
           const d: any = await res.json();
           if (typeof d.likes === "number") setCount(slug, d.likes);
+          if (d.liked) mineSet.add(slug); else mineSet.delete(slug);
           setLiked(btn, !!d.liked);
         } catch {}
         finally { btn.removeAttribute("disabled"); }
       });
-      (window as any).apRefreshLikes = refresh;
-      refresh();
+
+      (async () => {
+        const me: any = await fetch("/api/me.json").then((r) => r.json()).catch(() => ({ user: null, mine: [] }));
+        mineSet = new Set(me.mine || []);
+        if (me.user) renderAvatar(me.user);
+        fillLikes();
+      })();
     })();
   </script>
 </body>
