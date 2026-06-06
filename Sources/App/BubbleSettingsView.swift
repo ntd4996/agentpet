@@ -298,6 +298,12 @@ struct BubbleSettingsView: View {
                 .fixedSize()
                 .labelsHidden()
             }
+
+            Picker("Activity style", selection: $settings.activityTheme) {
+                ForEach(ActivityTheme.allCases, id: \.self) { theme in
+                    Text("\(theme.emoji) \(theme.displayName)").tag(theme)
+                }
+            }
         }
     }
 

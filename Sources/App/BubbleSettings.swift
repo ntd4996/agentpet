@@ -224,6 +224,12 @@ final class BubbleSettings: ObservableObject {
     @Published var iconChoices: [String: IconChoice] {
         didSet { saveJSON(Keys.iconChoices, iconChoices) }
     }
+    @Published var activityTheme: ActivityTheme {
+        didSet {
+            ud.set(activityTheme.rawValue, forKey: Keys.activityTheme)
+            ClaudeActivityFormatter.currentTheme = activityTheme
+        }
+    }
 
     // MARK: Computed
 
@@ -258,6 +264,7 @@ final class BubbleSettings: ObservableObject {
         static let multiAgentBubbleEnabled = "agentpet.bubble.multiAgentBubbleEnabled"
         static let hiddenKinds         = "agentpet.bubble.hiddenKinds"
         static let iconChoices     = "agentpet.bubble.iconChoices"
+        static let activityTheme   = "agentpet.bubble.activityTheme"
     }
 
     init() {
@@ -273,6 +280,8 @@ final class BubbleSettings: ObservableObject {
         multiAgentBubbleEnabled = ud.object(forKey: Keys.multiAgentBubbleEnabled) as? Bool ?? true
         hiddenKinds        = Set((Self.loadJSON(Keys.hiddenKinds) as [String]? ?? []).compactMap(AgentKind.init(rawValue:)))
         iconChoices    = Self.loadJSON(Keys.iconChoices) ?? [:]
+        activityTheme  = ActivityTheme(rawValue: ud.string(forKey: Keys.activityTheme) ?? "") ?? .chef
+        ClaudeActivityFormatter.currentTheme = activityTheme
     }
 
     private func saveJSON<T: Encodable>(_ key: String, _ value: T) {
