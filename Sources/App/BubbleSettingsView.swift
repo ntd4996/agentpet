@@ -15,11 +15,12 @@ struct BubbleSettingsView: View {
         Form {
             modeSection
             if settings.multiAgentBubbleEnabled {
-                paletteSection
-                canvasSection
-                agentIconsSection
-                appearanceSection
-                filterSection
+                previewSection
+                agentsSection
+                rowLayoutSection
+                iconsSection
+                styleSection
+                activitySection
             } else {
                 defaultBubbleSection
             }
@@ -30,14 +31,14 @@ struct BubbleSettingsView: View {
         }
     }
 
-    // MARK: Mode toggle
+    // MARK: - 1. Mode
 
     private var modeSection: some View {
         Section {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Multi-agent bubble")
-                    Text("Show all active agents with icons, state dots, and custom layout.")
+                    Text("Structured rows with icons, state dots, and activity messages.")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -48,10 +49,8 @@ struct BubbleSettingsView: View {
         }
     }
 
-    // MARK: Default mode config (shown when multi-agent is OFF)
-
     private var defaultBubbleSection: some View {
-        Section("Default bubble") {
+        Section {
             HStack {
                 Text("Show chat bubble")
                 Spacer()
@@ -84,6 +83,10 @@ struct BubbleSettingsView: View {
                         .controlSize(.small)
                 }
             }
+        } header: {
+            Text("Simple bubble")
+        } footer: {
+            Text("Turn on multi-agent bubble above for per-agent rows with icons and activity.")
         }
     }
 
@@ -97,7 +100,99 @@ struct BubbleSettingsView: View {
         }
     }
 
-    // MARK: Available tokens (palette)
+    // MARK: - 2. Preview
+
+    private var previewSection: some View {
+        Section {
+            BubbleRowPreview()
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } header: {
+            Text("Preview")
+        } footer: {
+            Text("Sample row using your current layout and style settings.")
+        }
+    }
+
+    // MARK: - 3. Agents — what to show
+
+    private var agentsSection: some View {
+        Group {
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Sessions")
+                        .font(.subheadline)
+                    Picker("Sessions", selection: $settings.sessionGrouping) {
+                        ForEach(BubbleSessionGrouping.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    Text(settings.sessionGrouping.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Rows")
+                        .font(.subheadline)
+                    Picker("Rows", selection: $settings.displayMode) {
+                        ForEach(BubbleDisplayMode.allCases, id: \.self) { mode in
+                            Text(mode.displayName).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    Text(settings.displayMode.detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                if settings.displayMode != .carousel {
+                    Stepper(maxRowsLabel, value: $settings.maxSessions, in: 1...10)
+                }
+
+                if settings.sessionGrouping == .allSessions {
+                    Toggle("Sort by agent kind", isOn: $settings.groupByKind)
+                }
+            } header: {
+                Text("Display")
+            }
+
+            Section {
+                Picker("Include states", selection: $settings.minStateFilter) {
+                    ForEach(MinStateFilter.allCases, id: \.self) {
+                        Text($0.displayName).tag($0)
+                    }
+                }
+            } header: {
+                Text("Filter")
+            } footer: {
+                Text("Which session states appear in the bubble.")
+            }
+
+            Section {
+                ForEach(AgentCatalog.all, id: \.kind) { agent in
+                    Toggle(agent.displayName, isOn: Binding(
+                        get: { !settings.hiddenKinds.contains(agent.kind) },
+                        set: { show in
+                            if show { settings.hiddenKinds.remove(agent.kind) }
+                            else    { settings.hiddenKinds.insert(agent.kind) }
+                        }
+                    ))
+                }
+            } header: {
+                Text("Visible agents")
+            }
+        }
+    }
+
+    private var maxRowsLabel: String {
+        let noun = settings.sessionGrouping == .byKind ? "agent kinds" : "sessions"
+        return "Max \(noun): \(settings.maxSessions)"
+    }
+
+    // MARK: - 4. Row layout — tokens & order
 
     private var inactiveTokens: [BubbleToken] {
         BubbleToken.allCases.filter { token in
@@ -109,14 +204,12 @@ struct BubbleSettingsView: View {
         settings.customLayout.tokens.filter { $0.isVisible }
     }
 
-    private var paletteSection: some View {
+    private var rowLayoutSection: some View {
         Section {
             if inactiveTokens.isEmpty {
-                Text("All tokens are active")
+                Text("All tokens are in use")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 4)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -124,93 +217,61 @@ struct BubbleSettingsView: View {
                             PaletteChip(token: token) { addToken(token) }
                         }
                     }
-                    .padding(.horizontal, 2)
                     .padding(.vertical, 2)
                 }
             }
-        } header: {
-            Text("Available tokens")
-        } footer: {
-            Text("Tap a chip to add it to the bubble layout.")
-        }
-    }
 
-    // MARK: Active canvas + preview
-
-    private var canvasSection: some View {
-        Section {
-            VStack(alignment: .leading, spacing: 0) {
-                // Chip row
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        if activeTokenItems.isEmpty {
-                            Text("Add tokens from above")
-                                .font(.caption)
-                                .foregroundStyle(.tertiary)
-                                .frame(height: 36)
-                        } else {
-                            ForEach(activeTokenItems) { item in
-                                CanvasChip(
-                                    token: item.token,
-                                    isDragging: dragging == item.token
-                                ) {
-                                    removeToken(item.token)
-                                }
-                                .onDrag {
-                                    dragging = item.token
-                                    return NSItemProvider(object: item.token.rawValue as NSString)
-                                }
-                                .onDrop(
-                                    of: [UTType.plainText],
-                                    delegate: ChipDropDelegate(
-                                        target: item.token,
-                                        tokens: $settings.customLayout.tokens,
-                                        dragging: $dragging
-                                    )
-                                )
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    if activeTokenItems.isEmpty {
+                        Text("Tap a chip above to add tokens")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .frame(height: 36)
+                    } else {
+                        ForEach(activeTokenItems) { item in
+                            CanvasChip(
+                                token: item.token,
+                                isDragging: dragging == item.token
+                            ) {
+                                removeToken(item.token)
                             }
+                            .onDrag {
+                                dragging = item.token
+                                return NSItemProvider(object: item.token.rawValue as NSString)
+                            }
+                            .onDrop(
+                                of: [UTType.plainText],
+                                delegate: ChipDropDelegate(
+                                    target: item.token,
+                                    tokens: $settings.customLayout.tokens,
+                                    dragging: $dragging
+                                )
+                            )
                         }
                     }
-                    .padding(.horizontal, 2)
-                    .padding(.vertical, 6)
                 }
+                .padding(.vertical, 4)
+            }
 
-                Divider()
-
-                // Live preview
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Preview")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    BubbleRowPreview()
-                }
-                .padding(.vertical, 10)
-
-                Divider()
-
-                // Reset shortcuts
-                HStack(spacing: 8) {
-                    Text("Reset:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Button("Original") { settings.customLayout = .original }
-                        .controlSize(.small)
-                    Button("Standard") { settings.customLayout = .standard }
-                        .controlSize(.small)
-                    Button("Detailed") { settings.customLayout = .detailed }
-                        .controlSize(.small)
-                    Spacer()
-                }
-                .padding(.vertical, 8)
+            HStack(spacing: 8) {
+                Text("Presets")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Button("Original") { settings.customLayout = .original }
+                    .controlSize(.small)
+                Button("Standard") { settings.customLayout = .standard }
+                    .controlSize(.small)
+                Button("Detailed") { settings.customLayout = .detailed }
+                    .controlSize(.small)
+                Spacer()
             }
         } header: {
-            Text("Bubble layout")
+            Text("Row content")
         } footer: {
-            Text("Drag chips to reorder · × to remove")
+            Text("Tap to add · drag to reorder · × to remove. Controls what each agent row shows.")
         }
     }
-
-    // MARK: Helpers
 
     private func addToken(_ token: BubbleToken) {
         withAnimation(.easeOut(duration: 0.18)) {
@@ -230,10 +291,10 @@ struct BubbleSettingsView: View {
         }
     }
 
-    // MARK: Agent Icons
+    // MARK: - 5. Icons
 
-    private var agentIconsSection: some View {
-        Section("Agent Icons") {
+    private var iconsSection: some View {
+        Section {
             ForEach(AgentCatalog.all, id: \.kind) { agent in
                 HStack(spacing: 10) {
                     ResolvedIconView(choice: settings.iconChoice(for: agent.kind), size: 20)
@@ -243,13 +304,15 @@ struct BubbleSettingsView: View {
                         .controlSize(.small)
                 }
             }
+        } header: {
+            Text("Agent icons")
         }
     }
 
-    // MARK: Appearance
+    // MARK: - 6. Style
 
-    private var appearanceSection: some View {
-        Section("Appearance") {
+    private var styleSection: some View {
+        Section {
             HStack {
                 Text("Separator")
                 Spacer()
@@ -298,45 +361,24 @@ struct BubbleSettingsView: View {
                 .fixedSize()
                 .labelsHidden()
             }
+        } header: {
+            Text("Style")
+        }
+    }
 
-            Picker("Activity style", selection: $settings.activityTheme) {
+    // MARK: - 7. Activity phrases
+
+    private var activitySection: some View {
+        Section {
+            Picker("Vocabulary", selection: $settings.activityTheme) {
                 ForEach(ActivityTheme.allCases, id: \.self) { theme in
                     Text("\(theme.emoji) \(theme.displayName)").tag(theme)
                 }
             }
-        }
-    }
-
-    // MARK: Filter & Sort
-
-    private var filterSection: some View {
-        Section("Filter & Sort") {
-            Stepper(
-                "Max sessions: \(settings.maxSessions)",
-                value: $settings.maxSessions,
-                in: 1...10
-            )
-
-            Picker("Show sessions", selection: $settings.minStateFilter) {
-                ForEach(MinStateFilter.allCases, id: \.self) {
-                    Text($0.displayName).tag($0)
-                }
-            }
-
-            Toggle("Group by agent kind", isOn: $settings.groupByKind)
-            Toggle("Collapse same session id", isOn: $settings.collapseDuplicates)
-
-            Section("Hide agents") {
-                ForEach(AgentCatalog.all, id: \.kind) { agent in
-                    Toggle(agent.displayName, isOn: Binding(
-                        get: { !settings.hiddenKinds.contains(agent.kind) },
-                        set: { show in
-                            if show { settings.hiddenKinds.remove(agent.kind) }
-                            else    { settings.hiddenKinds.insert(agent.kind) }
-                        }
-                    ))
-                }
-            }
+        } header: {
+            Text("Activity messages")
+        } footer: {
+            Text("Whimsical phrases shown while agents work, e.g. \"Brewing…\" or \"Compiling…\".")
         }
     }
 }

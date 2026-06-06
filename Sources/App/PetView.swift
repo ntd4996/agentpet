@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import AgentPetCore
 
@@ -71,11 +72,11 @@ struct FloatingPetView: View {
 
 // MARK: - Agent Bubble (structured rows for working/waiting)
 
-/// Sessions with the same agent kind + project are collapsed into one row.
+/// Sessions sharing an agent kind collapse into one row when enabled.
 private struct GroupedSession: Identifiable {
     let session: AgentSession   // highest-priority session in the group
-    let count: Int              // total sessions sharing this kind+project
-    var id: String { session.id }
+    let count: Int              // total sessions sharing this agent kind
+    var id: String { "\(session.agentKind.rawValue)-\(session.id)" }
 }
 
 /// Speech bubble listing one row per (agentKind, project) group.
@@ -97,9 +98,10 @@ struct AgentBubble: View {
             .filter { !settings.hiddenKinds.contains($0.agentKind) }
             .filter { settings.minStateFilter.includes($0.state) }
 
-        // 2. Sort
+        // 2. Sort (grouped mode always sorts by kind first)
         var sorted = filtered
-        if settings.groupByKind {
+        let sortByKind = settings.sessionGrouping == .byKind || settings.groupByKind
+        if sortByKind {
             sorted.sort {
                 if $0.agentKind.rawValue != $1.agentKind.rawValue {
                     return $0.agentKind.rawValue < $1.agentKind.rawValue
@@ -114,16 +116,16 @@ struct AgentBubble: View {
             }
         }
 
-        // 3. One row per session id. Collapse only exact duplicate ids (defensive).
+        // 3. Collapse by agent kind when grouped (highest-priority session per kind).
         var result: [GroupedSession]
-        if settings.collapseDuplicates {
-            var seen: [String: Int] = [:]
+        if settings.sessionGrouping == .byKind {
+            var seen: [AgentKind: Int] = [:]
             result = []
             for s in sorted {
-                if let idx = seen[s.id] {
+                if let idx = seen[s.agentKind] {
                     result[idx] = GroupedSession(session: result[idx].session, count: result[idx].count + 1)
                 } else {
-                    seen[s.id] = result.count
+                    seen[s.agentKind] = result.count
                     result.append(GroupedSession(session: s, count: 1))
                 }
             }
@@ -131,13 +133,22 @@ struct AgentBubble: View {
             result = sorted.map { GroupedSession(session: $0, count: 1) }
         }
 
-        // 4. Cap to maxSessions
+        // 4. Cap to maxSessions (list/compact); carousel shows all groups.
+        if settings.displayMode == .carousel {
+            return result
+        }
         return Array(result.prefix(settings.maxSessions))
     }
 
+    private var totalSessionCount: Int {
+        groupedSessions.reduce(0) { $0 + $1.count }
+    }
+
     private var isPetChat: Bool { tailEdge == .bottom }
-    // Use capsule only for a single-agent pet-chat bubble; switch to rounded rect for 2+ agents.
-    private var useCapsule: Bool { isPetChat && groupedSessions.count <= 1 }
+    // Capsule for single visible row; rounded rect when taller or carousel dots are shown.
+    private var useCapsule: Bool {
+        isPetChat && groupedSessions.count <= 1 && settings.displayMode != .compact
+    }
 
     var body: some View {
         let fill = isPetChat ? Color.white : bubbleFill
@@ -151,9 +162,7 @@ struct AgentBubble: View {
                     .scaleEffect(x: 1, y: -1)
             }
             VStack(alignment: .leading, spacing: isPetChat ? 4 : 5) {
-                ForEach(groupedSessions) { group in
-                    AgentRow(session: group.session, count: group.count, chatStyle: isPetChat)
-                }
+                bubbleContent
             }
             .padding(.horizontal, 12)
             .padding(.vertical, isPetChat ? 7 : 9)
@@ -201,6 +210,253 @@ struct AgentBubble: View {
         case .dark:   return .white.opacity(0.12)
         case .system: return Color.primary.opacity(0.08)
         }
+    }
+
+    @ViewBuilder
+    private var bubbleContent: some View {
+        switch settings.displayMode {
+        case .list:
+            ForEach(groupedSessions) { group in
+                AgentRow(session: group.session, count: group.count, chatStyle: isPetChat)
+            }
+        case .carousel:
+            BubbleCarousel(groups: groupedSessions, chatStyle: isPetChat)
+        case .compact:
+            BubbleCompactLayout(
+                groups: groupedSessions,
+                totalCount: totalSessionCount,
+                chatStyle: isPetChat,
+                textColor: textColor
+            )
+        }
+    }
+
+    private func textColor(_ opacity: Double) -> Color {
+        if isPetChat { return .black.opacity(opacity) }
+        switch settings.theme {
+        case .light:  return .black.opacity(opacity)
+        case .dark:   return .white.opacity(opacity)
+        case .system: return Color.primary.opacity(opacity)
+        }
+    }
+}
+
+// MARK: - Carousel (one agent at a time)
+
+private struct BubbleCarousel: View {
+    let groups: [GroupedSession]
+    var chatStyle: Bool = false
+    @State private var index = 0
+    @State private var timer: Timer?
+    @State private var dragOffset: CGFloat = 0
+
+    private static let interval: TimeInterval = 3.0
+    private static let swipeThreshold: CGFloat = 32
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: chatStyle ? 4 : 5) {
+            Group {
+                if let group = groups[safe: index] {
+                    AgentRow(session: group.session, count: group.count, chatStyle: chatStyle)
+                        .id(group.id)
+                        .transition(.opacity)
+                }
+            }
+            .offset(x: dragOffset)
+            .animation(.easeInOut(duration: 0.35), value: index)
+            .clipped()
+
+            if groups.count > 1 {
+                HStack(spacing: 4) {
+                    Spacer(minLength: 0)
+                    ForEach(0..<groups.count, id: \.self) { i in
+                        Circle()
+                            .fill(i == index ? dotActive : dotInactive)
+                            .frame(width: 4, height: 4)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+        }
+        .contentShape(Rectangle())
+        .background {
+            if groups.count > 1 {
+                HorizontalSwipeReader(
+                    onSwipeLeft: { step(by: 1) },
+                    onSwipeRight: { step(by: -1) }
+                )
+            }
+        }
+        .highPriorityGesture(swipeGesture)
+        .onAppear { syncTimer() }
+        .onDisappear { stopTimer() }
+        .onChange(of: groups.map(\.id)) { _ in
+            index = 0
+            dragOffset = 0
+            syncTimer()
+        }
+    }
+
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                guard groups.count > 1 else { return }
+                dragOffset = value.translation.width
+            }
+            .onEnded { value in
+                guard groups.count > 1 else {
+                    dragOffset = 0
+                    return
+                }
+                let tx = value.translation.width
+                if tx <= -Self.swipeThreshold {
+                    step(by: 1)
+                } else if tx >= Self.swipeThreshold {
+                    step(by: -1)
+                }
+                withAnimation(.easeOut(duration: 0.2)) { dragOffset = 0 }
+            }
+    }
+
+    private var dotActive: Color {
+        chatStyle ? .black.opacity(0.55) : Color.primary.opacity(0.7)
+    }
+
+    private var dotInactive: Color {
+        chatStyle ? .black.opacity(0.2) : Color.primary.opacity(0.25)
+    }
+
+    private func step(by delta: Int) {
+        guard groups.count > 1 else { return }
+        withAnimation(.easeInOut(duration: 0.35)) {
+            index = (index + delta + groups.count) % groups.count
+        }
+        syncTimer()
+    }
+
+    private func syncTimer() {
+        stopTimer()
+        guard groups.count > 1 else { return }
+        timer = Timer.scheduledTimer(withTimeInterval: Self.interval, repeats: true) { _ in
+            Task { @MainActor in step(by: 1) }
+        }
+    }
+
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+}
+
+// MARK: - Trackpad horizontal swipe (scroll wheel)
+
+/// Captures two-finger horizontal trackpad swipes inside the carousel bubble.
+private struct HorizontalSwipeReader: NSViewRepresentable {
+    let onSwipeLeft: () -> Void
+    let onSwipeRight: () -> Void
+
+    func makeNSView(context: Context) -> HorizontalSwipeNSView {
+        let view = HorizontalSwipeNSView()
+        view.onSwipeLeft = onSwipeLeft
+        view.onSwipeRight = onSwipeRight
+        return view
+    }
+
+    func updateNSView(_ nsView: HorizontalSwipeNSView, context: Context) {
+        nsView.onSwipeLeft = onSwipeLeft
+        nsView.onSwipeRight = onSwipeRight
+    }
+}
+
+private final class HorizontalSwipeNSView: NSView {
+    var onSwipeLeft: (() -> Void)?
+    var onSwipeRight: (() -> Void)?
+    private var accumulatedX: CGFloat = 0
+    private var lastFireAt: TimeInterval = 0
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func scrollWheel(with event: NSEvent) {
+        guard abs(event.scrollingDeltaX) >= abs(event.scrollingDeltaY) else { return }
+
+        accumulatedX += event.scrollingDeltaX
+        let ended = event.phase == .ended || event.phase == .cancelled
+            || event.momentumPhase == .ended || event.momentumPhase == .cancelled
+        guard ended else { return }
+
+        let threshold: CGFloat = 28
+        if accumulatedX <= -threshold {
+            fireSwipe(left: true)
+        } else if accumulatedX >= threshold {
+            fireSwipe(left: false)
+        }
+        accumulatedX = 0
+    }
+
+    private func fireSwipe(left: Bool) {
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - lastFireAt > 0.35 else { return }
+        lastFireAt = now
+        Task { @MainActor in
+            if left { onSwipeLeft?() } else { onSwipeRight?() }
+        }
+    }
+}
+
+// MARK: - Compact (summary header + 2 rows + fold)
+
+private struct BubbleCompactLayout: View {
+    let groups: [GroupedSession]
+    let totalCount: Int
+    var chatStyle: Bool = false
+    let textColor: (Double) -> Color
+    @State private var expanded = false
+
+    private let visibleRows = 2
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: chatStyle ? 4 : 5) {
+            Text(summaryLabel)
+                .font(.system(size: chatStyle ? 10 : 10.5, weight: .semibold))
+                .foregroundStyle(textColor(0.45))
+
+            ForEach(visibleGroups) { group in
+                AgentRow(session: group.session, count: group.count, chatStyle: chatStyle)
+            }
+
+            if hiddenCount > 0 {
+                Button(action: { withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() } }) {
+                    Text(expanded ? "Show less" : "+\(hiddenCount) more")
+                        .font(.system(size: chatStyle ? 10 : 10.5, weight: .medium))
+                        .foregroundStyle(textColor(0.5))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .onChange(of: groups.map(\.id)) { _ in expanded = false }
+    }
+
+    private var summaryLabel: String {
+        let n = totalCount
+        let kinds = groups.count
+        if kinds <= 1 {
+            return "\(n) agent\(n == 1 ? "" : "s")"
+        }
+        return "\(n) agent\(n == 1 ? "" : "s") · \(kinds) kind\(kinds == 1 ? "" : "s")"
+    }
+
+    private var visibleGroups: [GroupedSession] {
+        expanded ? groups : Array(groups.prefix(visibleRows))
+    }
+
+    private var hiddenCount: Int {
+        max(0, groups.count - visibleRows)
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }
 

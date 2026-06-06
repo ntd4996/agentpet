@@ -138,6 +138,58 @@ extension IconChoice: Codable {
     }
 }
 
+// MARK: - Session grouping
+
+/// Whether the bubble shows one row per agent kind or one row per session.
+enum BubbleSessionGrouping: String, CaseIterable, Codable {
+    /// Collapse sessions sharing an agent kind into one row with a ×N badge.
+    case byKind
+    /// Every active session gets its own row.
+    case allSessions
+
+    var displayName: String {
+        switch self {
+        case .byKind:      return "Grouped by agent"
+        case .allSessions: return "All sessions"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .byKind:      return "One row per agent kind (×N when multiple)"
+        case .allSessions: return "One row per session"
+        }
+    }
+}
+
+// MARK: - Display mode
+
+/// How the multi-agent bubble lays out rows when more than one agent is active.
+enum BubbleDisplayMode: String, CaseIterable, Codable {
+    /// All rows up to `maxSessions`.
+    case list
+    /// One row at a time, cycling every 3 s with dot indicators (fixed height).
+    case carousel
+    /// Summary header, first two rows, fold for overflow.
+    case compact
+
+    var displayName: String {
+        switch self {
+        case .list:     return "All rows"
+        case .carousel: return "Carousel"
+        case .compact:  return "Compact"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .list:     return "Show every row at once, up to the max below."
+        case .carousel: return "One row at a time. Auto-cycles every 3 s — swipe or drag to browse."
+        case .compact:  return "Summary header, first two rows, then fold the rest."
+        }
+    }
+}
+
 // MARK: - Min-state filter
 
 enum MinStateFilter: String, CaseIterable, Codable {
@@ -204,13 +256,15 @@ final class BubbleSettings: ObservableObject {
     @Published var minStateFilter: MinStateFilter {
         didSet { ud.set(minStateFilter.rawValue, forKey: Keys.minStateFilter) }
     }
+    @Published var sessionGrouping: BubbleSessionGrouping {
+        didSet { ud.set(sessionGrouping.rawValue, forKey: Keys.sessionGrouping) }
+    }
+    /// When showing all sessions, sort rows by agent kind before priority.
     @Published var groupByKind: Bool {
         didSet { ud.set(groupByKind, forKey: Keys.groupByKind) }
     }
-    /// When true, rows with the same session id are collapsed into one row with
-    /// a ×N badge (normally one row per session; leave off for separate sessions).
-    @Published var collapseDuplicates: Bool {
-        didSet { ud.set(collapseDuplicates, forKey: Keys.collapseDuplicates) }
+    @Published var displayMode: BubbleDisplayMode {
+        didSet { ud.set(displayMode.rawValue, forKey: Keys.displayMode) }
     }
     /// When enabled, active sessions render with the structured multi-agent
     /// bubble. When off, AgentPet keeps the default chat bubble behavior.
@@ -259,8 +313,10 @@ final class BubbleSettings: ObservableObject {
         static let theme           = "agentpet.bubble.theme"
         static let maxSessions     = "agentpet.bubble.maxSessions"
         static let minStateFilter  = "agentpet.bubble.minStateFilter"
+        static let sessionGrouping     = "agentpet.bubble.sessionGrouping"
         static let groupByKind         = "agentpet.bubble.groupByKind"
-        static let collapseDuplicates  = "agentpet.bubble.collapseDuplicates"
+        static let collapseDuplicates  = "agentpet.bubble.collapseDuplicates" // legacy
+        static let displayMode         = "agentpet.bubble.displayMode"
         static let multiAgentBubbleEnabled = "agentpet.bubble.multiAgentBubbleEnabled"
         static let hiddenKinds         = "agentpet.bubble.hiddenKinds"
         static let iconChoices     = "agentpet.bubble.iconChoices"
@@ -275,8 +331,9 @@ final class BubbleSettings: ObservableObject {
         theme          = Theme(rawValue: ud.string(forKey: Keys.theme) ?? "") ?? .system
         maxSessions    = ud.object(forKey: Keys.maxSessions) as? Int ?? 5
         minStateFilter = MinStateFilter(rawValue: ud.string(forKey: Keys.minStateFilter) ?? "") ?? .all
-        groupByKind        = ud.bool(forKey: Keys.groupByKind)
-        collapseDuplicates = ud.object(forKey: Keys.collapseDuplicates) as? Bool ?? false
+        sessionGrouping = Self.loadSessionGrouping()
+        groupByKind     = ud.bool(forKey: Keys.groupByKind)
+        displayMode = BubbleDisplayMode(rawValue: ud.string(forKey: Keys.displayMode) ?? "") ?? .carousel
         multiAgentBubbleEnabled = ud.object(forKey: Keys.multiAgentBubbleEnabled) as? Bool ?? true
         hiddenKinds        = Set((Self.loadJSON(Keys.hiddenKinds) as [String]? ?? []).compactMap(AgentKind.init(rawValue:)))
         iconChoices    = Self.loadJSON(Keys.iconChoices) ?? [:]
@@ -291,5 +348,18 @@ final class BubbleSettings: ObservableObject {
     private static func loadJSON<T: Decodable>(_ key: String) -> T? {
         guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(T.self, from: data)
+    }
+
+    private static func loadSessionGrouping() -> BubbleSessionGrouping {
+        let ud = UserDefaults.standard
+        if let raw = ud.string(forKey: Keys.sessionGrouping),
+           let mode = BubbleSessionGrouping(rawValue: raw) {
+            return mode
+        }
+        // Migrate from the old collapseDuplicates toggle.
+        if ud.object(forKey: Keys.collapseDuplicates) as? Bool == false {
+            return .allSessions
+        }
+        return .byKind
     }
 }
