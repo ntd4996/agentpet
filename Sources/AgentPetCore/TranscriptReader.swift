@@ -35,6 +35,35 @@ public enum TranscriptReader {
         return result
     }
 
+    /// Returns the raw, trimmed text of the most recent Claude assistant
+    /// message in the transcript (capped at 400 characters), or `nil` if none
+    /// is found. Unlike `latestAssistantRecap`, this returns ordinary
+    /// turn-ending text too — it's used to check whether Claude ended its
+    /// turn by asking the user a question, not to extract a named recap.
+    public static func latestAssistantText(at path: String) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { try? handle.close() }
+
+        let fileSize = (try? handle.seekToEnd()) ?? 0
+        let maxBytes: UInt64 = 131_072
+        try? handle.seek(toOffset: fileSize > maxBytes ? fileSize - maxBytes : 0)
+        let raw = handle.readDataToEndOfFile()
+        guard let text = String(data: raw, encoding: .utf8) else { return nil }
+
+        for line in text.components(separatedBy: "\n").reversed() {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmed.isEmpty,
+                  let lineData = trimmed.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                  json["type"] as? String == "assistant",
+                  let assistantText = extractAssistantText(from: json)
+            else { continue }
+            return String(assistantText.trimmingCharacters(in: .whitespacesAndNewlines).prefix(400))
+        }
+
+        return nil
+    }
+
     /// Clears cached titles — useful after fixing the extraction logic at runtime.
     public static func clearCache() {
         summaryCache.removeAll()
