@@ -67,7 +67,7 @@ const FILTERS = ["all", ...KIND_OPTIONS, "hidden"];
       const kindSelect=(slug,kind)=>`<select data-kind-for="${slug}" class="rounded-lg border border-line bg-white px-2 py-1.5 text-sm text-ink outline-none focus:border-brand-300">${KINDS.map((k)=>`<option value="${k}"${k===kind?" selected":""}>${k}</option>`).join("")}</select>`;
       function row(p){
         return `<div data-row="${p.slug}" class="flex items-center gap-3 rounded-2xl border border-line bg-white px-3 py-2 ${p.hidden?"opacity-55":""}">
-          <span class="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-line bg-white"><canvas class="h-10 w-10" width="80" height="80" data-slug="${p.slug}"></canvas></span>
+          <span class="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-line sprite-checker"><canvas class="h-10 w-10" width="80" height="80" data-slug="${p.slug}"></canvas></span>
           <div class="min-w-0 flex-1">
             <div class="truncate font-display font-semibold text-ink">${esc(p.name)}</div>
             <div class="flex items-center gap-2 text-xs text-faint">

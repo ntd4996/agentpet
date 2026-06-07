@@ -76,7 +76,7 @@ import Hero from "../components/Hero.astro";
       petsBox.innerHTML = pets.map((p: any, i: number) => `
         <a href="/pet/${p.slug}" class="flex items-center gap-3 rounded-2xl border border-line bg-white px-3 py-2 transition hover:border-brand-300 hover:bg-brand-50/40">
           <span class="w-6 shrink-0 text-center font-display text-sm font-bold ${i < 3 ? "text-accent-600" : "text-faint"}">${i + 1}</span>
-          <span class="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-line bg-white"><canvas class="lb-thumb h-10 w-10" width="80" height="80" data-slug="${p.slug}"></canvas></span>
+          <span class="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-line sprite-checker"><canvas class="lb-thumb h-10 w-10" width="80" height="80" data-slug="${p.slug}"></canvas></span>
           <span class="min-w-0 flex-1 truncate font-display font-semibold text-ink">${esc(names[p.slug] || p.slug)}</span>
           <span class="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 text-accent-500"><path d="M20.8 6.6a5 5 0 0 0-7.1 0L12 8.3l-1.7-1.7a5 5 0 1 0-7.1 7.1l1.7 1.7L12 22l7.1-7.1 1.7-1.7a5 5 0 0 0 0-7.1z"/></svg>${p.likes}</span>
         </a>`).join("");

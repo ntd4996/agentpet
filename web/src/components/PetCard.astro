@@ -14,7 +14,7 @@ const { pet: p } = Astro.props as { pet: Pet };
       ? <span class="inline-flex items-center gap-1 text-brand-600"><Icon name="star" class="h-3 w-3" /> FEATURED</span>
       : <span class="uppercase">{p.kind}</span>}
   </div>
-  <div class="relative mx-4 mt-2 grid aspect-[4/5] place-items-center rounded-2xl border border-line bg-white p-3">
+  <div class="relative mx-4 mt-2 grid aspect-[4/5] place-items-center rounded-2xl border border-line sprite-checker p-3">
     <canvas class="thumb h-full w-full" width="180" height="220" data-sheet={`/api/sprite/${p.slug}`}></canvas>
     <span class="states absolute bottom-2 right-2 rounded-full bg-white/90 px-2 py-0.5 font-pixel text-[10px] tracking-wide text-faint shadow-sm"></span>
   </div>
