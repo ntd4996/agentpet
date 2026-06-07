@@ -47,6 +47,22 @@ public final class SessionStore {
         byID[id]?.title = title
     }
 
+    /// Corrects a session's state after the fact — used when an async check
+    /// (e.g. reading the transcript to see how Claude ended its turn)
+    /// determines the state we set synchronously was wrong.
+    ///
+    /// Only applies when the session is *still* in `expected` state from the
+    /// *same* transition (`since` matches `stateSince`): if a newer event has
+    /// already moved the session on, this is a no-op — the correction targets
+    /// a transition that no longer exists, and must never clobber fresher
+    /// state. `stateSince` is preserved (this corrects the existing
+    /// transition; it isn't a new one).
+    public func refineState(id: String, from expected: AgentState, to refined: AgentState, since: Date) {
+        guard var session = byID[id], session.state == expected, session.stateSince == since else { return }
+        session.state = refined
+        byID[id] = session
+    }
+
     /// Applies an event, creating or updating the matching session.
     /// Returns the updated session, or `nil` if the event maps to no state.
     @discardableResult

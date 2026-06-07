@@ -86,6 +86,41 @@ final class SessionStoreTests: XCTestCase {
         XCTAssertEqual(store.sessions.count, 0)
     }
 
+    func testRefineStateAppliesWhenStateAndSinceStillMatch() {
+        let store = SessionStore()
+        let applied = store.apply(event("Stop"), now: t0)
+        XCTAssertEqual(applied?.state, .done)
+
+        store.refineState(id: "s1", from: .done, to: .waiting, since: applied!.stateSince)
+
+        let refined = store.session(id: "s1")
+        XCTAssertEqual(refined?.state, .waiting)
+        XCTAssertEqual(refined?.stateSince, applied!.stateSince,
+                       "correction preserves the original transition time")
+    }
+
+    func testRefineStateNoOpsWhenANewerEventAlreadyChangedState() {
+        let store = SessionStore()
+        let applied = store.apply(event("Stop"), now: t0)
+        store.apply(event("UserPromptSubmit"), now: t0.addingTimeInterval(2))   // user replied -> working
+
+        store.refineState(id: "s1", from: .done, to: .waiting, since: applied!.stateSince)
+
+        XCTAssertEqual(store.session(id: "s1")?.state, .working,
+                       "a newer transition must never be clobbered by a stale correction")
+    }
+
+    func testRefineStateNoOpsWhenSinceNoLongerMatches() {
+        let store = SessionStore()
+        let applied = store.apply(event("Stop"), now: t0)
+        let staleSince = applied!.stateSince.addingTimeInterval(-10)
+
+        store.refineState(id: "s1", from: .done, to: .waiting, since: staleSince)
+
+        XCTAssertEqual(store.session(id: "s1")?.state, .done,
+                       "a `since` mismatch means this correction targets a transition that's gone")
+    }
+
     func testPruneDemotesDoneToIdle() {
         let store = SessionStore(doneToIdleAfter: 30, removeIdleAfter: 600)
         store.apply(event("Stop"), now: t0)
