@@ -58,7 +58,9 @@ public final class SessionStore {
             existing.state = state
             existing.updatedAt = now
             if let project = event.project { existing.project = project }
-            existing.message = event.message
+            // Don't clear the live message with a nil — keeps "npm install…"
+            // visible across the post-tool event until the next meaningful update.
+            if let msg = event.message { existing.message = msg }
             byID[event.sessionId] = existing
             return existing
         }

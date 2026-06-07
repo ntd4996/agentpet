@@ -9,21 +9,36 @@ struct ImageSpriteView: View {
     let frames: [NSImage]
     let mood: PetMood
     var size: CGFloat = 110
+    var isMoving: Bool = false
+    var direction: CGFloat = 1
+    var isResting: Bool = false
 
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1.0 / 12.0)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
-            let m = PetMotion.resolve(mood, t)
-
+        if isResting {
             ZStack {
-                MoodAccessories(mood: mood, t: t, size: size)
+                MoodAccessories(mood: mood, t: 0, size: size)
 
-                frameImage(at: t)
-                    .rotationEffect(.degrees(m.rotation), anchor: .bottom)
-                    .scaleEffect(x: m.scaleX, y: m.scaleY, anchor: .bottom)
-                    .offset(y: m.offsetY)
+                frameImage(at: 0)
+                    .rotationEffect(.degrees(0), anchor: .bottom)
+                    .scaleEffect(x: direction, y: 1, anchor: .bottom)
+                    .offset(y: 0)
             }
             .frame(width: size, height: size)
+        } else {
+            TimelineView(.animation(minimumInterval: 1.0 / 12.0)) { context in
+                let t = context.date.timeIntervalSinceReferenceDate
+                let m = PetMotion.resolve(mood, t, isMoving: isMoving, direction: direction)
+
+                ZStack {
+                    MoodAccessories(mood: mood, t: t, size: size)
+
+                    frameImage(at: t)
+                        .rotationEffect(.degrees(m.rotation), anchor: .bottom)
+                        .scaleEffect(x: m.scaleX, y: m.scaleY, anchor: .bottom)
+                        .offset(y: m.offsetY)
+                }
+                .frame(width: size, height: size)
+            }
         }
     }
 

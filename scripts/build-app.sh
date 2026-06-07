@@ -9,13 +9,12 @@ ROOT="$(pwd)"
 APP="$ROOT/build/AgentPet.app"
 CONFIG="${1:-release}"
 
-# Build a universal binary (Apple Silicon + Intel) so the app runs on both.
-# Apple Silicon machines still run the native arm64 slice, unchanged.
-ARCHS=(--arch arm64 --arch x86_64)
+# Build native host architecture.
+ARCHS=()
 
-echo "Building ($CONFIG, universal arm64 + x86_64)..."
-swift build -c "$CONFIG" "${ARCHS[@]}"
-BINDIR="$(swift build -c "$CONFIG" "${ARCHS[@]}" --show-bin-path)"
+echo "Building ($CONFIG)..."
+swift build -c "$CONFIG"
+BINDIR="$(swift build -c "$CONFIG" --show-bin-path)"
 
 echo "Assembling $APP ..."
 rm -rf "$APP"

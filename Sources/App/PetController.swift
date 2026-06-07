@@ -16,12 +16,22 @@ final class PetController: ObservableObject {
     @Published var showChat: Bool {
         didSet {
             UserDefaults.standard.set(showChat, forKey: Self.chatKey)
-            refreshChat()
+            refreshChat(force: true)
         }
     }
     /// Sprite point size, freely adjustable via a slider.
     @Published var petPoint: Double {
         didSet { UserDefaults.standard.set(petPoint, forKey: Self.sizeKey) }
+    }
+    /// Chat frequency/probability (0% to 100%).
+    @Published var chatProbability: Double {
+        didSet {
+            UserDefaults.standard.set(chatProbability, forKey: Self.chatProbabilityKey)
+            if chatLine.isEmpty {
+                refreshChat(force: true)
+            }
+            scheduleChat()
+        }
     }
 
     static let minPoint: Double = 60
@@ -38,23 +48,55 @@ final class PetController: ObservableObject {
     private var latestSessions: [AgentSession] = []
     private var celebrateTimer: Timer?
     private var chatTimer: Timer?
+    private var chatClearTimer: Timer?
+    private var chatCooldownUntil: Date = .distantPast
 
     private static let petKey = "agentpet.selectedPetID"
     private static let chatKey = "agentpet.showChat"
+    private static let chatProbabilityKey = "agentpet.chatProbability"
     private static let sizeKey = "agentpet.petSize"
     private static let celebrateDuration: TimeInterval = 3
 
     init() {
         selectedPetID = UserDefaults.standard.string(forKey: Self.petKey)
         showChat = (UserDefaults.standard.object(forKey: Self.chatKey) as? Bool) ?? true
+        let savedProb = UserDefaults.standard.object(forKey: Self.chatProbabilityKey) as? Double ?? 50.0
+        chatProbability = min(max(savedProb, 0.0), 100.0)
         let saved = UserDefaults.standard.object(forKey: Self.sizeKey) as? Double ?? 120
         petPoint = min(max(saved, Self.minPoint), Self.maxPoint)
     }
 
     func start() {
-        // Vary the chat line periodically while the pet is active.
-        chatTimer = Timer.scheduledTimer(withTimeInterval: 5, repeats: true) { _ in
-            Task { @MainActor [weak self] in self?.refreshChat() }
+        scheduleChat()
+    }
+
+    /// Fires at random intervals — may skip so chat isn't constant.
+    private func scheduleChat() {
+        chatTimer?.invalidate()
+        let p = chatProbability / 100.0
+        let minInterval: Double
+        let maxInterval: Double
+        if p >= 0.5 {
+            let t = (p - 0.5) / 0.5
+            minInterval = 10.0 - 7.0 * t
+            maxInterval = 30.0 - 24.0 * t
+        } else {
+            let t = p / 0.5
+            minInterval = 30.0 - 20.0 * t
+            maxInterval = 60.0 - 30.0 * t
+        }
+        chatTimer = Timer.scheduledTimer(withTimeInterval: Double.random(in: minInterval...maxInterval), repeats: false) { _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                // Use user-configured chat probability.
+                let prob = self.chatProbability / 100.0
+                guard Double.random(in: 0...1) < prob else {
+                    self.scheduleChat()
+                    return
+                }
+                self.refreshChat(force: false)
+                self.scheduleChat()
+            }
         }
     }
 
@@ -112,26 +154,110 @@ final class PetController: ObservableObject {
         setMood(MoodResolver.aggregate(latestSessions))
     }
 
-    private func setMood(_ newMood: PetMood) {
-        mood = newMood
-        refreshChat()
+    private func speak(_ message: String, duration: TimeInterval, cooldown: TimeInterval) {
+        chatLine = message
+        StatusBarController.shared.refreshTitle()
+
+        chatClearTimer?.invalidate()
+        chatClearTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { _ in
+            Task { @MainActor [weak self] in
+                self?.chatLine = ""
+                StatusBarController.shared.refreshTitle()
+            }
+        }
+
+        chatCooldownUntil = Date().addingTimeInterval(duration + cooldown)
     }
 
-    private func refreshChat() {
-        let pool = ChatSettings.shared.lines(for: mood)
-        guard showChat, mood != .idle, !pool.isEmpty else {
+    private func setMood(_ newMood: PetMood) {
+        let changed = (mood != newMood)
+        mood = newMood
+        if changed {
+            if newMood == .idle {
+                // Instantly clear the chat bubble when entering idle.
+                chatLine = ""
+                StatusBarController.shared.refreshTitle()
+                chatClearTimer?.invalidate()
+                // Scale initial cooldown based on chatProbability (from 0s at 100% to 60s at 0%)
+                let factor = (100.0 - chatProbability) / 100.0
+                chatCooldownUntil = Date().addingTimeInterval(60.0 * factor)
+            } else {
+                refreshChat(force: true)
+            }
+        } else {
+            refreshChat(force: false)
+        }
+    }
+
+    private func refreshChat(force: Bool = false) {
+        guard showChat, selectedPetID != nil else {
             chatLine = ""
             StatusBarController.shared.refreshTitle()
             return
         }
-        chatLine = pool.randomElement() ?? ""
-        StatusBarController.shared.refreshTitle()
+
+        // Check for active live messages from hooks first.
+        let liveMessage = latestSessions.first(where: {
+            ($0.state == .working || $0.state == .waiting)
+            && ($0.message?.isEmpty == false)
+        })?.message
+
+        if let liveMessage = liveMessage {
+            // Show live hook events immediately without normal cooldowns.
+            if liveMessage != chatLine {
+                speak(liveMessage, duration: 6.0, cooldown: 0.5)
+            }
+            return
+        }
+
+        if !force {
+            guard Date() >= chatCooldownUntil else { return }
+        }
+
+        var messageToSpeak = ""
+        var speakDuration: TimeInterval = 5.0
+        var speakCooldown: TimeInterval = 10.0
+
+        let factor = (100.0 - chatProbability) / 100.0
+
+        if mood == .idle {
+            messageToSpeak = ChatSettings.shared.lines(for: .idle).randomElement() ?? ""
+            // Scale cooldown based on chatProbability (from 0s at 100% to 60s at 0%)
+            speakCooldown = 60.0 * factor
+            speakDuration = 5.0
+        } else {
+            let pool = ChatSettings.shared.lines(for: mood)
+            if !pool.isEmpty {
+                messageToSpeak = pool.randomElement() ?? ""
+            }
+            // Scale cooldown based on chatProbability
+            speakCooldown = Double.random(in: 15...30) * factor
+            speakDuration = 5.0
+        }
+
+        guard !messageToSpeak.isEmpty else { return }
+        speak(messageToSpeak, duration: speakDuration, cooldown: speakCooldown)
     }
 }
 
 /// Built-in (system) chat lines per mood.
 enum PetChat {
     static let lines: [PetMood: [String]] = [
+        .idle: [
+            "Dạo này code ngon không?",
+            "Hmm, để nghĩ xem… 🤔",
+            "Chán quá, có gì chơi không?",
+            "Bấm phím đi, mình chờ!",
+            "Pssst… ra lệnh gì đi!",
+            "Coding gì chưa?",
+            "Nằm dài chờ lệnh đây…",
+            "Hôm nay code gì hay không?",
+            "À lô, có ai hong?",
+            "Chờ hoài, chờ mãi…",
+            "Xem nhau qua màn hình này!",
+            "Mình đi ăn kem đi?",
+            "Bored… chưa có gì để làm.",
+        ],
         .working: [
             "Thinking…", "Working on it…", "On it!", "Crunching code…",
             "Hmm, let me see…", "Cooking something up…", "Deep in thought…",

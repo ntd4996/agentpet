@@ -104,6 +104,9 @@ struct MenuContentView: View {
             controlRow(icon: "number", label: "Show count on menu bar", isOn: $statusBar.showCount)
             controlRow(icon: "bubble.left", label: "Show chat on menu bar", isOn: $statusBar.showChatOnMenuBar)
             sizeRow
+            if pet.showChat {
+                chatFrequencyRow
+            }
         }
     }
 
@@ -115,6 +118,21 @@ struct MenuContentView: View {
             Slider(value: $pet.petPoint, in: PetController.minPoint...PetController.maxPoint)
                 .controlSize(.mini)
                 .tint(Color.systemAccent)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+    }
+
+    private var chatFrequencyRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "bubble.left.and.bubble.right")
+                .foregroundStyle(.white.opacity(0.8)).frame(width: 16)
+            Text("Chat rate").font(.system(size: 13)).foregroundStyle(.white)
+            Slider(value: $pet.chatProbability, in: 0...100)
+                .controlSize(.mini)
+                .tint(Color.systemAccent)
+            Text("\(Int(pet.chatProbability))%")
+                .font(.system(size: 11, weight: .medium)).monospacedDigit()
+                .foregroundStyle(.white.opacity(0.6)).fixedSize()
         }
         .padding(.horizontal, 14).padding(.vertical, 8)
     }

@@ -12,6 +12,7 @@ public enum StateMapper {
         case .claude: return eventName == "SessionEnd"
         case .gemini: return eventName == "SessionEnd"
         case .cursor: return eventName == "sessionEnd"
+        case .hermes: return eventName == "on_session_end"
         default: return false
         }
     }
@@ -71,6 +72,15 @@ public enum StateMapper {
             switch eventName {
             case "PreInvocation", "PreToolUse", "PostToolUse", "PostInvocation": return .working
             case "Stop": return .done
+            default: return nil
+            }
+        case .hermes:
+            switch eventName {
+            case "on_session_start": return .registered
+            case "pre_llm_call", "post_llm_call", "pre_tool_call", "post_tool_call",
+                 "pre_api_request", "post_api_request": return .working
+            case "on_session_end", "on_session_finalize", "on_session_reset",
+                 "subagent_stop": return .done
             default: return nil
             }
         case .cli, .unknown:

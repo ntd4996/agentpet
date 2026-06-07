@@ -29,5 +29,7 @@ public enum AgentCatalog {
                          note: "No \"needs input\" alerts (Windsurf has no such hook)"),
         AgentIntegration(kind: .antigravity, displayName: "Antigravity", isSupported: true,
                          note: "No \"needs input\" alerts (Antigravity has no notification hook)"),
+        AgentIntegration(kind: .hermes, displayName: "Hermes", isSupported: true,
+                         note: "No \"needs input\" alerts (Hermes has no notification hook)"),
     ]
 }

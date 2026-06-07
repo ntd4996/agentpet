@@ -174,6 +174,7 @@ final class MultiAgentHookTests: XCTestCase {
         XCTAssertTrue(StateMapper.isSessionEnd(for: .claude, eventName: "SessionEnd"))
         XCTAssertTrue(StateMapper.isSessionEnd(for: .gemini, eventName: "SessionEnd"))
         XCTAssertTrue(StateMapper.isSessionEnd(for: .cursor, eventName: "sessionEnd"))
+        XCTAssertTrue(StateMapper.isSessionEnd(for: .hermes, eventName: "on_session_end"))
         XCTAssertFalse(StateMapper.isSessionEnd(for: .claude, eventName: "Stop"))
         XCTAssertFalse(StateMapper.isSessionEnd(for: .codex, eventName: "Stop"))
     }
@@ -183,7 +184,7 @@ final class MultiAgentHookTests: XCTestCase {
     func testDiskRoundTripAllStyles() throws {
         let tmp = NSTemporaryDirectory() + "agentpet-test-\(UUID().uuidString)/"
         defer { try? FileManager.default.removeItem(atPath: tmp) }
-        let cases: [(AgentKind, String)] = [(.cursor, "cursor.json"), (.windsurf, "windsurf.json"), (.opencode, "plugin/agentpet.js"), (.antigravity, "config/hooks.json")]
+        let cases: [(AgentKind, String)] = [(.cursor, "cursor.json"), (.windsurf, "windsurf.json"), (.opencode, "plugin/agentpet.js"), (.antigravity, "config/hooks.json"), (.hermes, "config.yaml")]
         for (kind, file) in cases {
             let spec = AgentHooks.spec(for: kind)!
             let path = tmp + file
@@ -194,5 +195,60 @@ final class MultiAgentHookTests: XCTestCase {
             try HookInstaller.uninstallFromDisk(path: path, events: spec.events, style: spec.style)
             XCTAssertFalse(HookInstaller.isInstalledOnDisk(path: path, events: spec.events, style: spec.style), "\(kind) removed")
         }
+    }
+
+    // MARK: - Hermes
+
+    func testHermesStateMapping() {
+        XCTAssertEqual(StateMapper.state(for: .hermes, eventName: "on_session_start"), .registered)
+        XCTAssertEqual(StateMapper.state(for: .hermes, eventName: "pre_llm_call"), .working)
+        XCTAssertEqual(StateMapper.state(for: .hermes, eventName: "post_llm_call"), .working)
+        XCTAssertEqual(StateMapper.state(for: .hermes, eventName: "pre_tool_call"), .working)
+        XCTAssertEqual(StateMapper.state(for: .hermes, eventName: "post_tool_call"), .working)
+        XCTAssertEqual(StateMapper.state(for: .hermes, eventName: "pre_api_request"), .working)
+        XCTAssertEqual(StateMapper.state(for: .hermes, eventName: "post_api_request"), .working)
+        XCTAssertEqual(StateMapper.state(for: .hermes, eventName: "on_session_end"), .done)
+        XCTAssertEqual(StateMapper.state(for: .hermes, eventName: "on_session_finalize"), .done)
+        XCTAssertEqual(StateMapper.state(for: .hermes, eventName: "on_session_reset"), .done)
+        XCTAssertEqual(StateMapper.state(for: .hermes, eventName: "subagent_stop"), .done)
+        XCTAssertNil(StateMapper.state(for: .hermes, eventName: "unknown_event"))
+    }
+
+    func testHermesPayloadDecode() {
+        // Hermes uses the same snake_case JSON fields as Claude Code.
+        let json = #"{"session_id":"h1","hook_event_name":"pre_llm_call","cwd":"/proj","message":"processing"}"#
+        let ev = HookPayload.event(forAgent: .hermes, stdin: Data(json.utf8), now: Date())
+        XCTAssertEqual(ev?.sessionId, "h1")
+        XCTAssertEqual(ev?.eventName, "pre_llm_call")
+        XCTAssertEqual(ev?.project, "/proj")
+        XCTAssertEqual(ev?.agentKind, .hermes)
+        XCTAssertEqual(ev?.message, "processing")
+    }
+
+    func testHermesYamlInstall() {
+        let cmd = "\"/Applications/AgentPet.app/Contents/MacOS/agentpet\" hook --agent hermes"
+        let events = AgentHooks.spec(for: .hermes)!.events
+
+        // Install into empty content.
+        let installed = HookInstaller.installHermesYaml(into: "", command: cmd, events: events)
+        XCTAssertTrue(installed.contains(cmd))
+        XCTAssertTrue(HookInstaller.isInstalledHermesYaml(in: installed))
+
+        // Install again is idempotent.
+        let reinstall = HookInstaller.installHermesYaml(into: installed, command: cmd, events: events)
+        XCTAssertEqual(reinstall, installed)
+
+        // Preserve existing top-level YAML keys before hooks:.
+        let withPrefix = "model:\n  default: hermes-agent\n"
+        let withHooks = HookInstaller.installHermesYaml(into: withPrefix, command: cmd, events: events)
+        XCTAssertTrue(withHooks.hasPrefix(withPrefix))
+        XCTAssertTrue(withHooks.contains(cmd))
+        XCTAssertTrue(HookInstaller.isInstalledHermesYaml(in: withHooks))
+
+        // Uninstall.
+        let removed = HookInstaller.uninstallHermesYaml(from: withHooks)
+        XCTAssertFalse(HookInstaller.isInstalledHermesYaml(in: removed))
+        XCTAssertTrue(removed.contains("hooks: {}"))
+        XCTAssertTrue(removed.hasPrefix(withPrefix), "prefix preserved after uninstall")
     }
 }

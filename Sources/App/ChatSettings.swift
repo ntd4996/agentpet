@@ -20,8 +20,8 @@ final class ChatSettings: ObservableObject {
     private static let sourceKey = "agentpet.chatSource"
     private static let customKey = "agentpet.chatCustom"
 
-    /// Moods the user can write messages for (idle has no bubble).
-    static let editableMoods: [PetMood] = [.working, .waiting, .done, .celebrate]
+    /// Moods the user can write messages for (idle has a bubble too).
+    static let editableMoods: [PetMood] = [.idle, .working, .waiting, .done, .celebrate]
 
     init() {
         source = (UserDefaults.standard.string(forKey: Self.sourceKey)).flatMap(Source.init(rawValue:)) ?? .system
