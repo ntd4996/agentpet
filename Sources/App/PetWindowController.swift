@@ -100,6 +100,7 @@ final class PetWindowController: ObservableObject {
         case caret
     }
     private var currentDodgeSource: DodgeSource = .none
+    private var dodgeSpeed: CGFloat = 6.0
 
     private func startWandering() {
         nextStateTime = .init()
@@ -367,6 +368,14 @@ final class PetWindowController: ObservableObject {
                 targetDx = dx
                 isNear = true
                 source = .mouse
+                
+                // Calculate dynamic dodge speed: closer = faster.
+                // At distance 0, speed is maxSpeed (16.0).
+                // At distance threshold, speed is minSpeed (4.0).
+                let ratio = distance / threshold
+                let minSpeed: CGFloat = 4.0
+                let maxSpeed: CGFloat = 16.0
+                dodgeSpeed = maxSpeed - (maxSpeed - minSpeed) * ratio
             }
         }
 
@@ -385,6 +394,12 @@ final class PetWindowController: ObservableObject {
                 targetDx = dx
                 isNear = true
                 source = .caret
+                
+                // Calculate dynamic dodge speed: closer = faster.
+                let ratio = distance / threshold
+                let minSpeed: CGFloat = 4.0
+                let maxSpeed: CGFloat = 16.0
+                dodgeSpeed = maxSpeed - (maxSpeed - minSpeed) * ratio
             }
         }
 
@@ -417,6 +432,9 @@ final class PetWindowController: ObservableObject {
                     isMoving = false
                     isResting = false
                     nextStateTime = Date().addingTimeInterval(2.0) // Pause briefly after running away
+                } else {
+                    // Constant escape speed during coasting phase
+                    dodgeSpeed = 4.0
                 }
             }
         }
@@ -431,7 +449,7 @@ final class PetWindowController: ObservableObject {
 
         guard wanderState == .walking || isDodging else { return }
 
-        let speed: CGFloat = isDodging ? 6.0 : 3.0
+        let speed: CGFloat = isDodging ? dodgeSpeed : 3.0
         var newX = panel.frame.minX + wanderDirection * speed
         
         let petPoint = CGFloat(PetController.shared.petPoint)
