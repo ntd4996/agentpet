@@ -123,7 +123,7 @@ export async function deleteRequest(db: any, id: string): Promise<void> {
 export interface Collection { id: string; title: string; slug: string; description: string | null; created_at: number; }
 
 export async function listCollections(db: any): Promise<(Collection & { count: number; samples: string[] })[]> {
-  const c: any = await db.prepare("SELECT * FROM collections ORDER BY created_at ASC").all();
+  const c: any = await db.prepare("SELECT * FROM collections ORDER BY created_at DESC, slug ASC").all();
   const cols: Collection[] = c?.results ?? [];
   if (!cols.length) return [];
   const m: any = await db.prepare("SELECT collection_id, slug FROM collection_pets ORDER BY added_at ASC").all();
