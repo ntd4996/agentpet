@@ -7,6 +7,7 @@ struct PetView: View {
     @ObservedObject private var pet = PetController.shared
     @ObservedObject private var imagePets = ImagePetStore.shared
     @ObservedObject private var bindings = PetBindingsStore.shared
+    @ObservedObject private var window = PetWindowController.shared
 
     var body: some View {
         content
@@ -16,8 +17,24 @@ struct PetView: View {
 
     @ViewBuilder private var content: some View {
         if let id = pet.selectedPetID, let pack = imagePets.pack(id: id) {
-            let clip = bindings.clipIndex(packId: pack.id, clipCount: pack.clipCount, mood: pet.mood)
-            ImageSpriteView(frames: pack.clip(clip), mood: pet.mood, size: size)
+            let clipIndex: Int = {
+                if window.isMoving {
+                    return min(window.moveClipIndex, pack.clipCount - 1)
+                }
+                if pet.mood == .idle {
+                    return min(window.idleClipIndex, pack.clipCount - 1)
+                }
+                return bindings.clipIndex(packId: pack.id, clipCount: pack.clipCount, mood: pet.mood)
+            }()
+            let renderDirection: CGFloat = {
+                if window.isMoving {
+                    return window.moveScaleX
+                }
+                return window.direction
+            }()
+            ImageSpriteView(frames: pack.clip(clipIndex), mood: pet.mood, size: size,
+                            isMoving: window.isMoving, direction: renderDirection,
+                            isResting: window.isResting, speedRatio: window.speedRatio)
         } else {
             Image(systemName: "pawprint.fill")
                 .font(.system(size: size * 0.4))

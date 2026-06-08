@@ -57,6 +57,14 @@ public enum HookPayload {
             return CursorHookPayload.decode(from: data)?.makeEvent(now: now)
         case .windsurf:
             return WindsurfHookPayload.decode(from: data)?.makeEvent(now: now)
+        case .hermes:
+            // First try the richer Hermes decoder (tool_name, tool_input, etc.).
+            // Fall back to the generic Claude decoder if that doesn't work.
+            if let hermes = HermesHookPayload.decode(from: data),
+               let event = hermes.makeAgentEvent(now: now) {
+                return event
+            }
+            return ClaudeHookPayload.decode(from: data)?.makeEvent(now: now, kind: .hermes)
         default:
             return ClaudeHookPayload.decode(from: data)?.makeEvent(now: now, kind: kind)
         }

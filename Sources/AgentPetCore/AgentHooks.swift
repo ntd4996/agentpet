@@ -15,6 +15,8 @@ public enum HookStyle: Sendable {
     /// map lives under a named hook group instead of a top-level `"hooks"` key:
     /// `{"agentpet": {Event: [{"hooks": [{"type": "command", "command": ...}]}]}}`.
     case antigravityNested
+    /// Hermes `~/.hermes/config.yaml`: `hooks:\n  event:\n    - command: '...'`.
+    case hermesYaml
 }
 
 /// Where and which lifecycle events to register for an agent.
@@ -69,6 +71,13 @@ public enum AgentHooks {
                 kind: .antigravity, style: .antigravityNested,
                 events: ["PreInvocation", "PreToolUse", "PostToolUse", "Stop"],
                 settingsPath: home + "/.gemini/config/hooks.json")
+        case .hermes:
+            return AgentHookSpec(
+                kind: .hermes, style: .hermesYaml,
+                events: ["on_session_start", "pre_llm_call", "post_llm_call",
+                         "pre_tool_call", "post_tool_call",
+                         "on_session_end", "subagent_stop"],
+                settingsPath: home + "/.hermes/config.yaml")
         case .cli, .unknown:
             return nil
         }

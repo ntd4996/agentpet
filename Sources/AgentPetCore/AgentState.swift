@@ -26,6 +26,8 @@ public enum AgentKind: String, Codable, Sendable {
     case antigravity
     /// Any CLI agent launched via the `agentpet run` wrapper.
     case cli
+    /// Hermes Agent (Nous Research).
+    case hermes
     case unknown
 }
 

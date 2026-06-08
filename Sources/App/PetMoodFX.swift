@@ -8,7 +8,14 @@ struct PetMotion {
     var scaleX: CGFloat
     var scaleY: CGFloat
 
-    static func resolve(_ mood: PetMood, _ t: Double) -> PetMotion {
+    static func resolve(_ mood: PetMood, _ t: Double, isMoving: Bool = false, direction: CGFloat = 1) -> PetMotion {
+        if isMoving {
+            let step = sin(t * 14)
+            return PetMotion(offsetY: -abs(step) * 7,
+                             rotation: sin(t * 14) * 3,
+                             scaleX: direction,
+                             scaleY: 1 + 0.03 * (1 - abs(step)))
+        }
         switch mood {
         case .working:
             return PetMotion(offsetY: -abs(sin(t * 6)) * 5, rotation: sin(t * 12) * 2, scaleX: 1, scaleY: 1)

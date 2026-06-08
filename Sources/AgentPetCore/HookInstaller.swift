@@ -202,6 +202,172 @@ public enum HookInstaller {
         return "\"\(s)\""
     }
 
+    // MARK: - Hermes YAML shape (~/.hermes/config.yaml)
+
+    private struct ParsedHermesHooks {
+        var parsedEvents: [String: [String]]
+        var eventOrder: [String]
+        var startLineIndex: Int
+        var endLineIndex: Int
+    }
+
+    private static func parseHermesHooks(lines: [String]) -> ParsedHermesHooks? {
+        guard let idx = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespaces) == "hooks:" }) else {
+            return nil
+        }
+        var endIdx = lines.count
+        for j in (idx + 1)..<lines.count {
+            let trimmed = lines[j].trimmingCharacters(in: .whitespaces)
+            if !trimmed.isEmpty && !trimmed.hasPrefix("#") && trimmed.utf8.first.map({ $0 != UInt8(ascii: " ") && $0 != UInt8(ascii: "\t") }) ?? false {
+                endIdx = j
+                break
+            }
+        }
+
+        var parsedEvents: [String: [String]] = [:]
+        var eventOrder: [String] = []
+        var currentEvent: String? = nil
+
+        for line in lines[(idx + 1)..<endIdx] {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty || trimmed.hasPrefix("#") {
+                continue
+            }
+            if line.hasSuffix(":") && !trimmed.hasPrefix("-") {
+                let name = String(trimmed.dropLast())
+                currentEvent = name
+                if !eventOrder.contains(name) {
+                    eventOrder.append(name)
+                }
+                if parsedEvents[name] == nil {
+                    parsedEvents[name] = []
+                }
+            } else if trimmed.hasPrefix("-") {
+                if let event = currentEvent {
+                    parsedEvents[event]?.append(line)
+                }
+            }
+        }
+        return ParsedHermesHooks(
+            parsedEvents: parsedEvents,
+            eventOrder: eventOrder,
+            startLineIndex: idx,
+            endLineIndex: endIdx
+        )
+    }
+
+    /// Generates a `hooks:` YAML block with the given events and command, merging
+    /// with any existing hooks to preserve foreign/custom entries.
+    public static func installHermesYaml(into fileContent: String, command: String, events: [String]) -> String {
+        let escaped = command.replacingOccurrences(of: "'", with: "'\\''")
+        let cmdLine = "    - command: '\(escaped)'"
+        var lines = fileContent.components(separatedBy: "\n")
+
+        if let parsed = parseHermesHooks(lines: lines) {
+            var parsedEvents = parsed.parsedEvents
+            var eventOrder = parsed.eventOrder
+
+            // Clean up our old commands from all events
+            for event in parsedEvents.keys {
+                parsedEvents[event] = parsedEvents[event]?.filter { !isOurs($0) }
+            }
+
+            // Add our command to the target events
+            for event in events {
+                if parsedEvents[event] == nil {
+                    parsedEvents[event] = []
+                    eventOrder.append(event)
+                }
+                parsedEvents[event]?.append(cmdLine)
+            }
+
+            // Build the new hooks block
+            var blockLines: [String] = ["hooks:"]
+            for event in eventOrder {
+                if let cmds = parsedEvents[event], !cmds.isEmpty {
+                    blockLines.append("  \(event):")
+                    for cmd in cmds {
+                        if cmd.hasPrefix(" ") || cmd.hasPrefix("\t") {
+                            blockLines.append(cmd)
+                        } else {
+                            blockLines.append("    \(cmd)")
+                        }
+                    }
+                }
+            }
+
+            let hooksBlock = blockLines.joined(separator: "\n")
+            lines.replaceSubrange(parsed.startLineIndex..<parsed.endLineIndex, with: [hooksBlock])
+        } else {
+            // Append at the end
+            let hooksBlock = hermesYamlBlock(command: command, events: events)
+            if !fileContent.isEmpty && !fileContent.hasSuffix("\n") {
+                lines.append("")
+            }
+            lines.append(hooksBlock)
+        }
+
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// Removes only our hook commands from a Hermes YAML config, leaving any other
+    /// custom events/commands intact.
+    public static func uninstallHermesYaml(from fileContent: String) -> String {
+        var lines = fileContent.components(separatedBy: "\n")
+        guard let parsed = parseHermesHooks(lines: lines) else {
+            return fileContent
+        }
+
+        var parsedEvents = parsed.parsedEvents
+        let eventOrder = parsed.eventOrder
+
+        // Remove our commands
+        for event in parsedEvents.keys {
+            parsedEvents[event] = parsedEvents[event]?.filter { !isOurs($0) }
+        }
+
+        // Build the block lines
+        var blockLines: [String] = []
+        for event in eventOrder {
+            if let cmds = parsedEvents[event], !cmds.isEmpty {
+                blockLines.append("  \(event):")
+                for cmd in cmds {
+                    if cmd.hasPrefix(" ") || cmd.hasPrefix("\t") {
+                        blockLines.append(cmd)
+                    } else {
+                        blockLines.append("    \(cmd)")
+                    }
+                }
+            }
+        }
+
+        let replacement: String
+        if blockLines.isEmpty {
+            replacement = "hooks: {}"
+        } else {
+            replacement = (["hooks:"] + blockLines).joined(separator: "\n")
+        }
+
+        lines.replaceSubrange(parsed.startLineIndex..<parsed.endLineIndex, with: [replacement])
+        return lines.joined(separator: "\n") + "\n"
+    }
+
+    /// True if `fileContent` is a Hermes YAML config with our hook block installed.
+    public static func isInstalledHermesYaml(in fileContent: String) -> Bool {
+        isOurs(fileContent)
+    }
+
+    /// Builds the YAML hooks block string.
+    private static func hermesYamlBlock(command: String, events: [String]) -> String {
+        let escaped = command.replacingOccurrences(of: "'", with: "'\\''")
+        var block = "hooks:\n"
+        for event in events {
+            block += "  \(event):\n"
+            block += "    - command: '\(escaped)'\n"
+        }
+        return block.hasSuffix("\n") ? String(block.dropLast()) : block
+    }
+
     // MARK: - Disk IO
 
     /// Reads an agent's settings file. A missing or empty file is an empty
@@ -237,6 +403,12 @@ public enum HookInstaller {
             try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
             let js = opencodePlugin(binary: binaryPath(fromCommand: command))
             try Data(js.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
+        case .hermesYaml:
+            let existing = (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
+            let updated = installHermesYaml(into: existing, command: command, events: events)
+            let dir = (path as NSString).deletingLastPathComponent
+            try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+            try Data(updated.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
         }
     }
 
@@ -253,6 +425,10 @@ public enum HookInstaller {
             if isInstalledOnDisk(path: path, events: events, style: style) {
                 try? FileManager.default.removeItem(atPath: path)
             }
+        case .hermesYaml:
+            let existing = (try? String(contentsOfFile: path, encoding: .utf8)) ?? ""
+            let updated = uninstallHermesYaml(from: existing)
+            try Data(updated.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
         }
     }
 
@@ -268,6 +444,9 @@ public enum HookInstaller {
         case .opencodePlugin:
             guard let s = try? String(contentsOfFile: path, encoding: .utf8) else { return false }
             return isOurs(s)
+        case .hermesYaml:
+            guard let s = try? String(contentsOfFile: path, encoding: .utf8) else { return false }
+            return isInstalledHermesYaml(in: s)
         }
     }
 }
