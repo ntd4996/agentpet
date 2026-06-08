@@ -12,6 +12,8 @@ struct ImageSpriteView: View {
     var isMoving: Bool = false
     var direction: CGFloat = 1
     var isResting: Bool = false
+    /// Animation speed multiplier: 1.0 = base rate, higher = faster frames.
+    var speedRatio: CGFloat = 1.0
 
     var body: some View {
         if isResting {
@@ -25,7 +27,9 @@ struct ImageSpriteView: View {
             }
             .frame(width: size, height: size)
         } else {
-            TimelineView(.animation(minimumInterval: 1.0 / 12.0)) { context in
+            let effectiveFps = fps * max(speedRatio, 1.0)
+            let minInterval = 1.0 / min(effectiveFps * 2, 60.0)
+            TimelineView(.animation(minimumInterval: minInterval)) { context in
                 let t = context.date.timeIntervalSinceReferenceDate
                 let m = PetMotion.resolve(mood, t, isMoving: isMoving, direction: direction)
 
@@ -46,7 +50,8 @@ struct ImageSpriteView: View {
         if frames.isEmpty {
             Image(systemName: "pawprint.fill").font(.system(size: 36))
         } else {
-            let index = Int(t * fps) % frames.count
+            let effectiveFps = fps * speedRatio
+            let index = Int(t * effectiveFps) % frames.count
             Image(nsImage: frames[index])
                 .resizable()
                 .interpolation(.high)

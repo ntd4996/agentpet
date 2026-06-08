@@ -78,6 +78,9 @@ final class PetWindowController: ObservableObject {
     @Published private(set) var moveClipIndex: Int = 1
     /// The horizontal scale factor (1 or -1) to apply to the sprite when moving.
     @Published private(set) var moveScaleX: CGFloat = 1
+    /// Animation speed multiplier: 1.0 = normal walk, higher = faster animation
+    /// when dodging the mouse/caret at high speed.
+    @Published private(set) var speedRatio: CGFloat = 1.0
 
     // MARK: - Wandering animation
 
@@ -447,9 +450,13 @@ final class PetWindowController: ObservableObject {
 
         checkProximity(panel: panel)
 
-        guard wanderState == .walking || isDodging else { return }
+        guard wanderState == .walking || isDodging else {
+            speedRatio = 1.0
+            return
+        }
 
         let speed: CGFloat = isDodging ? dodgeSpeed : 3.0
+        speedRatio = speed / 3.0
         var newX = panel.frame.minX + wanderDirection * speed
         
         let petPoint = CGFloat(PetController.shared.petPoint)

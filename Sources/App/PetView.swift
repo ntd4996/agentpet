@@ -34,7 +34,7 @@ struct PetView: View {
             }()
             ImageSpriteView(frames: pack.clip(clipIndex), mood: pet.mood, size: size,
                             isMoving: window.isMoving, direction: renderDirection,
-                            isResting: window.isResting)
+                            isResting: window.isResting, speedRatio: window.speedRatio)
         } else {
             Image(systemName: "pawprint.fill")
                 .font(.system(size: size * 0.4))
