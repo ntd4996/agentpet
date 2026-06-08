@@ -1,30 +1,42 @@
 import AppKit
 import SwiftUI
 
-/// A multiline text editor that grows with its content and has no scroll view
-/// of its own, so scrolling never chains into the surrounding form.
+/// A multiline text editor with a capped height and built-in scroll support.
+/// Grows up to `maxHeight` then scrolls internally, so the surrounding form never
+/// gets pushed past a comfortable size.
 struct GrowingTextEditor: NSViewRepresentable {
     @Binding var text: String
+    var maxHeight: CGFloat = 200
 
-    func makeNSView(context: Context) -> AutoTextView {
-        let view = AutoTextView()
-        view.delegate = context.coordinator
-        view.isRichText = false
-        view.font = .preferredFont(forTextStyle: .callout)
-        view.textColor = .labelColor
-        view.drawsBackground = false
-        view.textContainerInset = NSSize(width: 4, height: 6)
-        view.isVerticallyResizable = true
-        view.isHorizontallyResizable = false
-        view.textContainer?.widthTracksTextView = true
-        view.textContainer?.lineFragmentPadding = 2
-        return view
+    func makeNSView(context: Context) -> NSScrollView {
+        let textView = AutoTextView()
+        textView.delegate = context.coordinator
+        textView.isRichText = false
+        textView.font = .preferredFont(forTextStyle: .callout)
+        textView.textColor = .labelColor
+        textView.drawsBackground = false
+        textView.textContainerInset = NSSize(width: 4, height: 6)
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.lineFragmentPadding = 2
+
+        let scroll = BoundedScrollView(maxHeight: maxHeight)
+        scroll.hasVerticalScroller = true
+        scroll.hasHorizontalScroller = false
+        scroll.borderType = .noBorder
+        scroll.documentView = textView
+        scroll.drawsBackground = false
+        scroll.automaticallyAdjustsContentInsets = false
+        scroll.contentInsets = NSEdgeInsets()
+        scroll.scrollerStyle = .overlay
+        return scroll
     }
 
-    func updateNSView(_ view: AutoTextView, context: Context) {
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let view = scrollView.documentView as? NSTextView else { return }
         if view.string != text {
             view.string = text
-            view.invalidateIntrinsicContentSize()
         }
     }
 
@@ -40,8 +52,8 @@ struct GrowingTextEditor: NSViewRepresentable {
     }
 }
 
-/// NSTextView that reports its content height so SwiftUI can size it to fit.
-final class AutoTextView: NSTextView {
+/// NSTextView that reports its content height so the scroll view can size accordingly.
+private final class AutoTextView: NSTextView {
     override var intrinsicContentSize: NSSize {
         guard let layoutManager, let textContainer else { return super.intrinsicContentSize }
         layoutManager.ensureLayout(for: textContainer)
@@ -52,5 +64,25 @@ final class AutoTextView: NSTextView {
     override func didChangeText() {
         super.didChangeText()
         invalidateIntrinsicContentSize()
+    }
+}
+
+/// NSScrollView that caps its height at `maxHeight` while letting its content
+/// grow naturally. When the text overflows, the scroller appears.
+private final class BoundedScrollView: NSScrollView {
+    let maxHeight: CGFloat
+
+    init(maxHeight: CGFloat) {
+        self.maxHeight = maxHeight
+        super.init(frame: .zero)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override var intrinsicContentSize: NSSize {
+        guard let textView = documentView as? AutoTextView else { return super.intrinsicContentSize }
+        let textSize = textView.intrinsicContentSize
+        let clamped = min(textSize.height, maxHeight)
+        return NSSize(width: NSView.noIntrinsicMetric, height: max(clamped, 44))
     }
 }
