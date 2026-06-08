@@ -1,11 +1,14 @@
 ---
 import "../styles/global.css";
 import Icon from "../components/Icon.astro";
+import SurprisePet from "../components/SurprisePet.astro";
 interface Props { title?: string; description?: string; active?: string; }
 const { title = "AgentPet", description = "Adopt, build, and share pixel companions for your AI coding agents.", active = "" } = Astro.props;
 const nav = [
   { href: "/gallery", label: "Gallery", key: "gallery" },
+  { href: "/collections", label: "Collections", key: "collections" },
   { href: "/leaderboard", label: "Leaderboard", key: "leaderboard" },
+  { href: "/requests", label: "Requests", key: "requests" },
   { href: "/make", label: "Make", key: "make" },
   { href: "/integrations", label: "Integrations", key: "integrations" },
   { href: "/creators", label: "Creators", key: "creators" },
@@ -38,6 +41,16 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
   <link rel="icon" href="/logo.png" />
   <title>{title}</title>
   <meta name="description" content={description} />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:image" content="https://agentpet.thenightwatcher.online/og.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content={title} />
+  <meta name="twitter:description" content={description} />
+  <meta name="twitter:image" content="https://agentpet.thenightwatcher.online/og.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Pixelify+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -61,32 +74,57 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
   </div>
 
   <header class="sticky top-3 z-30 px-4">
-    <nav class="nav-pill mx-auto flex max-w-6xl items-center gap-2 rounded-full px-3 py-2">
-      <a href="/" class="flex items-center gap-2 pl-1 pr-1 font-display text-lg font-bold text-ink">
+    <nav class="nav-pill mx-auto flex max-w-7xl items-center gap-2 rounded-full px-3 py-2">
+      <a href="/" class="flex shrink-0 items-center gap-2 pl-1 pr-1 font-display text-lg font-bold text-ink">
         <img src="/logo.png" alt="" class="h-9 w-9 rounded-xl" />
         <span>Agent<span class="text-brand-600">Pet</span></span>
       </a>
-      <div class="ml-1 hidden items-center gap-0.5 md:flex">
+      <!-- inline nav: only when there's room (xl+) -->
+      <div class="ml-1 hidden items-center gap-0.5 xl:flex">
         {nav.map((n) => (
           <a href={n.href} class={`nav-link ${active === n.key ? "active" : ""}`}>{n.label}</a>
         ))}
       </div>
-      <div class="ml-auto flex items-center gap-2">
+      <div class="ml-auto flex shrink-0 items-center gap-1.5">
         <a href={DISCORD} target="_blank" rel="noopener" aria-label="Discord" class="hidden rounded-full p-2.5 text-muted transition hover:bg-brand-50 hover:text-brand-700 sm:inline-flex">
           <Icon name="discord" />
         </a>
-        <a href={GITHUB} target="_blank" rel="noopener" class="hidden btn-ghost !px-4 !py-2 sm:inline-flex">
-          <Icon name="github" class="h-4 w-4" /> GitHub
+        <a href={GITHUB} target="_blank" rel="noopener" aria-label="GitHub" class="hidden rounded-full p-2.5 text-muted transition hover:bg-brand-50 hover:text-brand-700 sm:inline-flex">
+          <Icon name="github" class="h-5 w-5" />
         </a>
         <div id="ap-auth" class="flex items-center">
-          <a href="/api/auth/login?returnTo=/" class="btn-ghost !px-4 !py-2"><Icon name="users" class="h-4 w-4" /> Sign in</a>
+          <a href="/api/auth/login?returnTo=/" class="btn-ghost !px-3 !py-2"><Icon name="users" class="h-4 w-4" /> <span class="hidden sm:inline">Sign in</span></a>
         </div>
         <a href="/install" class="btn-primary !px-4 !py-2">
-          <Icon name="download" class="h-4 w-4" /> Get the app
+          <Icon name="download" class="h-4 w-4" /> <span class="hidden sm:inline">Get the app</span>
         </a>
+        <!-- menu toggle: below xl -->
+        <button id="navToggle" type="button" aria-label="Menu" aria-expanded="false" class="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted transition hover:bg-brand-50 hover:text-brand-700 xl:hidden">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" class="h-5 w-5"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+        </button>
       </div>
     </nav>
+    <!-- collapsed nav menu -->
+    <div id="navMenu" class="mx-auto mt-2 hidden max-w-7xl px-1 xl:!hidden">
+      <div class="rounded-2xl border border-line bg-white p-2 shadow-card">
+        {nav.map((n) => (
+          <a href={n.href} class={`block rounded-xl px-3 py-2 text-sm font-semibold transition hover:bg-brand-50 hover:text-brand-700 ${active === n.key ? "bg-brand-50 text-brand-700" : "text-muted"}`}>{n.label}</a>
+        ))}
+      </div>
+    </div>
   </header>
+  <script>
+    (() => {
+      const t = document.getElementById("navToggle");
+      const m = document.getElementById("navMenu");
+      if (!t || !m) return;
+      t.addEventListener("click", () => {
+        const hidden = m.classList.toggle("hidden");
+        t.setAttribute("aria-expanded", String(!hidden));
+      });
+      m.addEventListener("click", (e) => { if ((e.target as HTMLElement).closest("a")) m.classList.add("hidden"); });
+    })();
+  </script>
 
   <main class="relative">
     <slot />
@@ -109,8 +147,11 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
         <h4 class="font-display text-sm font-semibold text-ink">Explore</h4>
         <ul class="mt-3 space-y-2 text-sm text-muted">
           <li><a class="hover:text-brand-700" href="/gallery">Gallery</a></li>
+          <li><a class="hover:text-brand-700" href="/collections">Collections</a></li>
           <li><a class="hover:text-brand-700" href="/leaderboard">Leaderboard</a></li>
           <li><a class="hover:text-brand-700" href="/make">Make a pet</a></li>
+          <li><a class="hover:text-brand-700" href="/submit">Submit a pet</a></li>
+          <li><a class="hover:text-brand-700" href="/requests">Requests</a></li>
           <li><a class="hover:text-brand-700" href="/integrations">Integrations</a></li>
           <li><a class="hover:text-brand-700" href="/creators">Creators</a></li>
           <li><a class="hover:text-brand-700" href="/docs">Docs</a></li>
@@ -164,10 +205,13 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
     (() => {
       let mineSet = new Set<string>();
 
-      function renderAvatar(user: { login: string; avatar: string }) {
+      function renderAvatar(user: { login: string; avatar: string; isAdmin?: boolean }) {
         const slot = document.getElementById("ap-auth");
         if (!slot) return;
         const login = String(user.login).replace(/[^a-zA-Z0-9-]/g, "");
+        const adminLink = user.isAdmin
+          ? `<a href="/admin" class="block rounded-xl px-3 py-2 text-sm font-medium text-muted transition hover:bg-brand-50 hover:text-brand-700">Pet admin</a>`
+          : "";
         slot.innerHTML = `
           <div class="relative">
             <button id="ap-avatar" type="button" class="flex items-center gap-2 rounded-full border border-line bg-white py-1 pl-1 pr-3 shadow-soft transition hover:border-brand-300">
@@ -176,6 +220,7 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
             </button>
             <div id="ap-menu" class="absolute right-0 z-50 mt-2 hidden w-48 rounded-2xl border border-line bg-white p-2 shadow-card">
               <div class="px-3 py-2 text-xs text-faint">Signed in as <b class="text-ink">${login}</b></div>
+              ${adminLink}
               <a href="/api/auth/logout" class="block rounded-xl px-3 py-2 text-sm font-medium text-muted transition hover:bg-brand-50 hover:text-brand-700">Sign out</a>
             </div>
           </div>`;
@@ -200,8 +245,16 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
       async function fillLikes() {
         const s: any = await fetch("/api/stats.json").then((r) => r.json()).catch(() => ({}));
         const likes = s.likes || {};
+        const installs = s.installs || {};
+        const downloads = s.downloads || {};
         document.querySelectorAll("[data-like-count][data-slug]").forEach((el) => {
           el.textContent = String(likes[el.getAttribute("data-slug")!] || 0);
+        });
+        document.querySelectorAll("[data-install-count][data-slug]").forEach((el) => {
+          el.textContent = String(installs[el.getAttribute("data-slug")!] || 0);
+        });
+        document.querySelectorAll("[data-download-count][data-slug]").forEach((el) => {
+          el.textContent = String(downloads[el.getAttribute("data-slug")!] || 0);
         });
         document.querySelectorAll("[data-like-btn][data-slug]").forEach((btn) => setLiked(btn, mineSet.has(btn.getAttribute("data-slug")!)));
       }
@@ -232,5 +285,6 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
       })();
     })();
   </script>
+  <SurprisePet />
 </body>
 </html>

@@ -1,13 +1,15 @@
 import type { APIRoute } from "astro";
-import { getDB, ensureSchema } from "../../lib/db";
+import { getDB, ensureSchema, creatorCounts } from "../../lib/db";
 
 export const prerender = false;
 
-// Top pets by likes + top fans (users who liked the most pets). Public + cacheable.
+// Top pets by likes + top fans (most likes given) + top creators (most approved
+// community pets). Public + cacheable.
 export const GET: APIRoute = async () => {
   const db = getDB();
   const pets: Array<{ slug: string; likes: number }> = [];
   const fans: Array<{ login: string; avatar: string; count: number }> = [];
+  let creators: Array<{ login: string; avatar: string | null; count: number }> = [];
 
   if (db) {
     await ensureSchema(db);
@@ -20,9 +22,11 @@ export const GET: APIRoute = async () => {
       )
       .all();
     for (const r of f?.results ?? []) fans.push({ login: r.login, avatar: r.avatar, count: r.count });
+
+    creators = await creatorCounts(db, 20);
   }
 
-  return new Response(JSON.stringify({ pets, fans }), {
+  return new Response(JSON.stringify({ pets, fans, creators }), {
     headers: { "content-type": "application/json", "cache-control": "public, max-age=30" },
   });
 };

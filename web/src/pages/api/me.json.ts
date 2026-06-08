@@ -2,6 +2,7 @@ import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { verifySession, SESSION_COOKIE } from "../../lib/auth";
 import { getDB, ensureSchema } from "../../lib/db";
+import { isAdmin } from "../../lib/admin";
 
 export const prerender = false;
 
@@ -16,7 +17,7 @@ const v = (n: string): string => {
 export const GET: APIRoute = async ({ cookies }) => {
   const token = cookies.get(SESSION_COOKIE)?.value || "";
   const user = token ? await verifySession(token, v("SESSION_SECRET")) : null;
-  const safe = user ? { id: user.id, login: user.login, name: user.name, avatar: user.avatar } : null;
+  const safe = user ? { id: user.id, login: user.login, name: user.name, avatar: user.avatar, isAdmin: isAdmin(user.login) } : null;
 
   let mine: string[] = [];
   if (user) {

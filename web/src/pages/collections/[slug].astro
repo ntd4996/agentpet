@@ -1,0 +1,98 @@
+---
+import Base from "../../layouts/Base.astro";
+import Icon from "../../components/Icon.astro";
+import { getDB, ensureSchema, getCollection } from "../../lib/db";
+
+export const prerender = false;
+const { slug = "" } = Astro.params;
+const db = getDB();
+let col: any = null;
+if (db) { await ensureSchema(db); col = await getCollection(db, slug); }
+if (!col) return Astro.redirect("/collections");
+---
+<Base title={`${col.title} · Collections · AgentPet`} description={col.description || `Pets in the ${col.title} collection.`} active="">
+  <section class="px-4 pt-8 pb-16">
+    <div class="mx-auto max-w-6xl">
+      <a href="/collections" class="group inline-flex items-center gap-2 rounded-full border border-line bg-white/80 py-1.5 pl-1.5 pr-4 text-sm font-semibold text-muted shadow-soft transition hover:border-brand-300 hover:text-brand-700">
+        <span class="grid h-7 w-7 place-items-center rounded-full bg-brand-50 text-brand-600 transition group-hover:-translate-x-0.5"><Icon name="arrow" class="h-4 w-4 rotate-180" /></span>
+        All collections
+      </a>
+      <h1 class="mt-4 font-display text-3xl font-bold text-ink sm:text-4xl">{col.title}</h1>
+      {col.description && <p class="mt-2 max-w-2xl text-muted">{col.description}</p>}
+      <div class="mt-1 text-sm text-faint"><span id="count">…</span></div>
+
+      <label class="relative mt-5 flex max-w-md items-center">
+        <Icon name="search" class="pointer-events-none absolute left-4 h-5 w-5 text-faint" />
+        <input id="cq" type="search" placeholder="Search in this collection…" class="w-full rounded-full border border-line bg-white py-2.5 pl-12 pr-4 text-ink outline-none focus:border-brand-300" />
+      </label>
+
+      <div id="grid" class="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4"></div>
+      <div id="empty" class="hidden py-16 text-center text-muted">This collection is empty.</div>
+    </div>
+  </section>
+
+  <script define:vars={{ slug }}>
+    function seg(arr) { const r = []; let s = null; for (let i = 0; i < arr.length; i++) { if (arr[i] && s === null) s = i; else if (!arr[i] && s !== null) { r.push([s, i]); s = null; } } if (s !== null) r.push([s, arr.length]); return r; }
+    function sliceRows(img) {
+      const w = img.naturalWidth, h = img.naturalHeight, TH = 16;
+      const off = document.createElement("canvas"); off.width = w; off.height = h;
+      const o = off.getContext("2d"); o.drawImage(img, 0, 0);
+      let px; try { px = o.getImageData(0, 0, w, h).data; } catch { return null; }
+      const rh = new Array(h).fill(false);
+      for (let y = 0; y < h; y++) { const b = y * w * 4; for (let x = 0; x < w; x++) if (px[b + x * 4 + 3] > TH) { rh[y] = true; break; } }
+      const rows = [];
+      for (const [y0, y1] of seg(rh)) {
+        const ch = new Array(w).fill(false);
+        for (let x = 0; x < w; x++) for (let y = y0; y < y1; y++) if (px[(y * w + x) * 4 + 3] > TH) { ch[x] = true; break; }
+        const fr = seg(ch).map(([x0, x1]) => ({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }));
+        if (fr.length) rows.push(fr);
+      }
+      return rows;
+    }
+    function setupCanvas(cv) {
+      const ctx = cv.getContext("2d"); ctx.imageSmoothingEnabled = false;
+      const img = new Image(); let frames = []; let idx = 0; let timer = null;
+      const draw = (f) => { ctx.clearRect(0, 0, cv.width, cv.height); const s = Math.min(cv.width / f.w, cv.height / f.h) * 0.62, dw = f.w * s, dh = f.h * s; ctx.drawImage(img, f.x, f.y, f.w, f.h, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh); };
+      const play = () => { if (timer || frames.length < 2) return; timer = window.setInterval(() => { idx = (idx + 1) % frames.length; draw(frames[idx]); }, 150); };
+      const stop = () => { if (timer) { clearInterval(timer); timer = null; } idx = 0; if (frames[0]) draw(frames[0]); };
+      img.onload = () => { const rows = sliceRows(img); if (!rows || !rows.length) return; frames = rows.flat(); draw(frames[0]); cv.parentElement.classList.remove("ap-skel"); };
+      img.src = cv.dataset.sheet;
+      const host = cv.closest("a"); host.addEventListener("mouseenter", play); host.addEventListener("mouseleave", stop);
+    }
+    const io = new IntersectionObserver((es) => { for (const e of es) if (e.isIntersecting) { const cv = e.target; io.unobserve(cv); setupCanvas(cv); } }, { rootMargin: "200px" });
+    const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+    const heart = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5 text-accent-500"><path d="M20.8 6.6a5 5 0 0 0-7.1 0L12 8.3l-1.7-1.7a5 5 0 1 0-7.1 7.1l1.7 1.7L12 22l7.1-7.1 1.7-1.7a5 5 0 0 0 0-7.1z"/></svg>`;
+
+    (async () => {
+      const [col, pj] = await Promise.all([
+        fetch("/api/collection/" + slug + ".json").then((r) => r.json()).catch(() => ({ slugs: [] })),
+        fetch("/api/pets.json").then((r) => r.json()).catch(() => ({ pets: [] })),
+      ]);
+      const names = {}; for (const p of pj.pets || []) names[p.slug] = p.name;
+      const allSlugs = (col.slugs || []);
+      const grid = document.getElementById("grid");
+      const card = (s) => `
+        <a href="/pet/${esc(s)}" class="card group flex flex-col overflow-hidden p-0 transition hover:-translate-y-1">
+          <div class="grid aspect-[4/5] place-items-center rounded-2xl border border-line sprite-checker ap-skel m-3 mb-0 p-3">
+            <canvas class="h-full w-full" width="180" height="220" data-sheet="/api/sprite/${esc(s)}"></canvas>
+          </div>
+          <div class="px-4 pb-4 pt-3">
+            <div class="truncate font-display text-base font-semibold text-ink">${esc(names[s] || s)}</div>
+            <div class="mt-2 flex items-center gap-3 border-t border-line pt-2 text-xs font-medium text-muted">
+              <span class="inline-flex items-center gap-1">${heart}<span data-like-count data-slug="${esc(s)}">0</span></span>
+            </div>
+          </div>
+        </a>`;
+      function render(list) {
+        document.getElementById("count").textContent = `${list.length} pet${list.length === 1 ? "" : "s"}`;
+        document.getElementById("empty").classList.toggle("hidden", list.length > 0);
+        grid.innerHTML = list.map(card).join("");
+        grid.querySelectorAll("canvas[data-sheet]").forEach((cv) => io.observe(cv));
+        window.apRefreshLikes?.();
+      }
+      render(allSlugs);
+      let t; const cq = document.getElementById("cq");
+      cq.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { const q = cq.value.trim().toLowerCase(); render(!q ? allSlugs : allSlugs.filter((s) => (names[s] || s).toLowerCase().includes(q))); }, 150); });
+    })();
+  </script>
+</Base>

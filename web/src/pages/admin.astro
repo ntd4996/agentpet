@@ -1,0 +1,107 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/Icon.astro";
+import { adminUser } from "../lib/admin";
+import { KIND_OPTIONS } from "../lib/pets";
+
+export const prerender = false;
+const user = await adminUser(Astro.cookies);
+const FILTERS = ["all", "unchecked", "checked", "hidden", ...KIND_OPTIONS];
+---
+<Base title="Admin · AgentPet" description="Manage the pet library." active="">
+  {!user ? (
+    <section class="px-4 py-24">
+      <div class="card mx-auto max-w-md p-8 text-center">
+        <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Icon name="users" class="h-7 w-7" /></div>
+        <h1 class="mt-4 font-display text-2xl font-bold text-ink">Admin only</h1>
+        <p class="mt-2 text-muted">This page manages the pet library and is restricted to the project owner.</p>
+        <a href="/api/auth/login?returnTo=/admin" class="btn-primary mt-6 !px-6 !py-3"><Icon name="users" class="h-5 w-5" /> Sign in with GitHub</a>
+      </div>
+    </section>
+  ) : (
+    <section class="px-4 pt-8 pb-16">
+      <div class="mx-auto max-w-6xl">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-600"><Icon name="wand" class="h-5 w-5" /></span>
+          <h1 class="font-display text-2xl font-bold text-ink">Pet admin</h1>
+          <a href="/admin/collections" class="ml-auto btn-ghost !px-4 !py-2 text-sm"><Icon name="grid" class="h-4 w-4" /> Collections</a>
+          <a href="/admin/submissions" class="btn-ghost !px-4 !py-2 text-sm"><Icon name="wand" class="h-4 w-4" /> Submissions</a>
+          <a href="/requests" class="btn-ghost !px-4 !py-2 text-sm"><Icon name="sparkles" class="h-4 w-4" /> Requests</a>
+          <span class="text-sm text-muted"><b class="text-ink">{user.login}</b></span>
+        </div>
+        <p class="mt-2 text-muted">Sorted by dex number. Click a pet to open its full editor. A green check marks pets you've reviewed.</p>
+
+        <div class="card mt-6 flex flex-col gap-4 p-4 sm:flex-row sm:items-center">
+          <label class="relative flex flex-1 items-center">
+            <Icon name="search" class="pointer-events-none absolute left-4 h-5 w-5 text-faint" />
+            <input id="q" type="search" placeholder="Search by name or slug…" class="w-full rounded-full border border-line bg-white py-3 pl-12 pr-4 text-ink outline-none focus:border-brand-300" />
+          </label>
+          <div id="chips" class="flex flex-wrap gap-2">
+            {FILTERS.map((k) => (
+              <button data-filter={k} class={`chip ${k === "all" ? "chip-active" : ""} capitalize`}>{k}</button>
+            ))}
+          </div>
+        </div>
+
+        <div class="mt-3 px-1 text-sm text-muted"><span id="count">Loading…</span> · <span id="progress"></span></div>
+        <div id="rows" class="mt-3 space-y-2"></div>
+        <div id="empty" class="hidden py-16 text-center text-muted">No pets match.</div>
+        <div class="mt-8 flex justify-center"><button id="more" class="btn-ghost !px-6 !py-3" hidden><Icon name="sparkles" class="h-4 w-4" /> Load more</button></div>
+      </div>
+    </section>
+
+    <script>
+      function seg(a:boolean[]){const r:[number,number][]=[];let s:number|null=null;for(let i=0;i<a.length;i++){if(a[i]&&s===null)s=i;else if(!a[i]&&s!==null){r.push([s,i]);s=null;}}if(s!==null)r.push([s,a.length]);return r;}
+      function firstFrame(img:HTMLImageElement){const w=img.naturalWidth,h=img.naturalHeight,TH=16;const off=document.createElement("canvas");off.width=w;off.height=h;const o=off.getContext("2d")!;o.drawImage(img,0,0);let px:Uint8ClampedArray;try{px=o.getImageData(0,0,w,h).data;}catch{return null;}const rh:boolean[]=new Array(h).fill(false);for(let y=0;y<h;y++){const b=y*w*4;for(let x=0;x<w;x++)if(px[b+x*4+3]>TH){rh[y]=true;break;}}const rows=seg(rh);if(!rows.length)return null;const[y0,y1]=rows[0];const ch:boolean[]=new Array(w).fill(false);for(let x=0;x<w;x++)for(let y=y0;y<y1;y++)if(px[(y*w+x)*4+3]>TH){ch[x]=true;break;}const cols=seg(ch);if(!cols.length)return null;const[x0,x1]=cols[0];return{x:x0,y:y0,w:x1-x0,h:y1-y0};}
+      function drawThumb(cv:HTMLCanvasElement,slug:string){const ctx=cv.getContext("2d")!;ctx.imageSmoothingEnabled=false;const img=new Image();img.onload=()=>{const f=firstFrame(img);if(!f)return;const s=Math.min(cv.width/f.w,cv.height/f.h)*0.9,dw=f.w*s,dh=f.h*s;ctx.clearRect(0,0,cv.width,cv.height);ctx.drawImage(img,f.x,f.y,f.w,f.h,(cv.width-dw)/2,(cv.height-dh)/2,dw,dh);cv.parentElement!.classList.remove("ap-skel");};img.src="/api/sprite/"+slug;}
+      const io=new IntersectionObserver((es)=>{for(const e of es)if(e.isIntersecting){const cv=e.target as HTMLCanvasElement;io.unobserve(cv);drawThumb(cv,cv.dataset.slug!);}},{rootMargin:"200px"});
+
+      const esc=(s:string)=>String(s).replace(/[&<>"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]!));
+      const rowsBox=document.getElementById("rows")!,moreBtn=document.getElementById("more") as HTMLButtonElement,countEl=document.getElementById("count")!,progEl=document.getElementById("progress")!,emptyEl=document.getElementById("empty")!,qEl=document.getElementById("q") as HTMLInputElement;
+      let all:any[]=[],filtered:any[]=[],shown=0;const BATCH=60;let q="",filter="all";
+
+      function row(p:any){
+        const no=p.num?String(p.num).padStart(5,"0"):"—";
+        return `<a href="/admin/pet/${esc(p.slug)}" class="flex items-center gap-3 rounded-2xl border border-line bg-white px-3 py-2 transition hover:border-brand-300 ${p.hidden?"opacity-60":""}">
+          <span class="w-12 shrink-0 text-center font-pixel text-[11px] text-faint">${no}</span>
+          <span class="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-line sprite-checker ap-skel"><canvas class="h-10 w-10" width="80" height="80" data-slug="${esc(p.slug)}"></canvas></span>
+          <div class="min-w-0 flex-1">
+            <div class="truncate font-display font-semibold text-ink">${esc(p.name)}</div>
+            <div class="flex items-center gap-2 text-xs text-faint">
+              <span class="rounded-full bg-brand-50 px-2 py-0.5 font-pixel text-[10px] uppercase tracking-wide text-brand-700">${esc(p.kind)}</span>
+              <span class="truncate">${esc(p.slug)}</span>
+            </div>
+          </div>
+          ${p.hidden?'<span class="shrink-0 rounded-full bg-rose-50 px-2.5 py-1 text-[10px] font-semibold text-rose-600">hidden</span>':""}
+          ${p.reviewed?'<span class="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" class="h-3 w-3"><path d="M20 6L9 17l-5-5"/></svg>checked</span>':'<span class="shrink-0 rounded-full border border-line px-2.5 py-1 text-[10px] font-semibold text-faint">to review</span>'}
+          <span class="shrink-0 text-brand-600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></span>
+        </a>`;
+      }
+      function renderMore(){const slice=filtered.slice(shown,shown+BATCH);shown+=slice.length;rowsBox.insertAdjacentHTML("beforeend",slice.map(row).join(""));rowsBox.querySelectorAll<HTMLCanvasElement>("canvas[data-slug]").forEach((cv)=>{if(!cv.dataset.obs){cv.dataset.obs="1";io.observe(cv);}});moreBtn.hidden=shown>=filtered.length;}
+      function apply(){
+        filtered=all.filter((p)=>{
+          if(filter==="hidden"&&!p.hidden)return false;
+          if(filter==="checked"&&!p.reviewed)return false;
+          if(filter==="unchecked"&&p.reviewed)return false;
+          if(filter!=="all"&&filter!=="hidden"&&filter!=="checked"&&filter!=="unchecked"&&p.kind!==filter)return false;
+          if(q&&!(p.name.toLowerCase().includes(q)||p.slug.toLowerCase().includes(q)))return false;
+          return true;
+        });
+        shown=0;rowsBox.innerHTML="";
+        countEl.textContent=`${filtered.length.toLocaleString()} pet${filtered.length===1?"":"s"}`;
+        emptyEl.classList.toggle("hidden",filtered.length>0);
+        renderMore();
+      }
+      moreBtn.addEventListener("click",renderMore);
+      let t:number;qEl.addEventListener("input",()=>{clearTimeout(t);t=window.setTimeout(()=>{q=qEl.value.trim().toLowerCase();apply();},180);});
+      document.getElementById("chips")!.addEventListener("click",(e)=>{const b=(e.target as HTMLElement).closest("button");if(!b)return;filter=b.dataset.filter!;document.querySelectorAll("#chips button").forEach((x)=>x.classList.remove("chip-active"));b.classList.add("chip-active");apply();});
+
+      fetch("/api/admin/pets.json").then((r)=>r.json()).then((d)=>{
+        all=(d.pets||[]).sort((a:any,b:any)=>(a.num||1e9)-(b.num||1e9)||a.name.localeCompare(b.name));
+        const done=all.filter((p:any)=>p.reviewed).length;
+        progEl.textContent=`${done.toLocaleString()} reviewed`;
+        apply();
+      }).catch(()=>{countEl.textContent="Failed to load.";});
+    </script>
+  )}
+</Base>

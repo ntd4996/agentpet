@@ -17,6 +17,12 @@
 			"database_id": "13b5de60-5ac0-46bd-b493-5d5138309f6a"
 		}
 	],
+	"r2_buckets": [
+		{
+			"binding": "PETS",
+			"bucket_name": "agentpet-petcache"
+		}
+	],
 	"observability": {
 		"enabled": true
 	}

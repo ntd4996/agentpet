@@ -1,0 +1,136 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/Icon.astro";
+import Hero from "../components/Hero.astro";
+---
+<Base title="Pet requests · AgentPet" description="Request a pet you'd love to see, and vote on others." active="">
+  <Hero
+    eyebrow="Community wishlist"
+    icon="sparkles"
+    title="Pet"
+    accent="requests"
+    lead="Wish a pet existed? Drop it here. Vote up the ones you'd adopt, and creators can pick them up from the queue."
+  />
+
+  <section class="px-4 pt-6 pb-16">
+    <div class="mx-auto max-w-3xl">
+      <!-- add a request -->
+      <div class="card p-5 sm:p-6">
+        <h2 class="font-display text-lg font-bold text-ink">Request a pet</h2>
+        <input id="rqTitle" maxlength="80" placeholder="What pet do you want? e.g. A grumpy cactus" class="mt-3 w-full rounded-xl border border-line bg-white px-4 py-2.5 text-ink outline-none focus:border-brand-300" />
+        <textarea id="rqDesc" rows="2" maxlength="400" placeholder="Add details (optional): vibe, colours, what it should do…" class="mt-2 w-full rounded-xl border border-line bg-white px-4 py-2.5 text-ink outline-none focus:border-brand-300"></textarea>
+        <div class="mt-3 flex items-center gap-3">
+          <button id="rqSubmit" class="btn-primary !px-5 !py-2.5"><Icon name="sparkles" class="h-4 w-4" /> Submit request</button>
+          <span id="rqMsg" class="text-sm"></span>
+        </div>
+      </div>
+
+      <div class="mt-6 flex items-center justify-between">
+        <div id="tabs" class="flex gap-2">
+          <button data-status="open" class="chip chip-active !px-3 !py-1 text-xs">Open</button>
+          <button data-status="fulfilled" class="chip !px-3 !py-1 text-xs">Fulfilled</button>
+        </div>
+        <span id="count" class="text-sm text-muted"></span>
+      </div>
+
+      <div id="list" class="mt-4 space-y-3"></div>
+      <div id="empty" class="hidden py-16 text-center text-muted">No requests here yet.</div>
+    </div>
+  </section>
+
+  <script>
+    const esc = (s: string) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+    let status = "open";
+    let mine = new Set<string>();
+    let isAdmin = false;
+
+    const listEl = document.getElementById("list")!;
+    const countEl = document.getElementById("count")!;
+    const emptyEl = document.getElementById("empty")!;
+
+    function card(r: any) {
+      const voted = mine.has(r.id);
+      const login = esc(r.login);
+      const avatar = r.avatar ? `<img src="${r.avatar}" class="h-5 w-5 rounded-full" alt="" />` : "";
+      const adminBtns = isAdmin ? `
+        <div class="mt-2 flex gap-2">
+          ${r.status === "open" ? `<button data-fulfill="${r.id}" class="chip !px-3 !py-1 text-xs">Mark fulfilled</button>` : `<button data-reopen="${r.id}" class="chip !px-3 !py-1 text-xs">Reopen</button>`}
+          <button data-del="${r.id}" class="chip !border-rose-200 !text-rose-600 !px-3 !py-1 text-xs">Delete</button>
+        </div>` : "";
+      return `<div data-req="${r.id}" class="card flex items-start gap-4 p-4">
+        <button data-vote="${r.id}" class="flex w-12 shrink-0 flex-col items-center rounded-xl border px-2 py-1.5 transition ${voted ? "border-brand-400 bg-brand-50 text-brand-700" : "border-line text-muted hover:border-brand-300"}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-4 w-4"><path d="M12 19V5m0 0l-6 6m6-6l6 6"/></svg>
+          <span data-votes class="font-display text-sm font-bold">${r.votes}</span>
+        </button>
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2">
+            <h3 class="font-display text-base font-semibold text-ink">${esc(r.title)}</h3>
+            ${r.status === "fulfilled" ? `<span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-600">fulfilled</span>` : ""}
+          </div>
+          ${r.description ? `<p class="mt-0.5 text-sm text-muted">${esc(r.description)}</p>` : ""}
+          <div class="mt-1.5 flex items-center gap-1.5 text-xs text-faint">${avatar}<span>by ${login}</span></div>
+          ${adminBtns}
+        </div>
+      </div>`;
+    }
+
+    async function load() {
+      listEl.innerHTML = ""; countEl.textContent = "";
+      const [d, me] = await Promise.all([
+        fetch("/api/requests.json?status=" + status).then((r) => r.json()).catch(() => ({ requests: [], mine: [] })),
+        fetch("/api/me.json").then((r) => r.json()).catch(() => ({ user: null })),
+      ]);
+      mine = new Set(d.mine || []);
+      isAdmin = !!(me.user && me.user.isAdmin);
+      const reqs = d.requests || [];
+      countEl.textContent = `${reqs.length} ${status}`;
+      emptyEl.classList.toggle("hidden", reqs.length > 0);
+      listEl.innerHTML = reqs.map(card).join("");
+    }
+
+    function toLogin() { location.href = "/api/auth/login?returnTo=" + encodeURIComponent("/requests"); }
+
+    document.getElementById("tabs")!.addEventListener("click", (e) => {
+      const b = (e.target as HTMLElement).closest("button"); if (!b) return;
+      status = b.dataset.status!;
+      document.querySelectorAll("#tabs button").forEach((x) => x.classList.remove("chip-active"));
+      b.classList.add("chip-active"); load();
+    });
+
+    document.getElementById("rqSubmit")!.addEventListener("click", async () => {
+      const t = document.getElementById("rqTitle") as HTMLInputElement;
+      const dEl = document.getElementById("rqDesc") as HTMLTextAreaElement;
+      const msg = document.getElementById("rqMsg")!;
+      msg.textContent = ""; msg.className = "text-sm";
+      if (t.value.trim().length < 3) { msg.textContent = "Add a longer title."; msg.className = "text-sm text-rose-600"; return; }
+      const res = await fetch("/api/requests/create", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: t.value.trim(), description: dEl.value.trim() }) });
+      if (res.status === 401) return toLogin();
+      const r: any = await res.json().catch(() => ({}));
+      if (r.ok) { t.value = ""; dEl.value = ""; msg.textContent = "Requested!"; msg.className = "text-sm text-emerald-600"; status = "open"; document.querySelectorAll("#tabs button").forEach((x, i) => x.classList.toggle("chip-active", i === 0)); load(); }
+      else { msg.textContent = r.error || "Failed."; msg.className = "text-sm text-rose-600"; }
+    });
+
+    listEl.addEventListener("click", async (e) => {
+      const el = e.target as HTMLElement;
+      const vote = el.closest("[data-vote]") as HTMLElement | null;
+      const fulfill = el.closest("[data-fulfill]") as HTMLElement | null;
+      const reopen = el.closest("[data-reopen]") as HTMLElement | null;
+      const del = el.closest("[data-del]") as HTMLElement | null;
+      if (vote) {
+        const id = vote.dataset.vote!;
+        const res = await fetch("/api/requests/vote", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id }) });
+        if (res.status === 401) return toLogin();
+        const r: any = await res.json().catch(() => ({}));
+        if (r.ok) { if (r.voted) mine.add(id); else mine.delete(id); load(); }
+      } else if (fulfill || reopen || del) {
+        const id = (fulfill || reopen || del)!.dataset.fulfill || (reopen as HTMLElement)?.dataset.reopen || (del as HTMLElement)?.dataset.del;
+        const action = fulfill ? "fulfill" : reopen ? "reopen" : "delete";
+        const res = await fetch("/api/admin/request", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, action }) });
+        const r: any = await res.json().catch(() => ({}));
+        if (r.ok) load();
+      }
+    });
+
+    load();
+  </script>
+</Base>

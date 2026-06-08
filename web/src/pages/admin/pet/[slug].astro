@@ -1,0 +1,196 @@
+---
+import Base from "../../../layouts/Base.astro";
+import Icon from "../../../components/Icon.astro";
+import { adminUser } from "../../../lib/admin";
+import { loadManifest, applyOverrides, petsBase, KIND_OPTIONS } from "../../../lib/pets";
+import { getDB, ensureSchema, getOverrides, getColor, getNumber, collectionsForPet } from "../../../lib/db";
+
+export const prerender = false;
+const { slug = "" } = Astro.params;
+const user = await adminUser(Astro.cookies);
+
+let pet: any = null, ovr: any = {}, all: any[] = [], color = "", num: number | null = null, inCollections: any[] = [];
+if (user) {
+  try { pet = await (await fetch(`${petsBase()}/pets/${slug}/pet.json`)).json(); } catch {}
+  const db = getDB();
+  if (db) { await ensureSchema(db); const o = await getOverrides(db); ovr = (o as any)[slug] || {}; color = await getColor(db, slug); num = await getNumber(db, slug); inCollections = await collectionsForPet(db, slug); all = applyOverrides(await loadManifest(), o as any, true).sort((a, b) => a.name.localeCompare(b.name)); }
+}
+const idx = all.findIndex((p) => p.slug === slug);
+const entry = idx >= 0 ? all[idx] : null;
+
+const name = ovr.name || pet?.displayName || slug;
+const description = ovr.description ?? pet?.description ?? "";
+const kind = ovr.kind || pet?.category || entry?.kind || "creature";
+const hidden = !!ovr.hidden;
+const source = entry?.source || pet?.source || "community";
+const submittedBy = String(entry?.submittedBy || pet?.submittedBy || "").trim() || "community";
+const noLabel = num ? String(num).padStart(5, "0") : "—";
+const KINDS = KIND_OPTIONS;
+const COLOR_HEX: Record<string, string> = { red: "#f43f5e", orange: "#fb923c", yellow: "#eab308", green: "#22c55e", teal: "#14b8a6", blue: "#3b76f6", purple: "#a855f7", pink: "#ec4899", brown: "#a16207", mono: "#94a3b8" };
+---
+<Base title={`Edit ${name} · Admin`} description="Edit a pet." active="">
+  {!user ? (
+    <section class="px-4 py-24"><div class="card mx-auto max-w-md p-8 text-center"><h1 class="font-display text-2xl font-bold text-ink">Admin only</h1><a href={`/api/auth/login?returnTo=/admin/pet/${slug}`} class="btn-primary mt-6 !px-6 !py-3"><Icon name="users" class="h-5 w-5" /> Sign in</a></div></section>
+  ) : !pet ? (
+    <section class="px-4 py-24"><div class="card mx-auto max-w-md p-8 text-center"><h1 class="font-display text-2xl font-bold text-ink">Pet not found</h1><a href="/admin" class="btn-ghost mt-6 !px-6 !py-3">Back to list</a></div></section>
+  ) : (
+    <section class="px-4 pt-8 pb-16">
+      <div class="mx-auto max-w-6xl">
+        <!-- top bar: back / jump / prev-next -->
+        <div class="flex flex-wrap items-center gap-2">
+          <a href="/admin" class="btn-ghost !px-4 !py-2 text-sm"><Icon name="arrow" class="h-4 w-4 rotate-180" /> All pets</a>
+          <div class="relative" id="jumpBox">
+            <input id="jump" type="text" autocomplete="off" placeholder="Jump to a pet…" class="w-56 rounded-full border border-line bg-white px-4 py-2 text-sm text-ink outline-none focus:border-brand-300" />
+            <div id="jumpMenu" class="absolute z-30 mt-1 hidden max-h-72 w-72 overflow-y-auto rounded-2xl border border-line bg-white p-1.5 shadow-card"></div>
+          </div>
+          <div class="ml-auto flex items-center gap-2">
+            <label class="inline-flex items-center gap-1.5 text-xs font-semibold text-faint"><input type="checkbox" id="skipChecked" checked class="h-4 w-4 rounded border-line" /> skip checked</label>
+            <button id="navPrev" class="btn-ghost !px-4 !py-2 text-sm opacity-40" disabled><Icon name="arrow" class="h-4 w-4 rotate-180" /> Prev</button>
+            <button id="navNext" class="btn-ghost !px-4 !py-2 text-sm opacity-40" disabled>Next <Icon name="arrow" class="h-4 w-4" /></button>
+          </div>
+        </div>
+
+        <div class="mt-5 grid gap-6 lg:grid-cols-[360px_1fr]">
+          <!-- preview + meta -->
+          <div class="card p-5">
+            <div class="flex items-center justify-between font-pixel text-[11px] tracking-wide text-faint">
+              <span>NO. {noLabel}</span><span class="uppercase">{source}</span>
+            </div>
+            <div class="mt-3 grid place-items-center rounded-2xl border border-line sprite-checker p-4">
+              <canvas id="prev" class="h-56 w-full" width="320" height="280" data-sheet={`/api/sprite/${slug}`}></canvas>
+            </div>
+            <div class="mt-3 text-sm text-faint">by {submittedBy} · <span class="font-mono">{slug}</span></div>
+            <div class="mt-3 flex gap-4 text-sm">
+              <span class="inline-flex items-center gap-1"><Icon name="heart" class="h-4 w-4 text-accent-500" /><span data-like-count data-slug={slug}>0</span></span>
+              <span class="inline-flex items-center gap-1"><Icon name="bolt" class="h-4 w-4 text-brand-500" /><span data-install-count data-slug={slug}>0</span></span>
+              <span class="inline-flex items-center gap-1"><Icon name="download" class="h-4 w-4 text-emerald-500" /><span data-download-count data-slug={slug}>0</span></span>
+            </div>
+            <a href={`/pet/${slug}`} target="_blank" rel="noopener" class="btn-ghost mt-4 w-full !py-2.5 text-sm"><Icon name="grid" class="h-4 w-4" /> View public page</a>
+          </div>
+
+          <!-- editor -->
+          <div class="card p-6" id="editor" data-slug={slug}>
+            <h1 class="font-display text-2xl font-bold text-ink">Edit pet</h1>
+            <div class="mt-5 space-y-4">
+              <div>
+                <label class="text-xs font-semibold text-faint">Name</label>
+                <input id="fName" value={name} maxlength="80" class="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-ink outline-none focus:border-brand-300" />
+              </div>
+              <div>
+                <label class="text-xs font-semibold text-faint">Description</label>
+                <textarea id="fDesc" rows="4" maxlength="400" placeholder="Override description (optional)" class="mt-1 w-full rounded-lg border border-line bg-white px-3 py-2.5 text-ink outline-none focus:border-brand-300">{description}</textarea>
+              </div>
+              <div class="flex flex-wrap items-end gap-4">
+                <div>
+                  <label class="text-xs font-semibold text-faint">Category</label>
+                  <select id="fKind" class="mt-1 block rounded-lg border border-line bg-white px-3 py-2.5 text-ink outline-none focus:border-brand-300">
+                    {KINDS.map((k) => <option value={k} selected={k === kind}>{k}</option>)}
+                  </select>
+                </div>
+                {color && (
+                  <div>
+                    <label class="text-xs font-semibold text-faint">Analyzed colour</label>
+                    <div class="mt-1 inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2.5 text-sm font-semibold capitalize text-ink"><span class="h-3.5 w-3.5 rounded-full" style={`background:${COLOR_HEX[color] || "#94a3b8"}`}></span>{color === "mono" ? "monochrome" : color}</div>
+                  </div>
+                )}
+                <label class="ml-auto inline-flex items-center gap-2 text-sm font-semibold text-ink"><input type="checkbox" id="fHidden" checked={hidden} class="h-4 w-4 rounded border-line" /> Hidden from gallery</label>
+              </div>
+              <div>
+                <label class="text-xs font-semibold text-faint">Collections</label>
+                <div id="curCols" class="mt-1.5 flex flex-wrap gap-2"><span class="text-xs text-faint">Loading…</span></div>
+                <div class="relative mt-2">
+                  <input id="addInput" type="text" autocomplete="off" placeholder="Add to a collection…" class="w-full max-w-sm rounded-lg border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-300" />
+                  <div id="addMenu" class="absolute z-10 mt-1 hidden max-h-52 w-full max-w-sm overflow-y-auto rounded-xl border border-line bg-white p-1.5 shadow-card"></div>
+                </div>
+              </div>
+              <div class="flex items-center gap-3 border-t border-line pt-4">
+                <button id="save" class="btn-primary !px-6 !py-3"><Icon name="check" class="h-5 w-5" /> Save changes</button>
+                <button id="saveNext" class="btn-ghost !px-5 !py-3">Save &amp; next</button>
+                <span id="msg" class="text-sm"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      // animated preview
+      type Frame = { x: number; y: number; w: number; h: number };
+      function seg(a: boolean[]) { const r: [number, number][] = []; let s: number | null = null; for (let i = 0; i < a.length; i++) { if (a[i] && s === null) s = i; else if (!a[i] && s !== null) { r.push([s, i]); s = null; } } if (s !== null) r.push([s, a.length]); return r; }
+      function sliceRows(img: HTMLImageElement) { const w = img.naturalWidth, h = img.naturalHeight, TH = 16; const off = document.createElement("canvas"); off.width = w; off.height = h; const o = off.getContext("2d")!; o.drawImage(img, 0, 0); let px: Uint8ClampedArray; try { px = o.getImageData(0, 0, w, h).data; } catch { return null; } const rh: boolean[] = new Array(h).fill(false); for (let y = 0; y < h; y++) { const b = y * w * 4; for (let x = 0; x < w; x++) if (px[b + x * 4 + 3] > TH) { rh[y] = true; break; } } const rows: Frame[][] = []; for (const [y0, y1] of seg(rh)) { const ch: boolean[] = new Array(w).fill(false); for (let x = 0; x < w; x++) for (let y = y0; y < y1; y++) if (px[(y * w + x) * 4 + 3] > TH) { ch[x] = true; break; } const fr = seg(ch).map(([x0, x1]) => ({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 })); if (fr.length) rows.push(fr); } return rows; }
+      const cv = document.getElementById("prev") as HTMLCanvasElement;
+      if (cv) { const ctx = cv.getContext("2d")!; ctx.imageSmoothingEnabled = false; const img = new Image(); let fr: Frame[] = []; let i = 0; const draw = (f: Frame) => { ctx.clearRect(0, 0, cv.width, cv.height); const s = Math.min(cv.width / f.w, cv.height / f.h) * 0.72, dw = f.w * s, dh = f.h * s; ctx.drawImage(img, f.x, f.y, f.w, f.h, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh); }; img.onload = () => { const r = sliceRows(img); if (!r || !r.length) return; fr = r[0]; draw(fr[0]); if (fr.length > 1) setInterval(() => { i = (i + 1) % fr.length; draw(fr[i]); }, 150); }; img.src = cv.dataset.sheet!; }
+
+      const esc = (s: string) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+      const slug = (document.getElementById("editor") as HTMLElement).dataset.slug!;
+      async function postPet(patch: any) { const r = await fetch("/api/admin/pet", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug, ...patch }) }); return r.ok ? r.json() : null; }
+      async function postCol(action: string, id: string) { const r = await fetch("/api/admin/collection", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, id, slug }) }); return r.ok ? r.json() : null; }
+
+      // collections
+      let collections: any[] = [], petColIds = new Set<string>();
+      const curCols = document.getElementById("curCols")!, addInput = document.getElementById("addInput") as HTMLInputElement, addMenu = document.getElementById("addMenu")!;
+      function renderCur() { const inside = collections.filter((c) => petColIds.has(c.id)); curCols.innerHTML = inside.length ? inside.map((c) => `<span class="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700">${esc(c.title)}<button data-rmcol="${c.id}" class="grid h-4 w-4 place-items-center rounded-full bg-white/70 text-rose-600 hover:bg-white">×</button></span>`).join("") : `<span class="text-xs text-faint">Not in any collection.</span>`; }
+      function renderMenu(qv: string) { const ql = qv.trim().toLowerCase(); const list = collections.filter((c) => !petColIds.has(c.id) && (!ql || c.title.toLowerCase().includes(ql))).slice(0, 30); addMenu.innerHTML = list.length ? list.map((c) => `<button data-addcol="${c.id}" class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-brand-50"><span class="truncate font-semibold text-ink">${esc(c.title)}</span><span class="shrink-0 text-xs text-faint">${c.count}</span></button>`).join("") : `<div class="px-3 py-2 text-sm text-faint">No collections.</div>`; }
+      addInput.addEventListener("focus", () => { renderMenu(addInput.value); addMenu.classList.remove("hidden"); });
+      addInput.addEventListener("input", () => { renderMenu(addInput.value); addMenu.classList.remove("hidden"); });
+      document.addEventListener("click", (e) => { if (!addInput.parentElement!.contains(e.target as Node)) addMenu.classList.add("hidden"); });
+      addMenu.addEventListener("click", async (e) => { const b = (e.target as HTMLElement).closest("[data-addcol]") as HTMLElement | null; if (!b) return; const id = b.dataset.addcol!; const r = await postCol("add", id); if (r) { petColIds.add(id); const c = collections.find((x) => x.id === id); if (c) c.count++; renderCur(); renderMenu(addInput.value); } });
+      curCols.addEventListener("click", async (e) => { const b = (e.target as HTMLElement).closest("[data-rmcol]") as HTMLElement | null; if (!b) return; const id = b.dataset.rmcol!; const r = await postCol("remove", id); if (r) { petColIds.delete(id); const c = collections.find((x) => x.id === id); if (c && c.count > 0) c.count--; renderCur(); } });
+
+      Promise.all([
+        fetch("/api/collections.json").then((r) => r.json()).catch(() => ({ collections: [] })),
+        fetch("/api/admin/pet-collections.json?slug=" + encodeURIComponent(slug)).then((r) => r.json()).catch(() => ({ ids: [] })),
+      ]).then(([cj, pc]) => { collections = (cj.collections || []).map((c: any) => ({ id: c.id, title: c.title, slug: c.slug, count: c.count })); petColIds = new Set(pc.ids || []); renderCur(); });
+
+      // save
+      const msg = document.getElementById("msg")!;
+      async function doSave() {
+        const name = (document.getElementById("fName") as HTMLInputElement).value.trim();
+        const description = (document.getElementById("fDesc") as HTMLTextAreaElement).value.trim();
+        const kind = (document.getElementById("fKind") as HTMLSelectElement).value;
+        const hidden = (document.getElementById("fHidden") as HTMLInputElement).checked;
+        msg.textContent = "Saving…"; msg.className = "text-sm text-faint";
+        const r = await postPet({ name, description, kind, hidden, reviewed: true });
+        if (r) { msg.textContent = "Saved ✓ (marked reviewed)"; msg.className = "text-sm text-emerald-600"; const cur = navList[curPos]; if (cur) cur.reviewed = true; return true; }
+        msg.textContent = "Failed"; msg.className = "text-sm text-rose-600"; return false;
+      }
+      document.getElementById("save")!.addEventListener("click", doSave);
+
+      // ---- prev / next navigation by dex number (optionally skip reviewed) ----
+      let navList: any[] = [], curPos = -1;
+      const skipEl = document.getElementById("skipChecked") as HTMLInputElement;
+      const navPrev = document.getElementById("navPrev") as HTMLButtonElement, navNext = document.getElementById("navNext") as HTMLButtonElement;
+      function findAdj(dir: number) {
+        if (curPos < 0) return null;
+        if (skipEl.checked) { for (let i = curPos + dir; i >= 0 && i < navList.length; i += dir) if (!navList[i].reviewed) return navList[i]; }
+        const j = curPos + dir; return (j >= 0 && j < navList.length) ? navList[j] : null;
+      }
+      function updateNav() {
+        const p = findAdj(-1), n = findAdj(1);
+        navPrev.disabled = !p; navNext.disabled = !n;
+        navPrev.classList.toggle("opacity-40", !p); navNext.classList.toggle("opacity-40", !n);
+      }
+      navPrev.addEventListener("click", () => { const p = findAdj(-1); if (p) location.href = "/admin/pet/" + p.slug; });
+      navNext.addEventListener("click", () => { const n = findAdj(1); if (n) location.href = "/admin/pet/" + n.slug; });
+      skipEl.addEventListener("change", updateNav);
+      document.getElementById("saveNext")!.addEventListener("click", async () => { const ok = await doSave(); if (ok) { const n = findAdj(1); if (n) location.href = "/admin/pet/" + n.slug; } });
+
+      // jump-to-pet search + nav list (sorted by dex number)
+      const jump = document.getElementById("jump") as HTMLInputElement, jumpMenu = document.getElementById("jumpMenu")!, jumpBox = document.getElementById("jumpBox")!;
+      let petsList: any[] = [];
+      fetch("/api/admin/pets.json").then((r) => r.json()).then((d) => {
+        petsList = (d.pets || []).map((p: any) => ({ slug: p.slug, name: p.name, num: p.num || 0, reviewed: !!p.reviewed }));
+        navList = [...petsList].sort((a, b) => (a.num || 1e9) - (b.num || 1e9) || a.name.localeCompare(b.name));
+        curPos = navList.findIndex((p) => p.slug === slug);
+        updateNav();
+      }).catch(() => {});
+      function renderJump(qv: string) { const ql = qv.trim().toLowerCase(); if (!ql) { jumpMenu.innerHTML = `<div class="px-3 py-2 text-sm text-faint">Type a name…</div>`; return; } const list = petsList.filter((p) => p.name.toLowerCase().includes(ql) || p.slug.toLowerCase().includes(ql)).slice(0, 30); jumpMenu.innerHTML = list.length ? list.map((p) => `<a href="/admin/pet/${esc(p.slug)}" class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-ink hover:bg-brand-50"><span class="truncate">${esc(p.name)}</span>${p.reviewed ? '<span class="shrink-0 text-emerald-600">✓</span>' : ""}</a>`).join("") : `<div class="px-3 py-2 text-sm text-faint">No matches.</div>`; }
+      jump.addEventListener("focus", () => { renderJump(jump.value); jumpMenu.classList.remove("hidden"); });
+      jump.addEventListener("input", () => { renderJump(jump.value); jumpMenu.classList.remove("hidden"); });
+      document.addEventListener("click", (e) => { if (!jumpBox.contains(e.target as Node)) jumpMenu.classList.add("hidden"); });
+
+      document.addEventListener("keydown", (e) => { const t = e.target as HTMLElement; if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA")) return; if (e.key === "ArrowRight") navNext.click(); else if (e.key === "ArrowLeft") navPrev.click(); });
+    </script>
+  )}
+</Base>

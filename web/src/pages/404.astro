@@ -1,0 +1,32 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/Icon.astro";
+
+export const prerender = false;
+Astro.response.status = 404;
+---
+<Base title="Lost in the clouds · AgentPet" description="That page floated off the island , page not found.">
+  <section class="relative overflow-hidden px-4 pt-12 pb-24">
+    <img src="/island/cloud2.png" alt="" class="pixel-art pointer-events-none absolute left-0 top-10 w-48 opacity-70" style="animation: drift 90s linear infinite" />
+    <img src="/island/cloud4.png" alt="" class="pixel-art pointer-events-none absolute right-0 top-32 w-56 opacity-60" style="animation: drift 120s linear infinite -40s" />
+    <img src="/island/cloud5.png" alt="" class="pixel-art pointer-events-none absolute left-1/4 bottom-10 w-40 opacity-50" style="animation: drift 150s linear infinite -80s" />
+
+    <div class="relative z-10 mx-auto max-w-2xl text-center">
+      <img src="/island/main.png" alt="" class="bob-slow pixel-art relative z-10 mx-auto w-full max-w-sm" style="filter: drop-shadow(0 26px 22px rgba(30,58,130,.26))" />
+      <div class="mt-6 font-pixel text-[12px] uppercase tracking-wide text-brand-500">Error 404</div>
+      <h1 class="mt-2 font-display text-4xl font-bold text-ink sm:text-5xl">Lost in the clouds</h1>
+      <p class="mx-auto mt-3 max-w-md text-muted">This page floated off the island. Let's get you back to solid ground.</p>
+      <div class="mt-7 flex flex-wrap justify-center gap-3">
+        <a href="/" class="btn-primary !px-6 !py-3"><Icon name="paw" class="h-5 w-5" /> Back home</a>
+        <a href="/gallery" class="btn-ghost !px-6 !py-3"><Icon name="grid" class="h-5 w-5" /> Browse pets</a>
+        <button id="surprise404" type="button" class="btn-ghost !px-6 !py-3"><Icon name="shuffle" class="h-5 w-5" /> Surprise me</button>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    document.getElementById("surprise404")?.addEventListener("click", async () => {
+      try { const d: any = await (await fetch("/api/random-pet.json")).json(); if (d?.slug) location.href = "/pet/" + d.slug; } catch {}
+    });
+  </script>
+</Base>

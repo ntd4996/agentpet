@@ -1,0 +1,94 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/Icon.astro";
+import { currentUser } from "../lib/admin";
+import { KIND_OPTIONS } from "../lib/pets";
+
+export const prerender = false;
+const user = await currentUser(Astro.cookies);
+const KINDS = KIND_OPTIONS;
+---
+<Base title="Submit a pet · AgentPet" description="Share your pixel companion with the community." active="">
+  <section class="px-4 pt-8 pb-16">
+    <div class="mx-auto max-w-2xl">
+      <div class="text-center">
+        <div class="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Icon name="wand" class="h-7 w-7" /></div>
+        <h1 class="mt-4 font-display text-3xl font-bold text-ink">Submit a pet</h1>
+        <p class="mx-auto mt-2 max-w-lg text-muted">Share your pixel companion with the community. Approved pets show up in the gallery, credited to your GitHub, and count toward the creator leaderboard.</p>
+      </div>
+
+      {!user ? (
+        <div class="card mt-8 p-8 text-center">
+          <p class="text-muted">Sign in with GitHub to submit a pet and get credited as its creator.</p>
+          <a href="/api/auth/login?returnTo=/submit" class="btn-primary mt-5 !px-6 !py-3"><Icon name="users" class="h-5 w-5" /> Sign in with GitHub</a>
+        </div>
+      ) : (
+        <form id="form" class="card mt-8 space-y-5 p-6 sm:p-8">
+          <div>
+            <label class="font-display text-sm font-semibold text-ink">Pet name</label>
+            <input id="name" name="name" required maxlength="60" placeholder="e.g. Bubble-tea Otter" class="mt-1.5 w-full rounded-xl border border-line bg-white px-4 py-3 text-ink outline-none focus:border-brand-300" />
+          </div>
+          <div>
+            <label class="font-display text-sm font-semibold text-ink">Category</label>
+            <select id="kind" name="kind" class="mt-1.5 w-full rounded-xl border border-line bg-white px-4 py-3 text-ink outline-none focus:border-brand-300">
+              {KINDS.map((k) => <option value={k}>{k}</option>)}
+            </select>
+          </div>
+          <div>
+            <label class="font-display text-sm font-semibold text-ink">Description <span class="font-normal text-faint">(optional)</span></label>
+            <textarea id="description" name="description" rows="2" maxlength="280" placeholder="A short, vivid line about your pet." class="mt-1.5 w-full rounded-xl border border-line bg-white px-4 py-3 text-ink outline-none focus:border-brand-300"></textarea>
+          </div>
+          <div>
+            <label class="font-display text-sm font-semibold text-ink">Spritesheet</label>
+            <p class="mt-0.5 text-sm text-muted">A 9-row pet pack (Idle, Run, Wave, Jump…), PNG or WebP, transparent background, under 5 MB. See <a href="/make" class="font-semibold text-brand-600 hover:text-brand-700">how to make one</a>.</p>
+            <input id="sprite" name="sprite" type="file" accept="image/png,image/webp" required class="mt-2 block w-full text-sm text-muted file:mr-3 file:rounded-full file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:font-semibold file:text-brand-700 hover:file:bg-brand-100" />
+            <div class="mt-3 hidden rounded-2xl border border-line p-3 sprite-checker" id="previewWrap">
+              <img id="preview" alt="spritesheet preview" class="pixel-art mx-auto max-h-64" />
+            </div>
+          </div>
+          <div class="rounded-xl bg-brand-50/60 p-3 text-xs text-muted">
+            By submitting you confirm this is your own work or original fan art. Pets that clearly violate IP may be removed. See our <a href="/legal" class="font-semibold text-brand-600 hover:text-brand-700">legal &amp; takedown</a> page.
+          </div>
+          <div class="flex items-center gap-3">
+            <button type="submit" id="submitBtn" class="btn-primary !px-6 !py-3"><Icon name="download" class="h-5 w-5 rotate-180" /> Submit for review</button>
+            <span id="msg" class="text-sm"></span>
+          </div>
+        </form>
+      )}
+    </div>
+  </section>
+
+  <script>
+    const form = document.getElementById("form") as HTMLFormElement | null;
+    if (form) {
+      const fileEl = document.getElementById("sprite") as HTMLInputElement;
+      const preview = document.getElementById("preview") as HTMLImageElement;
+      const previewWrap = document.getElementById("previewWrap")!;
+      const msg = document.getElementById("msg")!;
+      const btn = document.getElementById("submitBtn") as HTMLButtonElement;
+
+      fileEl.addEventListener("change", () => {
+        const f = fileEl.files?.[0];
+        if (f) { preview.src = URL.createObjectURL(f); previewWrap.classList.remove("hidden"); }
+        else previewWrap.classList.add("hidden");
+      });
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        msg.textContent = ""; msg.className = "text-sm";
+        btn.disabled = true; btn.classList.add("opacity-60");
+        try {
+          const res = await fetch("/api/submit", { method: "POST", body: new FormData(form) });
+          const d: any = await res.json().catch(() => ({}));
+          if (res.ok && d.ok) {
+            form.innerHTML = `<div class="py-6 text-center"><div class="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-emerald-50 text-emerald-600"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="h-6 w-6"><path d="M20 6L9 17l-5-5"/></svg></div><h2 class="mt-3 font-display text-xl font-bold text-ink">Submitted!</h2><p class="mt-1 text-muted">Your pet is in the review queue. Once approved it'll appear in the gallery, credited to you.</p><a href="/gallery" class="btn-ghost mt-5 !px-6 !py-3">Back to gallery</a></div>`;
+          } else {
+            msg.textContent = d.error || "Something went wrong."; msg.className = "text-sm text-rose-600 font-medium";
+          }
+        } catch {
+          msg.textContent = "Network error, try again."; msg.className = "text-sm text-rose-600 font-medium";
+        } finally { btn.disabled = false; btn.classList.remove("opacity-60"); }
+      });
+    }
+  </script>
+</Base>

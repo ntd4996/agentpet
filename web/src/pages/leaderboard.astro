@@ -24,14 +24,26 @@ import Hero from "../components/Hero.astro";
         <div id="lb-pets-empty" class="hidden py-10 text-center text-muted">No likes yet. Be the first to tap a heart!</div>
       </div>
 
-      <!-- top fans -->
-      <div class="card p-6 sm:p-7">
-        <div class="flex items-center gap-2">
-          <span class="grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-600"><Icon name="users" class="h-5 w-5" /></span>
-          <h2 class="font-display text-xl font-bold text-ink">Top fans</h2>
+      <div class="space-y-6">
+        <!-- top creators -->
+        <div class="card p-6 sm:p-7">
+          <div class="flex items-center gap-2">
+            <span class="grid h-9 w-9 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><Icon name="wand" class="h-5 w-5" /></span>
+            <h2 class="font-display text-xl font-bold text-ink">Top creators</h2>
+          </div>
+          <div id="lb-creators" class="mt-5 space-y-2"></div>
+          <div id="lb-creators-empty" class="hidden py-8 text-center text-sm text-muted">No creators yet. <a href="/submit" class="font-semibold text-brand-600 hover:text-brand-700">Submit a pet</a> to be the first!</div>
         </div>
-        <div id="lb-fans" class="mt-5 space-y-2"></div>
-        <div id="lb-fans-empty" class="hidden py-10 text-center text-muted">No fans yet. Sign in and start liking!</div>
+
+        <!-- top fans -->
+        <div class="card p-6 sm:p-7">
+          <div class="flex items-center gap-2">
+            <span class="grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-600"><Icon name="users" class="h-5 w-5" /></span>
+            <h2 class="font-display text-xl font-bold text-ink">Top fans</h2>
+          </div>
+          <div id="lb-fans" class="mt-5 space-y-2"></div>
+          <div id="lb-fans-empty" class="hidden py-10 text-center text-muted">No fans yet. Sign in and start liking!</div>
+        </div>
       </div>
     </div>
   </section>
@@ -57,12 +69,14 @@ import Hero from "../components/Hero.astro";
     function drawThumb(cv: HTMLCanvasElement, slug: string) {
       const ctx = cv.getContext("2d")!; ctx.imageSmoothingEnabled = false;
       const img = new Image();
-      img.onload = () => { const f = firstFrame(img); if (!f) return; const s = Math.min(cv.width / f.w, cv.height / f.h) * 0.9, dw = f.w * s, dh = f.h * s; ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(img, f.x, f.y, f.w, f.h, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh); };
+      img.onload = () => { const f = firstFrame(img); if (!f) return; const s = Math.min(cv.width / f.w, cv.height / f.h) * 0.9, dw = f.w * s, dh = f.h * s; ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(img, f.x, f.y, f.w, f.h, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh); cv.parentElement?.classList.remove("ap-skel"); };
       img.src = "/api/sprite/" + slug;
     }
     const esc = (s: string) => String(s).replace(/[^a-zA-Z0-9 ._-]/g, "");
 
     (async () => {
+      const skelRow = `<div class="flex items-center gap-3 rounded-2xl border border-line bg-white px-3 py-2"><span class="h-6 w-6 shrink-0 rounded-full ap-skel"></span><span class="h-9 w-9 shrink-0 rounded-full ap-skel"></span><span class="h-4 flex-1 rounded ap-skel"></span></div>`;
+      ["lb-pets", "lb-fans", "lb-creators"].forEach((id) => { const el = document.getElementById(id); if (el) el.innerHTML = skelRow.repeat(5); });
       const [lb, pj] = await Promise.all([
         fetch("/api/leaderboard.json").then((r) => r.json()).catch(() => ({ pets: [], fans: [] })),
         fetch("/api/pets.json").then((r) => r.json()).catch(() => ({ pets: [] })),
@@ -76,11 +90,26 @@ import Hero from "../components/Hero.astro";
       petsBox.innerHTML = pets.map((p: any, i: number) => `
         <a href="/pet/${p.slug}" class="flex items-center gap-3 rounded-2xl border border-line bg-white px-3 py-2 transition hover:border-brand-300 hover:bg-brand-50/40">
           <span class="w-6 shrink-0 text-center font-display text-sm font-bold ${i < 3 ? "text-accent-600" : "text-faint"}">${i + 1}</span>
-          <span class="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-line bg-white"><canvas class="lb-thumb h-10 w-10" width="80" height="80" data-slug="${p.slug}"></canvas></span>
+          <span class="grid h-12 w-12 shrink-0 place-items-center rounded-xl border border-line sprite-checker ap-skel"><canvas class="lb-thumb h-10 w-10" width="80" height="80" data-slug="${p.slug}"></canvas></span>
           <span class="min-w-0 flex-1 truncate font-display font-semibold text-ink">${esc(names[p.slug] || p.slug)}</span>
           <span class="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-muted"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 text-accent-500"><path d="M20.8 6.6a5 5 0 0 0-7.1 0L12 8.3l-1.7-1.7a5 5 0 1 0-7.1 7.1l1.7 1.7L12 22l7.1-7.1 1.7-1.7a5 5 0 0 0 0-7.1z"/></svg>${p.likes}</span>
         </a>`).join("");
       petsBox.querySelectorAll<HTMLCanvasElement>("canvas.lb-thumb").forEach((cv) => drawThumb(cv, cv.dataset.slug!));
+
+      const creatorsBox = document.getElementById("lb-creators")!;
+      const creators = lb.creators || [];
+      document.getElementById("lb-creators-empty")!.classList.toggle("hidden", creators.length > 0);
+      creatorsBox.innerHTML = creators.map((u: any, i: number) => {
+        const login = esc(u.login);
+        const avatar = u.avatar ? `<img src="${u.avatar}" alt="" class="h-9 w-9 shrink-0 rounded-full" />` : `<span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-600 font-display font-bold">${login.charAt(0).toUpperCase()}</span>`;
+        return `
+        <a href="https://github.com/${login}" target="_blank" rel="noopener" class="flex items-center gap-3 rounded-2xl border border-line bg-white px-3 py-2 transition hover:border-brand-300 hover:bg-brand-50/40">
+          <span class="w-6 shrink-0 text-center font-display text-sm font-bold ${i < 3 ? "text-emerald-600" : "text-faint"}">${i + 1}</span>
+          ${avatar}
+          <span class="min-w-0 flex-1 truncate font-display font-semibold text-ink">${login}</span>
+          <span class="shrink-0 text-sm font-medium text-muted">${u.count} pet${u.count === 1 ? "" : "s"}</span>
+        </a>`;
+      }).join("");
 
       const fansBox = document.getElementById("lb-fans")!;
       const fans = lb.fans || [];

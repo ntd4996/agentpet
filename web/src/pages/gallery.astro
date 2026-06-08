@@ -2,7 +2,9 @@
 import Base from "../layouts/Base.astro";
 import Icon from "../components/Icon.astro";
 import Hero from "../components/Hero.astro";
-const KINDS = ["all", "creature", "character", "critter", "spirit", "object"];
+const KINDS = ["all", "character", "creature", "asian", "western", "object"];
+const COLORS = ["all", "red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "brown", "mono"];
+const COLOR_HEX: Record<string, string> = { red: "#f43f5e", orange: "#fb923c", yellow: "#eab308", green: "#22c55e", teal: "#14b8a6", blue: "#3b76f6", purple: "#a855f7", pink: "#ec4899", brown: "#a16207", mono: "#94a3b8" };
 ---
 <Base title="Pet gallery · AgentPet" description="Browse over 1,100 pixel companions for your AI coding agents." active="gallery">
   <Hero
@@ -28,6 +30,19 @@ const KINDS = ["all", "creature", "character", "critter", "spirit", "object"];
             <button data-kind={k} class={`chip ${k === "all" ? "chip-active" : ""} capitalize`}>{k}</button>
           ))}
         </div>
+        <div class="relative" id="collectionBox">
+          <input id="collectionInput" type="text" placeholder="All collections" autocomplete="off" role="combobox" aria-expanded="false" class="w-full rounded-full border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink outline-none focus:border-brand-300 sm:w-56" />
+          <div id="collectionMenu" class="absolute right-0 z-30 mt-1 hidden max-h-72 w-full min-w-[15rem] overflow-y-auto rounded-2xl border border-line bg-white p-1.5 shadow-card"></div>
+        </div>
+      </div>
+
+      <div id="colorChips" class="mt-3 flex flex-wrap items-center gap-2 px-1">
+        <span class="mr-1 font-pixel text-[10px] uppercase tracking-wide text-faint">Color</span>
+        {COLORS.map((c) => (
+          <button data-color={c} class={`chip ${c === "all" ? "chip-active" : ""} !px-3 !py-1 text-xs capitalize`}>
+            {c !== "all" && <span class="mr-1 inline-block h-2.5 w-2.5 rounded-full align-middle" style={`background:${COLOR_HEX[c] || "#94a3b8"}`}></span>}{c === "mono" ? "mono" : c}
+          </button>
+        ))}
       </div>
 
       <div class="mt-4 flex flex-wrap items-center justify-between gap-2 px-1 text-sm text-muted">
@@ -51,8 +66,6 @@ const KINDS = ["all", "creature", "character", "critter", "spirit", "object"];
   <script>
     type Frame = { x: number; y: number; w: number; h: number };
     function fnv(s: string): number { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619) >>> 0; } return x >>> 0; }
-    const KINDS = ["creature", "character", "critter", "spirit", "object"];
-    const kindOf = (slug: string) => KINDS[(fnv(slug) >>> 3) % KINDS.length];
     const TRAITS = ["focused", "mischievous", "sleepy", "cheerful", "brave", "shy", "curious", "chaotic", "loyal", "zen", "sassy", "dreamy"];
     // Deterministic placeholder stats (per slug), same scheme as the home page,
     // until the community backend (likes / downloads) is wired up.
@@ -81,7 +94,7 @@ const KINDS = ["all", "creature", "character", "critter", "spirit", "object"];
       const draw = (f: Frame) => { ctx.clearRect(0, 0, cv.width, cv.height); const s = Math.min(cv.width / f.w, cv.height / f.h) * 0.62, dw = f.w * s, dh = f.h * s; ctx.drawImage(img, f.x, f.y, f.w, f.h, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh); };
       const play = () => { if (timer || frames.length < 2) return; timer = window.setInterval(() => { idx = (idx + 1) % frames.length; draw(frames[idx]); }, 150); };
       const stop = () => { if (timer) { clearInterval(timer); timer = null; } idx = 0; if (frames[0]) draw(frames[0]); };
-      img.onload = () => { const rows = sliceRows(img); if (!rows || !rows.length) return; const st = cv.closest("a")?.querySelector<HTMLElement>(".states"); if (st) st.textContent = rows.length + (rows.length === 1 ? " state" : " states"); frames = rows.flat(); draw(frames[0]); };
+      img.onload = () => { const rows = sliceRows(img); if (!rows || !rows.length) return; const st = cv.closest("a")?.querySelector<HTMLElement>(".states"); if (st) st.textContent = rows.length + (rows.length === 1 ? " state" : " states"); frames = rows.flat(); draw(frames[0]); cv.parentElement?.classList.remove("ap-skel"); };
       img.src = cv.dataset.sheet!;
       const host = cv.closest("a")!; host.addEventListener("mouseenter", play); host.addEventListener("mouseleave", stop);
     }
@@ -94,10 +107,12 @@ const KINDS = ["all", "creature", "character", "critter", "spirit", "object"];
     const countEl = document.getElementById("count")!;
     const emptyEl = document.getElementById("empty")!;
     const qEl = document.getElementById("q") as HTMLInputElement;
-    let all: { slug: string; name: string; kind: string }[] = [];
+    let all: { slug: string; name: string; kind: string; num: number; color: string }[] = [];
     let filtered: typeof all = []; let shown = 0; const BATCH = 50;
-    let q = "", kind = "all", sort = "default";
+    let q = "", kind = "all", color = "all", sort = "default";
     let likesMap: Record<string, number> = {};
+    let colSet: Set<string> | null = null;
+    const colCache: Record<string, Set<string>> = {};
 
     const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
     const heartSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5 text-accent-500"><path d="M20.8 6.6a5 5 0 0 0-7.1 0L12 8.3l-1.7-1.7a5 5 0 1 0-7.1 7.1l1.7 1.7L12 22l7.1-7.1 1.7-1.7a5 5 0 0 0 0-7.1z"/></svg>`;
@@ -108,7 +123,7 @@ const KINDS = ["all", "creature", "character", "critter", "spirit", "object"];
     // by community, desc fallback, tags, 3-stat footer).
     const card = (p: typeof all[number]) => {
       const f = fnv(p.slug);
-      const no = String(100 + (f % 900)).padStart(3, "0");
+      const no = p.num ? String(p.num).padStart(5, "0") : "—";
       const featured = f % 4 === 0;
       const t1 = TRAITS[f % TRAITS.length];
       const t2 = TRAITS[(f >>> 5) % TRAITS.length];
@@ -121,7 +136,7 @@ const KINDS = ["all", "creature", "character", "critter", "spirit", "object"];
         <div class="flex items-center justify-between px-4 pt-3 font-pixel text-[11px] tracking-wide text-faint">
           <span>NO. ${no}</span>${head}
         </div>
-        <div class="relative mx-4 mt-2 grid aspect-[4/5] place-items-center rounded-2xl border border-line bg-white p-3">
+        <div class="relative mx-4 mt-2 grid aspect-[4/5] place-items-center rounded-2xl border border-line sprite-checker ap-skel p-3">
           <canvas class="thumb h-full w-full" width="180" height="220" data-sheet="/api/sprite/${p.slug}"></canvas>
           <span class="states absolute bottom-2 right-2 rounded-full bg-white/90 px-2 py-0.5 font-pixel text-[10px] tracking-wide text-faint shadow-sm"></span>
         </div>
@@ -137,6 +152,7 @@ const KINDS = ["all", "creature", "character", "critter", "spirit", "object"];
           </div>
           <div class="mt-3 flex items-center gap-3 border-t border-line pt-2.5 text-xs font-medium text-muted">
             <span class="inline-flex items-center gap-1" title="Likes">${heartSvg}<span data-like-count data-slug="${p.slug}">0</span></span>
+            <span class="inline-flex items-center gap-1" title="Installs">${dlSvg}<span data-install-count data-slug="${p.slug}">0</span></span>
           </div>
         </div>
       </a>`;
@@ -151,7 +167,7 @@ const KINDS = ["all", "creature", "character", "critter", "spirit", "object"];
       moreBtn.hidden = shown >= filtered.length;
     }
     function apply() {
-      filtered = all.filter((p) => (kind === "all" || p.kind === kind) && (!q || p.name.toLowerCase().includes(q)));
+      filtered = all.filter((p) => (kind === "all" || p.kind === kind) && (color === "all" || p.color === color) && (colSet === null || colSet.has(p.slug)) && (!q || p.name.toLowerCase().includes(q)));
       if (sort === "liked") filtered = filtered.slice().sort((a, b) => (likesMap[b.slug] || 0) - (likesMap[a.slug] || 0));
       shown = 0; grid.innerHTML = "";
       countEl.textContent = `${filtered.length.toLocaleString()} pet${filtered.length === 1 ? "" : "s"}`;
@@ -166,19 +182,66 @@ const KINDS = ["all", "creature", "character", "critter", "spirit", "object"];
       document.querySelectorAll("#chips button").forEach((x) => x.classList.remove("chip-active"));
       b.classList.add("chip-active"); apply();
     });
+    document.getElementById("colorChips")!.addEventListener("click", (e) => {
+      const b = (e.target as HTMLElement).closest("button"); if (!b) return;
+      color = b.dataset.color!;
+      document.querySelectorAll("#colorChips button").forEach((x) => x.classList.remove("chip-active"));
+      b.classList.add("chip-active"); apply();
+    });
     document.querySelectorAll<HTMLButtonElement>("[data-sort]").forEach((b) => b.addEventListener("click", () => {
       sort = b.dataset.sort!;
       document.querySelectorAll("[data-sort]").forEach((x) => x.classList.remove("chip-active"));
       b.classList.add("chip-active"); apply();
     }));
 
+    // Collection filter , searchable combobox (autocomplete). Members fetched + cached.
+    const cInput = document.getElementById("collectionInput") as HTMLInputElement;
+    const cMenu = document.getElementById("collectionMenu")!;
+    const cBox = document.getElementById("collectionBox")!;
+    let allCols: { title: string; slug: string; count: number }[] = [];
+    async function selectCollection(slug: string, title: string) {
+      cInput.value = slug ? title : "";
+      cMenu.classList.add("hidden");
+      if (!slug) { colSet = null; apply(); return; }
+      if (!colCache[slug]) {
+        const cd: any = await fetch("/api/collection/" + slug + ".json").then((r) => r.json()).catch(() => ({ slugs: [] }));
+        colCache[slug] = new Set(cd.slugs || []);
+      }
+      colSet = colCache[slug]; apply();
+    }
+    function renderMenu(q: string) {
+      const ql = q.trim().toLowerCase();
+      const list = [{ title: "All collections", slug: "", count: 0 }, ...allCols.filter((c) => !ql || c.title.toLowerCase().includes(ql))].slice(0, 50);
+      cMenu.innerHTML = list.map((c) => `<button type="button" data-slug="${esc(c.slug)}" data-title="${esc(c.title)}" class="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-brand-50"><span class="truncate font-semibold text-ink">${esc(c.title)}</span>${c.slug ? `<span class="shrink-0 text-xs text-faint">${c.count}</span>` : ""}</button>`).join("") || `<div class="px-3 py-2 text-sm text-faint">No collections found.</div>`;
+    }
+    fetch("/api/collections.json").then((r) => r.json()).then((d: any) => { allCols = d.collections || []; }).catch(() => {});
+    cInput.addEventListener("focus", () => { renderMenu(cInput.value); cMenu.classList.remove("hidden"); });
+    cInput.addEventListener("input", () => { renderMenu(cInput.value); cMenu.classList.remove("hidden"); });
+    cMenu.addEventListener("click", (e) => { const b = (e.target as HTMLElement).closest("[data-slug]") as HTMLElement | null; if (b) selectCollection(b.dataset.slug!, b.dataset.title!); });
+    document.addEventListener("click", (e) => { if (!cBox.contains(e.target as Node)) cMenu.classList.add("hidden"); });
+
     // Like counts (for the "Most liked" sort). Re-sort once they arrive if active.
     fetch("/api/stats.json").then((r) => r.json()).then((d: any) => { likesMap = d.likes || {}; if (sort === "liked") apply(); }).catch(() => {});
 
+    // Pre-apply filters from URL (?kind=&color=&q=) so home facets can deep-link here.
+    function applyParams() {
+      const p = new URLSearchParams(location.search);
+      const pk = p.get("kind");
+      if (pk) { const b = document.querySelector(`#chips [data-kind="${CSS.escape(pk)}"]`); if (b) { kind = pk; document.querySelectorAll("#chips button").forEach((x) => x.classList.remove("chip-active")); b.classList.add("chip-active"); } }
+      const pc = p.get("color");
+      if (pc) { const b = document.querySelector(`#colorChips [data-color="${CSS.escape(pc)}"]`); if (b) { color = pc; document.querySelectorAll("#colorChips button").forEach((x) => x.classList.remove("chip-active")); b.classList.add("chip-active"); } }
+      const pq = p.get("q");
+      if (pq) { q = pq.toLowerCase(); qEl.value = pq; }
+    }
+
+    // skeletons while the pet list loads
+    grid.innerHTML = Array.from({ length: 12 }, () => `<div class="card overflow-hidden p-0"><div class="mx-4 mt-2 aspect-[4/5] rounded-2xl ap-skel"></div><div class="px-4 pb-4 pt-3"><div class="h-4 w-2/3 rounded ap-skel"></div><div class="mt-2 h-3 w-1/3 rounded ap-skel"></div></div></div>`).join("");
+
     fetch("/api/pets.json").then((r) => r.json()).then((d: any) => {
-      all = (d.pets ?? []).map((p: any) => ({ ...p, kind: kindOf(p.slug) }));
+      all = (d.pets ?? []).map((p: any) => ({ slug: p.slug, name: p.name, kind: p.kind || "creature", num: p.num || 0, color: p.color || "" }));
       // shuffle once so the gallery isn't always the same order
       for (let i = all.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [all[i], all[j]] = [all[j], all[i]]; }
+      applyParams();
       apply();
     });
   </script>

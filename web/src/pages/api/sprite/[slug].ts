@@ -14,7 +14,9 @@ export const GET: APIRoute = async ({ params }) => {
   const base = (env as any).PETS_ORIGIN || import.meta.env.PETS_ORIGIN || "";
   if (!base) return new Response("not configured", { status: 500 });
 
-  const upstream = await fetch(`${base}/pets/${slug}/spritesheet.webp`);
+  // Mirrored pets are .webp; community uploads may be .png, so fall back.
+  let upstream = await fetch(`${base}/pets/${slug}/spritesheet.webp`);
+  if (!upstream.ok) upstream = await fetch(`${base}/pets/${slug}/spritesheet.png`);
   if (!upstream.ok) return new Response("not found", { status: upstream.status });
 
   return new Response(upstream.body, {

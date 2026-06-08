@@ -44,7 +44,7 @@ enum PetInstaller {
     /// Returns the installed pack's id (pet.json `id`); throws on failure so the
     /// caller can show a meaningful message.
     @discardableResult
-    static func download(slug: String, petJsonURL: URL, spritesheetURL: URL) async throws -> String {
+    static func download(slug: String, petJsonURL: URL, spritesheetURL: URL, report: Bool = true) async throws -> String {
         let fm = FileManager.default
         let dir = URL(fileURLWithPath: AgentPetPaths.baseDir)
             .appendingPathComponent("pets").appendingPathComponent(slug)
@@ -57,7 +57,19 @@ enum PetInstaller {
         let sheetData = try await PetdexAssets.data(spritesheetURL)
         try sheetData.write(to: dir.appendingPathComponent(meta.spritesheetPath))
 
+        if report { reportInstall(slug: slug) }
         return meta.id ?? slug
+    }
+
+    /// Best-effort install ping so the community site can show real install counts.
+    /// Fire-and-forget: never blocks or fails the install.
+    private static func reportInstall(slug: String) {
+        guard let url = URL(string: "https://agentpet.thenightwatcher.online/api/install") else { return }
+        var r = URLRequest(url: url)
+        r.httpMethod = "POST"
+        r.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        r.httpBody = try? JSONSerialization.data(withJSONObject: ["slug": slug])
+        Task.detached { _ = try? await URLSession.shared.data(for: r) }
     }
 
     /// A user-facing reason for a failed download.
@@ -177,7 +189,8 @@ enum DefaultPetBootstrap {
                   let petJsonURL = URL(string: pick.petJsonUrl),
                   let sheetURL = URL(string: pick.spritesheetUrl) else { return }
 
-            let id = try? await PetInstaller.download(slug: pick.slug, petJsonURL: petJsonURL, spritesheetURL: sheetURL)
+            // First-run auto-install: don't count it (not a user choice).
+            let id = try? await PetInstaller.download(slug: pick.slug, petJsonURL: petJsonURL, spritesheetURL: sheetURL, report: false)
             ImagePetStore.shared.reload()
             if let id, PetController.shared.selectedPetID == nil {
                 PetController.shared.selectedPetID = id

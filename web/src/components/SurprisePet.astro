@@ -1,0 +1,68 @@
+---
+// A playful "surprise pet" that peeks in from the corner once per session (not on
+// pet/admin pages), showing a random animated companion with an adopt link.
+---
+<div id="surprise" class="pointer-events-none fixed bottom-4 left-4 z-40 hidden w-72 translate-y-6 opacity-0 transition-all duration-500">
+  <div class="pointer-events-auto card relative overflow-hidden p-4">
+    <button data-dismiss aria-label="Dismiss" class="absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full text-faint transition hover:bg-brand-50 hover:text-brand-700">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div class="flex items-center gap-3">
+      <span class="grid h-16 w-16 shrink-0 place-items-center rounded-xl border border-line sprite-checker">
+        <canvas id="surpriseCanvas" width="120" height="120" class="h-14 w-14"></canvas>
+      </span>
+      <div class="min-w-0 flex-1">
+        <div class="font-pixel text-[10px] uppercase tracking-wide text-brand-500">A wild pet appeared</div>
+        <div id="surpriseName" class="truncate font-display text-base font-bold text-ink">…</div>
+        <a id="surpriseLink" href="#" class="mt-1 inline-flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">Say hi <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-3.5 w-3.5"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const KEY = "ap_surprise_seen";
+    const p = location.pathname;
+    if (sessionStorage.getItem(KEY) || p.startsWith("/pet/") || p.startsWith("/admin")) return;
+    const box = document.getElementById("surprise"); if (!box) return;
+
+    type Frame = { x: number; y: number; w: number; h: number };
+    function seg(a: boolean[]) { const r: [number, number][] = []; let s: number | null = null; for (let i = 0; i < a.length; i++) { if (a[i] && s === null) s = i; else if (!a[i] && s !== null) { r.push([s, i]); s = null; } } if (s !== null) r.push([s, a.length]); return r; }
+    function sliceFirstRow(img: HTMLImageElement): Frame[] | null {
+      const w = img.naturalWidth, h = img.naturalHeight, TH = 16;
+      const off = document.createElement("canvas"); off.width = w; off.height = h;
+      const o = off.getContext("2d")!; o.drawImage(img, 0, 0);
+      let px: Uint8ClampedArray; try { px = o.getImageData(0, 0, w, h).data; } catch { return null; }
+      const rh: boolean[] = new Array(h).fill(false);
+      for (let y = 0; y < h; y++) { const b = y * w * 4; for (let x = 0; x < w; x++) if (px[b + x * 4 + 3] > TH) { rh[y] = true; break; } }
+      const rows = seg(rh); if (!rows.length) return null;
+      const [y0, y1] = rows[0];
+      const ch: boolean[] = new Array(w).fill(false);
+      for (let x = 0; x < w; x++) for (let y = y0; y < y1; y++) if (px[(y * w + x) * 4 + 3] > TH) { ch[x] = true; break; }
+      return seg(ch).map(([x0, x1]) => ({ x: x0, y: y0, w: x1 - x0, h: y1 - y0 }));
+    }
+
+    box.querySelector("[data-dismiss]")?.addEventListener("click", () => { box.classList.add("translate-y-6", "opacity-0"); sessionStorage.setItem(KEY, "1"); window.setTimeout(() => box.classList.add("hidden"), 400); });
+
+    window.setTimeout(async () => {
+      let d: any; try { d = await (await fetch("/api/random-pet.json")).json(); } catch { return; }
+      if (!d?.slug) return;
+      document.getElementById("surpriseName")!.textContent = d.name || d.slug;
+      document.getElementById("surpriseLink")!.setAttribute("href", "/pet/" + d.slug);
+      const cv = document.getElementById("surpriseCanvas") as HTMLCanvasElement;
+      const ctx = cv.getContext("2d")!; ctx.imageSmoothingEnabled = false;
+      const img = new Image();
+      img.onload = () => {
+        const fr = sliceFirstRow(img); if (!fr || !fr.length) return;
+        let i = 0;
+        const draw = (f: Frame) => { ctx.clearRect(0, 0, cv.width, cv.height); const s = Math.min(cv.width / f.w, cv.height / f.h) * 0.82, dw = f.w * s, dh = f.h * s; ctx.drawImage(img, f.x, f.y, f.w, f.h, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh); };
+        draw(fr[0]);
+        if (fr.length > 1) window.setInterval(() => { i = (i + 1) % fr.length; draw(fr[i]); }, 150);
+      };
+      img.src = "/api/sprite/" + d.slug;
+      box.classList.remove("hidden");
+      requestAnimationFrame(() => box.classList.remove("translate-y-6", "opacity-0"));
+    }, 5000);
+  })();
+</script>

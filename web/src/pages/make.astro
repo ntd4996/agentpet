@@ -6,7 +6,7 @@ const DISCORD = "https://discord.gg/kzFJKsZav";
 const steps = [
   { icon: "wand", title: "Design a spritesheet", body: "One transparent PNG. Each row is an animation (idle, running, waving…), each column a frame, with clear transparent gaps between frames." },
   { icon: "sparkles", title: "Add a pet.json", body: "A tiny manifest: id, displayName, and description, packed next to the spritesheet. AgentPet maps each row to a state." },
-  { icon: "paw", title: "Share it", body: "Drop your pet in our Discord (upload here is coming soon). The pet-pack format is open; artwork stays with its creator." },
+  { icon: "paw", title: "Share it", body: "Upload your spritesheet on the Submit page. Once approved it joins the gallery, credited to you. The pet-pack format is open; artwork stays with its creator." },
 ];
 const prompt = `Draw a chibi pixel-art desktop pet as ONE transparent PNG spritesheet.
 - Each ROW is an animation (idle, run, jump, wave, waiting), frames left to right.
@@ -101,10 +101,10 @@ Output a single transparent PNG.`;
       <!-- share -->
       <div class="mt-6 relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-brand-600 to-brand-500 p-10 text-center text-white shadow-card">
         <h2 class="font-display text-3xl font-bold text-white">Got a pet to share?</h2>
-        <p class="mx-auto mt-2 max-w-md text-brand-100">In-browser upload to the library is coming soon. For now, post your spritesheet in our Discord and we'll add it.</p>
+        <p class="mx-auto mt-2 max-w-md text-brand-100">Upload your spritesheet and we'll review it. Approved pets join the gallery, credited to your GitHub.</p>
         <div class="mt-6 flex flex-wrap justify-center gap-3">
-          <a href={DISCORD} target="_blank" rel="noopener" class="btn !bg-white !px-6 !py-3.5 text-base font-semibold text-brand-700"><Icon name="discord" class="h-5 w-5" /> Share on Discord</a>
-          <a href="/docs#format" class="btn !px-6 !py-3.5 text-base font-semibold text-white" style="border:1px solid rgba(255,255,255,.5)"><Icon name="book" class="h-5 w-5" /> Read the format</a>
+          <a href="/submit" class="btn !bg-white !px-6 !py-3.5 text-base font-semibold text-brand-700"><Icon name="download" class="h-5 w-5 rotate-180" /> Submit a pet</a>
+          <a href={DISCORD} target="_blank" rel="noopener" class="btn !px-6 !py-3.5 text-base font-semibold text-white" style="border:1px solid rgba(255,255,255,.5)"><Icon name="discord" class="h-5 w-5" /> Ask on Discord</a>
         </div>
       </div>
     </div>

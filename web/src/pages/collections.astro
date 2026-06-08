@@ -1,0 +1,73 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/Icon.astro";
+import Hero from "../components/Hero.astro";
+---
+<Base title="Collections · AgentPet" description="Curated shelves of pixel companions." active="collections">
+  <Hero
+    eyebrow="Curated shelves"
+    icon="grid"
+    title="Pet"
+    accent="collections"
+    lead="Hand-picked groups of companions, gathered into themed shelves. Open one to browse every pet inside."
+  />
+  <section class="px-4 pt-6 pb-16">
+    <div class="mx-auto max-w-6xl">
+      <div class="card flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+        <label class="relative flex flex-1 items-center">
+          <Icon name="search" class="pointer-events-none absolute left-4 h-5 w-5 text-faint" />
+          <input id="q" type="search" placeholder="Search collections…" class="w-full rounded-full border border-line bg-white py-3 pl-12 pr-4 text-ink outline-none focus:border-brand-300" />
+        </label>
+        <span id="count" class="px-1 text-sm text-muted">Loading…</span>
+      </div>
+      <div id="grid" class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3"></div>
+      <div id="empty" class="hidden py-16 text-center text-muted">No collections match.</div>
+    </div>
+  </section>
+
+  <script>
+    import { drawComposite } from "../lib/composite";
+    const esc = (s: string) => String(s).replace(/[^a-zA-Z0-9 &.,'!-]/g, "");
+    const grid = document.getElementById("grid")!;
+    const countEl = document.getElementById("count")!;
+    const emptyEl = document.getElementById("empty")!;
+    const qEl = document.getElementById("q") as HTMLInputElement;
+    let cols: any[] = [];
+
+    function render(list: any[]) {
+      emptyEl.classList.toggle("hidden", list.length > 0);
+      countEl.textContent = `${list.length} collection${list.length === 1 ? "" : "s"}`;
+      grid.innerHTML = list.map((c) => `
+        <a href="/collections/${esc(c.slug)}" class="card group overflow-hidden p-0 transition hover:-translate-y-1">
+          <div class="aspect-[16/9] w-full overflow-hidden border-b border-line">
+            <canvas class="collection-thumb h-full w-full" width="384" height="216" data-slugs="${(c.samples || []).join(",")}"></canvas>
+          </div>
+          <div class="p-5">
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="font-display text-xl font-bold text-ink">${esc(c.title)}</h2>
+              <span class="shrink-0 rounded-full bg-brand-50 px-2.5 py-0.5 font-pixel text-[10px] tracking-wide text-brand-700">${c.count}</span>
+            </div>
+            ${c.description ? `<p class="mt-1 line-clamp-2 text-sm text-muted">${esc(c.description)}</p>` : ""}
+            <span class="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-600">Open collection <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="h-4 w-4 transition group-hover:translate-x-1"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></span>
+          </div>
+        </a>`).join("");
+      grid.querySelectorAll<HTMLCanvasElement>(".collection-thumb[data-slugs]").forEach((cv) => drawComposite(cv, (cv.dataset.slugs || "").split(",").filter(Boolean)));
+    }
+
+    let t: number;
+    qEl.addEventListener("input", () => {
+      clearTimeout(t);
+      t = window.setTimeout(() => {
+        const q = qEl.value.trim().toLowerCase();
+        render(!q ? cols : cols.filter((c) => c.title.toLowerCase().includes(q) || (c.description || "").toLowerCase().includes(q)));
+      }, 150);
+    });
+
+    (async () => {
+      grid.innerHTML = Array.from({ length: 6 }, () => `<div class="card overflow-hidden p-0"><div class="aspect-[16/9] w-full ap-skel"></div><div class="p-5"><div class="h-5 w-1/2 rounded ap-skel"></div><div class="mt-2 h-3 w-3/4 rounded ap-skel"></div></div></div>`).join("");
+      const d: any = await fetch("/api/collections.json").then((r) => r.json()).catch(() => ({ collections: [] }));
+      cols = (d.collections || []).filter((c: any) => c.count > 0);
+      render(cols);
+    })();
+  </script>
+</Base>

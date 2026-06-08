@@ -3,23 +3,39 @@ import Base from "../layouts/Base.astro";
 import Icon from "../components/Icon.astro";
 import PetCard from "../components/PetCard.astro";
 import CodeBlock from "../components/CodeBlock.astro";
+import { loadManifest, applyOverrides, petsBase } from "../lib/pets";
+import { getDB, ensureSchema, getOverrides, approvedCommunityPets, getNumbers, listCollections, getColors } from "../lib/db";
+
+// Rendered per request (no-store) so the home reshuffles on every reload and
+// reflects admin edits live. Sprites go through our same-origin proxy
+// (/api/sprite/<slug>) so the source origin stays hidden.
+export const prerender = false;
+Astro.response.headers.set("cache-control", "no-store");
 
 const RELEASE_LATEST = "https://github.com/ntd4996/agentpet/releases/latest";
 const BREW = "brew install --cask ntd4996/tap/agentpet";
 
-// Build-time fetch from the private origin (server-side only; the URL lives in
-// env and never reaches the client). Sprites are rendered through our same-origin
-// proxy (/api/sprite/<slug>) so the source stays hidden.
-const ORIGIN = import.meta.env.PETS_ORIGIN || "";
-let petCount = 1100;
-let pets: { slug: string; name: string }[] = [];
-try {
-  const res = await fetch(`${ORIGIN}/manifest.json`);
-  const data: any = await res.json();
-  const list = data.pets ?? [];
-  petCount = list.length;
-  pets = list.map((p: any) => ({ slug: p.slug, name: p.displayName ?? p.slug }));
-} catch {}
+const manifest = await loadManifest();
+const db = getDB();
+let ovr = {};
+let community: any[] = [];
+let nums: Record<string, number> = {};
+let collections: any[] = [];
+let colorsMap: Record<string, string> = {};
+if (db) { await ensureSchema(db); ovr = await getOverrides(db); community = await approvedCommunityPets(db); nums = await getNumbers(db); collections = await listCollections(db); colorsMap = await getColors(db); }
+const collectionPreview = collections.filter((c) => c.count > 0).slice(0, 6);
+const allPets = applyOverrides([...community, ...manifest], ovr);
+
+// Facets for the home quick-browse (link into the gallery with ?kind / ?color).
+const KIND_FACETS = ["character", "creature", "asian", "western", "object"];
+const COLOR_FACETS = ["red", "orange", "yellow", "green", "teal", "blue", "purple", "pink", "brown"];
+const COLOR_HEX: Record<string, string> = { red: "#f43f5e", orange: "#fb923c", yellow: "#eab308", green: "#22c55e", teal: "#14b8a6", blue: "#3b76f6", purple: "#a855f7", pink: "#ec4899", brown: "#a16207" };
+const kindCounts: Record<string, number> = {};
+for (const p of allPets) kindCounts[p.kind] = (kindCounts[p.kind] || 0) + 1;
+const colorCounts: Record<string, number> = {};
+for (const c of Object.values(colorsMap)) colorCounts[c] = (colorCounts[c] || 0) + 1;
+const petCount = allPets.length || 1100;
+const pets: { slug: string; name: string; kind: string; num: number }[] = allPets.map((p) => ({ slug: p.slug, name: p.name, kind: p.kind, num: nums[p.slug] || 0 }));
 
 const bubbles = pets.slice(0, 10);
 
@@ -28,18 +44,17 @@ const bubbles = pets.slice(0, 10);
 function fnv(s: string): number { let x = 2166136261; for (let i = 0; i < s.length; i++) { x ^= s.charCodeAt(i); x = Math.imul(x, 16777619) >>> 0; } return x >>> 0; }
 const stat = (slug: string, k: string, mod: number, base: number) => (fnv(slug + k) % mod) + base;
 async function descOf(slug: string): Promise<string> {
-  try { const r = await fetch(`${ORIGIN}/pets/${slug}/pet.json`); const j: any = await r.json(); return (j.description ?? "").toString(); } catch { return ""; }
+  try { const r = await fetch(`${petsBase()}/pets/${slug}/pet.json`); const j: any = await r.json(); return (j.description ?? "").toString(); } catch { return ""; }
 }
-const KINDS = ["creature", "character", "critter", "spirit", "object"];
 const TRAITS = ["focused", "mischievous", "sleepy", "cheerful", "brave", "shy", "curious", "chaotic", "loyal", "zen", "sassy", "dreamy"];
-async function enrich(p: { slug: string; name: string }) {
+async function enrich(p: { slug: string; name: string; kind: string; num: number }) {
   const f = fnv(p.slug);
   const t1 = TRAITS[f % TRAITS.length];
   const t2 = TRAITS[(f >>> 5) % TRAITS.length];
   return {
     slug: p.slug, name: p.name, author: "community",
-    no: 100 + (f % 900),
-    kind: KINDS[(f >>> 3) % KINDS.length],
+    no: p.num,
+    kind: p.kind,
     tags: Array.from(new Set([t1, t2])).filter(Boolean),
     featured: f % 4 === 0,
     desc: await descOf(p.slug),
@@ -56,13 +71,13 @@ function sample<T>(arr: T[], n: number): T[] {
 }
 // Lightweight enrich (no per-pet description fetch) for the category rows so the
 // home page can group the whole library without hundreds of build-time requests.
-function lite(p: { slug: string; name: string }) {
+function lite(p: { slug: string; name: string; kind: string; num: number }) {
   const f = fnv(p.slug);
   const t1 = TRAITS[f % TRAITS.length];
   const t2 = TRAITS[(f >>> 5) % TRAITS.length];
   return {
-    slug: p.slug, name: p.name, no: 100 + (f % 900),
-    kind: KINDS[(f >>> 3) % KINDS.length],
+    slug: p.slug, name: p.name, no: p.num,
+    kind: p.kind,
     featured: f % 4 === 0,
     tags: Array.from(new Set([t1, t2])).filter(Boolean),
     desc: "",
@@ -79,10 +94,10 @@ const spotlight = chosen[0] ? await enrich(chosen[0]) : null;
 
 // Browse-by-category rows, like a pet shop. Each kind gets a small sample.
 const CATS = [
-  { key: "creature", title: "Creatures", sub: "Beasts, monsters, and little beings." },
   { key: "character", title: "Characters", sub: "Heroes, mascots, and familiar faces." },
-  { key: "critter", title: "Critters", sub: "Tiny companions with big energy." },
-  { key: "spirit", title: "Spirits", sub: "Ethereal, glowy, otherworldly pals." },
+  { key: "creature", title: "Creatures", sub: "Beasts, monsters, and little beings." },
+  { key: "object", title: "Objects", sub: "Gadgets, items, and curious things." },
+  { key: "asian", title: "Asian style", sub: "Companions with an Eastern flavour." },
 ];
 const categories = CATS.map((c) => ({
   ...c,
@@ -164,6 +179,23 @@ const bubblePos = [
     </div>
   </section>
 
+  <!-- WORKS WITH (multi-agent advantage) -->
+  <section class="px-4 pt-12">
+    <div class="mx-auto max-w-6xl text-center">
+      <div class="font-pixel text-[11px] uppercase tracking-wide text-brand-500">Works with your stack</div>
+      <h2 class="mt-2 font-display text-3xl font-bold text-ink sm:text-4xl">One pet, every coding agent</h2>
+      <p class="mx-auto mt-3 max-w-xl text-muted">AgentPet reacts to whichever agent you run, not just one. Your companion thinks, works, and celebrates right alongside them all.</p>
+      <div class="mt-7 flex flex-wrap items-center justify-center gap-2.5">
+        {["Claude Code", "Codex", "Cursor", "Gemini", "Windsurf", "Antigravity"].map((a) => (
+          <span class="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2 font-display text-sm font-semibold text-ink shadow-soft">
+            <span class="h-2 w-2 rounded-full bg-brand-500"></span>{a}
+          </span>
+        ))}
+        <a href="/integrations" class="inline-flex items-center rounded-full bg-brand-50 px-4 py-2 font-display text-sm font-semibold text-brand-700 transition hover:bg-brand-100">+ more</a>
+      </div>
+    </div>
+  </section>
+
   <!-- SPOTLIGHT: one random pet of the moment -->
   {spotlight && (
   <section class="px-4 pt-16">
@@ -178,14 +210,19 @@ const bubblePos = [
         </button>
       </div>
       <div class="card grid overflow-hidden md:grid-cols-[340px_1fr]">
-        <div class="relative grid place-items-center border-b border-line bg-white p-8 md:border-b-0 md:border-r">
+        <div class="relative grid place-items-center border-b border-line sprite-checker p-8 md:border-b-0 md:border-r">
           <span class="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full bg-accent-500 px-3 py-1 text-xs font-bold text-white shadow">
             <Icon name="sparkles" class="h-3.5 w-3.5" /> Random pick
           </span>
           <canvas id="spotCanvas" class="thumb h-52 w-48" width="200" height="240" data-sheet={`/api/sprite/${spotlight.slug}`}></canvas>
         </div>
         <div class="p-7 md:p-9">
-          <h3 id="spotName" class="font-display text-3xl font-bold text-ink">{spotlight.name}</h3>
+          <div class="flex items-center gap-2 font-pixel text-[11px] tracking-wide text-faint">
+            <span id="spotNo">NO. {spotlight.no ? String(spotlight.no).padStart(5, "0") : "—"}</span>
+            <span>·</span>
+            <span id="spotKind" class="uppercase">{spotlight.kind}</span>
+          </div>
+          <h3 id="spotName" class="mt-1 font-display text-3xl font-bold text-ink">{spotlight.name}</h3>
           <div class="mt-1 flex items-center gap-2 text-sm text-faint">
             <span class="grid h-6 w-6 place-items-center rounded-full bg-brand-100 text-brand-700"><Icon name="paw" class="h-3.5 w-3.5" /></span>
             by {spotlight.author}
@@ -204,6 +241,79 @@ const bubblePos = [
     </div>
   </section>
   )}
+
+  <!-- BROWSE BY COLLECTION (quick preview, composite scenes) -->
+  {collectionPreview.length > 0 && (
+  <section class="px-4 pt-16">
+    <div class="mx-auto max-w-6xl">
+      <div class="flex items-end justify-between">
+        <div>
+          <h2 class="font-display text-3xl font-bold text-ink">Browse by collection</h2>
+          <p class="mt-1 text-muted">Curated shelves of companions, hand-grouped by theme.</p>
+        </div>
+        <a href="/collections" class="hidden items-center gap-1 font-semibold text-brand-600 hover:text-brand-700 sm:flex">See all <Icon name="arrow" class="h-4 w-4" /></a>
+      </div>
+      <div class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        {collectionPreview.map((c) => (
+          <a href={`/collections/${c.slug}`} class="card group overflow-hidden p-0 transition hover:-translate-y-1">
+            <div class="aspect-[16/9] w-full overflow-hidden border-b border-line">
+              <canvas class="collection-thumb h-full w-full" width="384" height="216" data-slugs={c.samples.join(",")}></canvas>
+            </div>
+            <div class="flex items-center justify-between gap-2 p-5">
+              <div>
+                <h3 class="font-display text-lg font-bold text-ink">{c.title}</h3>
+                <p class="text-sm text-muted">{c.count} pet{c.count === 1 ? "" : "s"}</p>
+              </div>
+              <span class="inline-flex items-center gap-1 text-sm font-semibold text-brand-600">Open <Icon name="arrow" class="h-4 w-4 transition group-hover:translate-x-1" /></span>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+  )}
+
+  <!-- FIND YOUR MATCH (sky-island themed facet browser) -->
+  <section class="px-4 pt-16">
+    <div class="mx-auto max-w-6xl">
+      <div class="relative">
+        <!-- floating cartoon mascots (outside the panel so they aren't clipped) -->
+        <img src="/island/isl-snorlax.png" alt="" class="bob pixel-art pointer-events-none absolute -right-5 -top-8 z-20 hidden w-24 md:block" style="animation-delay:-1.2s" />
+        <img src="/island/isl-cherry.png" alt="" class="bob-2 pixel-art pointer-events-none absolute -left-5 -bottom-7 z-20 hidden w-24 md:block" style="animation-delay:-2.4s" />
+        <div class="relative overflow-hidden rounded-[2rem] border border-line bg-gradient-to-b from-brand-100 via-brand-50 to-white px-6 py-10 shadow-card sm:px-10">
+        <!-- drifting clouds (clipped to the panel) -->
+        <img src="/island/cloud3.png" alt="" class="pixel-art pointer-events-none absolute left-0 top-8 w-40 opacity-70" style="animation: drift 90s linear infinite" />
+        <img src="/island/cloud5.png" alt="" class="pixel-art pointer-events-none absolute right-0 top-28 w-48 opacity-60" style="animation: drift 120s linear infinite -40s" />
+        <img src="/island/cloud2.png" alt="" class="pixel-art pointer-events-none absolute bottom-6 left-1/4 w-32 opacity-50" style="animation: drift 150s linear infinite -80s" />
+
+        <div class="relative z-10 text-center">
+          <div class="font-pixel text-[11px] uppercase tracking-wide text-brand-500">Pick a vibe</div>
+          <h2 class="mt-2 font-display text-3xl font-bold text-ink sm:text-4xl">Find your match</h2>
+          <p class="mx-auto mt-2 max-w-lg text-muted">Float through the island library , filter by type or colour.</p>
+        </div>
+
+        <div class="relative z-10 mx-auto mt-7 grid max-w-4xl gap-5 lg:grid-cols-2">
+          <div class="rounded-3xl border border-white/70 bg-white/70 p-5 shadow-soft backdrop-blur">
+            <div class="flex items-center gap-2"><span class="grid h-8 w-8 place-items-center rounded-xl bg-brand-100 text-brand-600"><Icon name="grid" class="h-4 w-4" /></span><h3 class="font-display text-lg font-bold text-ink">By type</h3></div>
+            <div class="mt-4 flex flex-wrap gap-2">
+              {KIND_FACETS.map((k) => (
+                <a href={`/gallery?kind=${k}`} class="inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2 font-display text-sm font-semibold capitalize text-ink shadow-soft transition hover:-translate-y-0.5 hover:border-brand-300">{k}<span class="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] text-brand-700">{(kindCounts[k] || 0).toLocaleString()}</span></a>
+              ))}
+            </div>
+          </div>
+          <div class="rounded-3xl border border-white/70 bg-white/70 p-5 shadow-soft backdrop-blur">
+            <div class="flex items-center gap-2"><span class="grid h-8 w-8 place-items-center rounded-xl bg-brand-100 text-brand-600"><Icon name="sparkles" class="h-4 w-4" /></span><h3 class="font-display text-lg font-bold text-ink">By colour</h3></div>
+            <div class="mt-4 flex flex-wrap gap-2">
+              {COLOR_FACETS.map((c) => (
+                <a href={`/gallery?color=${c}`} class="inline-flex items-center gap-2 rounded-full border border-line bg-white px-3.5 py-2 font-display text-sm font-semibold capitalize text-ink shadow-soft transition hover:-translate-y-0.5 hover:border-brand-300"><span class="h-3.5 w-3.5 rounded-full ring-1 ring-black/5" style={`background:${COLOR_HEX[c]}`}></span>{c}<span class="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] text-brand-700">{(colorCounts[c] || 0).toLocaleString()}</span></a>
+              ))}
+            </div>
+          </div>
+        </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- BROWSE BY CATEGORY -->
   <section class="px-4 pt-16">
@@ -322,6 +432,9 @@ const bubblePos = [
   </section>
 
   <script>
+    import { drawComposite } from "../lib/composite";
+    document.querySelectorAll<HTMLCanvasElement>(".collection-thumb[data-slugs]").forEach((cv) => drawComposite(cv, (cv.dataset.slugs || "").split(",").filter(Boolean)));
+
     // Slice a spritesheet (alpha gutters) into rows=animations, play one row on a
     // canvas. Spotlight ([data-autoplay]) loops automatically; cards play on hover.
     // Same-origin (/api/sprite) so getImageData isn't blocked.
@@ -366,6 +479,7 @@ const bubblePos = [
           const sEl = cv.closest("a")?.querySelector<HTMLElement>(".states");
           if (sEl) sEl.textContent = rows.length + (rows.length === 1 ? " state" : " states");
           frames = rows.flat(); idx = 0; draw(frames[0]);
+          cv.parentElement?.classList.remove("ap-skel");
           if (opts.autoplay) play();
         };
         img.src = url;
@@ -394,6 +508,8 @@ const bubblePos = [
         const d: any = await (await fetch("/api/random-pet.json")).json();
         if (d && d.slug) {
           setText("spotName", d.name);
+          setText("spotNo", d.num ? "NO. " + String(d.num).padStart(5, "0") : "NO. —");
+          setText("spotKind", String(d.kind || "").toUpperCase());
           setText("spotDesc", d.desc || "A delightful community pixel companion, ready to live on your desktop.");
           const sl = document.getElementById("spotLikes");
           if (sl) { sl.setAttribute("data-slug", d.slug); sl.textContent = "0"; }

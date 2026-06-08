@@ -153,5 +153,15 @@ a.card:hover { border-color: var(--color-brand-300); box-shadow: 0 22px 48px -20
   background-position: 0 0, 8px 8px;
 }
 
+/* loading skeleton shimmer (placeholders while pets/data load) */
+@keyframes ap-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+.ap-skel {
+  background-color: #eef2fb;
+  background-image: linear-gradient(110deg, #eef2fb 30%, #f7f9ff 50%, #eef2fb 70%);
+  background-size: 200% 100%;
+  animation: ap-shimmer 1.25s linear infinite;
+}
+.ap-skel.is-loaded { animation: none; background: transparent; }
+
 /* scattered cloud field: gentle in-place sway (spread across the whole width) */
 @keyframes sway { 0%,100% { transform: translate(0,0); } 50% { transform: translate(30px,-10px); } }

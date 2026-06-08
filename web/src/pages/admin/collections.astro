@@ -1,0 +1,146 @@
+---
+import Base from "../../layouts/Base.astro";
+import Icon from "../../components/Icon.astro";
+import { adminUser } from "../../lib/admin";
+
+export const prerender = false;
+const user = await adminUser(Astro.cookies);
+---
+<Base title="Collections · Admin · AgentPet" description="Manage curated collections." active="">
+  {!user ? (
+    <section class="px-4 py-24"><div class="card mx-auto max-w-md p-8 text-center"><h1 class="font-display text-2xl font-bold text-ink">Admin only</h1><a href="/api/auth/login?returnTo=/admin/collections" class="btn-primary mt-6 !px-6 !py-3"><Icon name="users" class="h-5 w-5" /> Sign in</a></div></section>
+  ) : (
+    <section class="px-4 pt-8 pb-16">
+      <div class="mx-auto max-w-5xl">
+        <div class="flex items-center gap-2">
+          <a href="/admin" class="grid h-8 w-8 place-items-center rounded-full border border-line bg-white text-muted hover:border-brand-300 hover:text-brand-700"><Icon name="arrow" class="h-4 w-4 rotate-180" /></a>
+          <h1 class="font-display text-2xl font-bold text-ink">Collections</h1>
+        </div>
+
+        <!-- create -->
+        <div class="card mt-6 flex flex-col gap-3 p-5 sm:flex-row sm:items-end">
+          <div class="flex-1">
+            <label class="font-display text-sm font-semibold text-ink">New collection</label>
+            <input id="newTitle" placeholder="e.g. Sea Creatures" maxlength="60" class="mt-1.5 w-full rounded-xl border border-line bg-white px-4 py-2.5 text-ink outline-none focus:border-brand-300" />
+          </div>
+          <div class="flex-1">
+            <input id="newDesc" placeholder="Short description (optional)" maxlength="200" class="w-full rounded-xl border border-line bg-white px-4 py-2.5 text-ink outline-none focus:border-brand-300" />
+          </div>
+          <button id="createBtn" class="btn-primary !px-5 !py-2.5">Create</button>
+        </div>
+
+        <div class="mt-6 grid gap-6 lg:grid-cols-[1fr_1.3fr]">
+          <!-- collections list -->
+          <div>
+            <h2 class="px-1 font-display text-sm font-semibold uppercase tracking-wide text-faint">Collections</h2>
+            <div id="cols" class="mt-2 space-y-2"></div>
+            <div id="colsEmpty" class="hidden py-6 text-center text-sm text-muted">No collections yet.</div>
+          </div>
+          <!-- manage workspace -->
+          <div id="workspace" class="card hidden p-5">
+            <div class="flex items-center justify-between gap-2">
+              <h2 id="wsTitle" class="font-display text-xl font-bold text-ink"></h2>
+              <button id="wsDelete" class="chip !border-rose-200 !text-rose-600 !px-3 !py-1.5 text-xs">Delete collection</button>
+            </div>
+            <h3 class="mt-4 font-display text-sm font-semibold text-ink">Members (<span id="wsCount">0</span>)</h3>
+            <div id="wsMembers" class="mt-2 flex flex-wrap gap-2"></div>
+            <h3 class="mt-5 font-display text-sm font-semibold text-ink">Add pets</h3>
+            <input id="wsSearch" placeholder="Search pets to add…" class="mt-1.5 w-full rounded-xl border border-line bg-white px-4 py-2.5 text-ink outline-none focus:border-brand-300" />
+            <div id="wsResults" class="mt-2 max-h-72 space-y-1 overflow-y-auto"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <script>
+      const esc = (s: string) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+      let collections: any[] = [];
+      let pets: any[] = [];
+      const names: Record<string, string> = {};
+      let sel: any = null;
+      let members = new Set<string>();
+
+      const colsBox = document.getElementById("cols")!;
+      const ws = document.getElementById("workspace")!;
+
+      async function api(action: string, extra: any = {}) {
+        return fetch("/api/admin/collection", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, ...extra }) }).then((r) => r.json()).catch(() => null);
+      }
+
+      function renderCols() {
+        document.getElementById("colsEmpty")!.classList.toggle("hidden", collections.length > 0);
+        colsBox.innerHTML = collections.map((c) => `
+          <button data-col="${c.id}" class="flex w-full items-center gap-3 rounded-2xl border bg-white px-3 py-2 text-left transition hover:border-brand-300 ${sel && sel.id === c.id ? "border-brand-400 ring-1 ring-brand-300" : "border-line"}">
+            <span class="min-w-0 flex-1"><span class="block truncate font-display font-semibold text-ink">${esc(c.title)}</span><span class="text-xs text-faint">${esc(c.slug)}</span></span>
+            <span class="shrink-0 rounded-full bg-brand-50 px-2 py-0.5 font-pixel text-[10px] text-brand-700">${c.count}</span>
+          </button>`).join("");
+      }
+
+      async function select(c: any) {
+        sel = c; renderCols();
+        ws.classList.remove("hidden");
+        document.getElementById("wsTitle")!.textContent = c.title;
+        const d: any = await fetch("/api/collection/" + c.slug + ".json").then((r) => r.json()).catch(() => ({ slugs: [] }));
+        members = new Set(d.slugs || []);
+        renderMembers(); renderResults((document.getElementById("wsSearch") as HTMLInputElement).value);
+      }
+
+      function renderMembers() {
+        document.getElementById("wsCount")!.textContent = String(members.size);
+        const box = document.getElementById("wsMembers")!;
+        box.innerHTML = [...members].map((s) => `<span class="inline-flex items-center gap-1.5 rounded-full border border-line bg-white py-1 pl-2.5 pr-1.5 text-sm"><span class="max-w-[10rem] truncate">${esc(names[s] || s)}</span><button data-rm="${esc(s)}" class="grid h-5 w-5 place-items-center rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100">×</button></span>`).join("") || `<span class="text-sm text-faint">No pets yet.</span>`;
+      }
+
+      function renderResults(q: string) {
+        const box = document.getElementById("wsResults")!;
+        q = q.trim().toLowerCase();
+        if (!q) { box.innerHTML = `<p class="px-1 py-2 text-sm text-faint">Type to search pets.</p>`; return; }
+        const hits = pets.filter((p) => p.name.toLowerCase().includes(q) || p.slug.toLowerCase().includes(q)).slice(0, 25);
+        box.innerHTML = hits.map((p) => {
+          const inside = members.has(p.slug);
+          return `<div class="flex items-center gap-2 rounded-xl px-2 py-1.5 hover:bg-brand-50/50"><span class="min-w-0 flex-1 truncate text-sm text-ink">${esc(p.name)} <span class="text-faint">${esc(p.kind)}</span></span><button data-add="${esc(p.slug)}" ${inside ? "disabled" : ""} class="chip !px-3 !py-1 text-xs ${inside ? "opacity-50" : ""}">${inside ? "Added" : "Add"}</button></div>`;
+        }).join("") || `<p class="px-1 py-2 text-sm text-faint">No matches.</p>`;
+      }
+
+      // events
+      colsBox.addEventListener("click", (e) => { const b = (e.target as HTMLElement).closest("[data-col]") as HTMLElement | null; if (!b) return; const c = collections.find((x) => x.id === b.dataset.col); if (c) select(c); });
+      document.getElementById("createBtn")!.addEventListener("click", async () => {
+        const t = (document.getElementById("newTitle") as HTMLInputElement);
+        const dEl = (document.getElementById("newDesc") as HTMLInputElement);
+        if (t.value.trim().length < 2) return;
+        const r = await api("create", { title: t.value.trim(), description: dEl.value.trim() });
+        if (r?.ok) { collections.push({ ...r.collection, count: 0, samples: [] }); t.value = ""; dEl.value = ""; renderCols(); select(r.collection); }
+      });
+      document.getElementById("wsDelete")!.addEventListener("click", async () => {
+        if (!sel) return;
+        const r = await api("delete", { id: sel.id });
+        if (r?.ok) { collections = collections.filter((c) => c.id !== sel.id); sel = null; ws.classList.add("hidden"); renderCols(); }
+      });
+      let st: number;
+      document.getElementById("wsSearch")!.addEventListener("input", (e) => { clearTimeout(st); st = window.setTimeout(() => renderResults((e.target as HTMLInputElement).value), 150); });
+      document.getElementById("wsResults")!.addEventListener("click", async (e) => {
+        const b = (e.target as HTMLElement).closest("[data-add]") as HTMLElement | null; if (!b || !sel) return;
+        const slug = b.dataset.add!; b.setAttribute("disabled", "true");
+        const r = await api("add", { id: sel.id, slug });
+        if (r?.ok) { members.add(slug); const c = collections.find((x) => x.id === sel.id); if (c) c.count = members.size; renderMembers(); renderResults((document.getElementById("wsSearch") as HTMLInputElement).value); renderCols(); }
+      });
+      document.getElementById("wsMembers")!.addEventListener("click", async (e) => {
+        const b = (e.target as HTMLElement).closest("[data-rm]") as HTMLElement | null; if (!b || !sel) return;
+        const slug = b.dataset.rm!;
+        const r = await api("remove", { id: sel.id, slug });
+        if (r?.ok) { members.delete(slug); const c = collections.find((x) => x.id === sel.id); if (c) c.count = members.size; renderMembers(); renderResults((document.getElementById("wsSearch") as HTMLInputElement).value); renderCols(); }
+      });
+
+      (async () => {
+        const [cj, pj] = await Promise.all([
+          fetch("/api/collections.json").then((r) => r.json()).catch(() => ({ collections: [] })),
+          fetch("/api/pets.json").then((r) => r.json()).catch(() => ({ pets: [] })),
+        ]);
+        collections = cj.collections || [];
+        pets = pj.pets || [];
+        for (const p of pets) names[p.slug] = p.name;
+        renderCols();
+      })();
+    </script>
+  )}
+</Base>
