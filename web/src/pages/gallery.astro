@@ -28,6 +28,9 @@ const KINDS = ["all", "character", "creature", "asian", "western", "object"];
             <button data-kind={k} class={`chip ${k === "all" ? "chip-active" : ""} capitalize`}>{k}</button>
           ))}
         </div>
+        <select id="collection" class="rounded-full border border-line bg-white px-4 py-2.5 text-sm font-semibold text-ink outline-none focus:border-brand-300">
+          <option value="">All collections</option>
+        </select>
       </div>
 
       <div class="mt-4 flex flex-wrap items-center justify-between gap-2 px-1 text-sm text-muted">
@@ -96,6 +99,8 @@ const KINDS = ["all", "character", "creature", "asian", "western", "object"];
     let filtered: typeof all = []; let shown = 0; const BATCH = 50;
     let q = "", kind = "all", sort = "default";
     let likesMap: Record<string, number> = {};
+    let colSet: Set<string> | null = null;
+    const colCache: Record<string, Set<string>> = {};
 
     const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
     const heartSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-3.5 w-3.5 text-accent-500"><path d="M20.8 6.6a5 5 0 0 0-7.1 0L12 8.3l-1.7-1.7a5 5 0 1 0-7.1 7.1l1.7 1.7L12 22l7.1-7.1 1.7-1.7a5 5 0 0 0 0-7.1z"/></svg>`;
@@ -150,7 +155,7 @@ const KINDS = ["all", "character", "creature", "asian", "western", "object"];
       moreBtn.hidden = shown >= filtered.length;
     }
     function apply() {
-      filtered = all.filter((p) => (kind === "all" || p.kind === kind) && (!q || p.name.toLowerCase().includes(q)));
+      filtered = all.filter((p) => (kind === "all" || p.kind === kind) && (colSet === null || colSet.has(p.slug)) && (!q || p.name.toLowerCase().includes(q)));
       if (sort === "liked") filtered = filtered.slice().sort((a, b) => (likesMap[b.slug] || 0) - (likesMap[a.slug] || 0));
       shown = 0; grid.innerHTML = "";
       countEl.textContent = `${filtered.length.toLocaleString()} pet${filtered.length === 1 ? "" : "s"}`;
@@ -170,6 +175,21 @@ const KINDS = ["all", "character", "creature", "asian", "western", "object"];
       document.querySelectorAll("[data-sort]").forEach((x) => x.classList.remove("chip-active"));
       b.classList.add("chip-active"); apply();
     }));
+
+    // Collection filter (populated from the API; members fetched + cached on demand).
+    const colSel = document.getElementById("collection") as HTMLSelectElement;
+    fetch("/api/collections.json").then((r) => r.json()).then((d: any) => {
+      for (const c of d.collections || []) { const o = document.createElement("option"); o.value = c.slug; o.textContent = `${c.title} (${c.count})`; colSel.appendChild(o); }
+    }).catch(() => {});
+    colSel.addEventListener("change", async () => {
+      const slug = colSel.value;
+      if (!slug) { colSet = null; apply(); return; }
+      if (!colCache[slug]) {
+        const cd: any = await fetch("/api/collection/" + slug + ".json").then((r) => r.json()).catch(() => ({ slugs: [] }));
+        colCache[slug] = new Set(cd.slugs || []);
+      }
+      colSet = colCache[slug]; apply();
+    });
 
     // Like counts (for the "Most liked" sort). Re-sort once they arrive if active.
     fetch("/api/stats.json").then((r) => r.json()).then((d: any) => { likesMap = d.likes || {}; if (sort === "liked") apply(); }).catch(() => {});
