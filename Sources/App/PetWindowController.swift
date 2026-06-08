@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import Combine
+import ApplicationServices
 
 /// A borderless, always-on-top, draggable floating window that hosts the pet.
 /// Visibility is user-toggleable; size follows the pet-size setting.
@@ -90,6 +91,16 @@ final class PetWindowController: ObservableObject {
     private var animClipTimer: Timer?
     private static let moveInterval = 1.0 / 30.0
 
+    private var isDodging = false
+    private var lastDodgeTriggerTime: Date?
+
+    private enum DodgeSource {
+        case none
+        case mouse
+        case caret
+    }
+    private var currentDodgeSource: DodgeSource = .none
+
     private func startWandering() {
         nextStateTime = .init()
         // State transition: check every 0.5s whether to walk/idle/rest.
@@ -163,6 +174,8 @@ final class PetWindowController: ObservableObject {
     }
 
     private func wanderStateTick() {
+        guard !isDodging else { return }
+
         let mood = PetController.shared.mood
 
         // If mood is not idle, we should not rest.
@@ -243,29 +256,207 @@ final class PetWindowController: ObservableObject {
         }
     }
 
+    private func getCaretRect() -> CGRect? {
+        guard AXIsProcessTrusted() else { return nil }
+        
+        let systemWideElement = AXUIElementCreateSystemWide()
+        var focusedElement: AnyObject?
+        let error = AXUIElementCopyAttributeValue(systemWideElement, kAXFocusedUIElementAttribute as CFString, &focusedElement)
+        guard error == .success, let focused = focusedElement else { return nil }
+        let element = focused as! AXUIElement
+
+        var selectedRangeValue: AnyObject?
+        let rangeError = AXUIElementCopyAttributeValue(element, kAXSelectedTextRangeAttribute as CFString, &selectedRangeValue)
+        guard rangeError == .success, let rangeVal = selectedRangeValue else { return nil }
+
+        var selectBounds: AnyObject?
+        var boundsError = AXUIElementCopyParameterizedAttributeValue(element, kAXBoundsForRangeParameterizedAttribute as CFString, rangeVal, &selectBounds)
+        
+        var boundsSuccess = (boundsError == .success && selectBounds != nil)
+        
+        // Fallback: If querying the range directly failed (common in non-native or web-based text fields
+        // when range length is 0), we decode the range and try with length = 1.
+        if !boundsSuccess {
+            var range = CFRange()
+            if AXValueGetValue(rangeVal as! AXValue, .cfRange, &range) {
+                // Try with length = 1 (next character)
+                var modifiedRange = range
+                modifiedRange.length = 1
+                if let newValue = AXValueCreate(.cfRange, &modifiedRange) {
+                    boundsError = AXUIElementCopyParameterizedAttributeValue(element, kAXBoundsForRangeParameterizedAttribute as CFString, newValue, &selectBounds)
+                    boundsSuccess = (boundsError == .success && selectBounds != nil)
+                }
+                
+                // Second Fallback: If that also failed (e.g. at the end of text),
+                // try location - 1 with length = 1 (previous character).
+                if !boundsSuccess && range.location > 0 {
+                    var prevRange = range
+                    prevRange.location -= 1
+                    prevRange.length = 1
+                    if let newValue = AXValueCreate(.cfRange, &prevRange) {
+                        boundsError = AXUIElementCopyParameterizedAttributeValue(element, kAXBoundsForRangeParameterizedAttribute as CFString, newValue, &selectBounds)
+                        boundsSuccess = (boundsError == .success && selectBounds != nil)
+                    }
+                }
+            }
+        }
+
+        guard boundsSuccess, let boundsVal = selectBounds else { return nil }
+
+        var selectRect = CGRect()
+        if AXValueGetValue(boundsVal as! AXValue, .cgRect, &selectRect) {
+            if let primaryScreen = NSScreen.screens.first {
+                let primaryHeight = primaryScreen.frame.height
+                let cocoaY = primaryHeight - selectRect.origin.y - selectRect.size.height
+                return CGRect(x: selectRect.origin.x, y: cocoaY, width: selectRect.size.width, height: selectRect.size.height)
+            }
+            return selectRect
+        }
+        return nil
+    }
+
+    private func checkProximity(panel: NSPanel) {
+        let mouseEnabled = PetController.shared.dodgeMouse
+        let caretEnabled = PetController.shared.dodgeTextCursor
+
+        guard mouseEnabled || caretEnabled else {
+            if isDodging {
+                isDodging = false
+                currentDodgeSource = .none
+                wanderState = .idle
+                isMoving = false
+                isResting = false
+            }
+            return
+        }
+
+        // If mouse button is pressed (any button), don't trigger/continue dodging.
+        // This prevents jittering when the user tries to drag or click the pet.
+        guard NSEvent.pressedMouseButtons == 0 else {
+            if isDodging {
+                isDodging = false
+                currentDodgeSource = .none
+                wanderState = .idle
+                isMoving = false
+                isResting = false
+            }
+            return
+        }
+
+        let windowFrame = panel.frame
+        let windowCenter = NSPoint(x: windowFrame.midX, y: windowFrame.midY)
+        
+        let sensitivity = PetController.shared.dodgeSensitivity / 100.0
+
+        var targetDx: CGFloat = 0
+        var isNear = false
+        var source: DodgeSource = .none
+
+        // 1. Check Mouse Proximity
+        if mouseEnabled {
+            let mouseLoc = NSEvent.mouseLocation
+            let dx = windowCenter.x - mouseLoc.x // positive if pet is to the right of the mouse
+            let dy = windowCenter.y - mouseLoc.y
+            let distance = sqrt(dx * dx + dy * dy)
+            
+            let maxThreshold = max(130.0, windowFrame.width * 0.8)
+            let minThreshold = windowFrame.width * 0.4
+            let threshold = minThreshold + (maxThreshold - minThreshold) * sensitivity
+
+            if distance < threshold {
+                targetDx = dx
+                isNear = true
+                source = .mouse
+            }
+        }
+
+        // 2. Check Caret Proximity if mouse is not already close
+        if !isNear && caretEnabled, let caretRect = getCaretRect() {
+            let caretCenter = NSPoint(x: caretRect.midX, y: caretRect.midY)
+            let dx = windowCenter.x - caretCenter.x // positive if pet is to the right of the caret
+            let dy = windowCenter.y - caretCenter.y
+            let distance = sqrt(dx * dx + dy * dy)
+            
+            let maxThreshold = max(160.0, windowFrame.width * 1.0)
+            let minThreshold = windowFrame.width * 0.4
+            let threshold = minThreshold + (maxThreshold - minThreshold) * sensitivity
+
+            if distance < threshold {
+                targetDx = dx
+                isNear = true
+                source = .caret
+            }
+        }
+
+        if isNear {
+            isDodging = true
+            lastDodgeTriggerTime = Date()
+            currentDodgeSource = source
+
+            // Run in the direction away from the source.
+            // If pet is to the right of the source (targetDx >= 0), run right (1).
+            // If pet is to the left of the source (targetDx < 0), run left (-1).
+            let targetDirection: CGFloat = targetDx >= 0 ? 1 : -1
+            if wanderDirection != targetDirection || !isMoving {
+                wanderDirection = targetDirection
+                direction = targetDirection
+                updateMoveClip(for: targetDirection)
+            }
+            
+            wanderState = .walking
+            isMoving = true
+            isResting = false
+        } else {
+            // Mouse and Caret are far. If we were dodging, keep running for a brief moment
+            // to make the escape feel natural and move the pet further away.
+            if isDodging {
+                if let lastTrigger = lastDodgeTriggerTime, Date().timeIntervalSince(lastTrigger) > 0.8 {
+                    isDodging = false
+                    currentDodgeSource = .none
+                    wanderState = .idle
+                    isMoving = false
+                    isResting = false
+                    nextStateTime = Date().addingTimeInterval(2.0) // Pause briefly after running away
+                }
+            }
+        }
+    }
+
     private func moveTick() {
-        guard wanderState == .walking,
-              let panel,
+        guard let panel,
               let screen = currentScreen(for: panel.frame)?.visibleFrame
         else { return }
 
-        let speed: CGFloat = 3.0
+        checkProximity(panel: panel)
+
+        guard wanderState == .walking || isDodging else { return }
+
+        let speed: CGFloat = isDodging ? 6.0 : 3.0
         var newX = panel.frame.minX + wanderDirection * speed
         let margin: CGFloat = 16
         let minX = screen.minX + margin
         let maxX = screen.maxX - panel.frame.width - margin
 
-        // Hit wall → bounce off the wall and continue moving.
-        if newX < minX {
-            newX = minX
-            wanderDirection = 1
-            direction = 1
-            updateMoveClip(for: 1)
-        } else if newX > maxX {
-            newX = maxX
-            wanderDirection = -1
-            direction = -1
-            updateMoveClip(for: -1)
+        if isDodging {
+            // If dodging, we run up to the wall and stay there. Do not bounce back towards the source!
+            if wanderDirection == -1 && newX <= minX {
+                newX = minX
+            } else if wanderDirection == 1 && newX >= maxX {
+                newX = maxX
+            }
+        } else {
+            // Hit wall → bounce off the wall and continue moving.
+            if newX < minX {
+                newX = minX
+                wanderDirection = 1
+                direction = 1
+                updateMoveClip(for: 1)
+            } else if newX > maxX {
+                newX = maxX
+                wanderDirection = -1
+                direction = -1
+                updateMoveClip(for: -1)
+            }
         }
 
         panel.setFrameOrigin(NSPoint(x: newX, y: panel.frame.minY))

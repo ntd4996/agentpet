@@ -276,6 +276,41 @@ private struct GeneralTab: View {
                          onReset: { sound.resetToDefault(.waiting) })
             }
 
+            Section("Movement") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Dodge mouse cursor")
+                        Text("The pet automatically runs away from the mouse cursor.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    ColorSwitch(isOn: $pet.dodgeMouse)
+                }
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Dodge text cursor")
+                        Text("The pet automatically runs away from the text insertion point.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    ColorSwitch(isOn: $pet.dodgeTextCursor)
+                }
+                if pet.dodgeMouse || pet.dodgeTextCursor {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Dodge sensitivity")
+                            Text("Adjust the radius at which the pet starts fleeing.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Slider(value: $pet.dodgeSensitivity, in: 0...100)
+                            .frame(width: 240)
+                        Text("\(Int(pet.dodgeSensitivity))%")
+                            .monospacedDigit().foregroundStyle(.secondary).fixedSize()
+                    }
+                }
+            }
+
             Section("Agent integrations") {
                 ForEach(model.agents) { agent in
                     HStack {

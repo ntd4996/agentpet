@@ -103,11 +103,31 @@ struct MenuContentView: View {
             controlRow(icon: "pawprint", label: "Show pet", isOn: $petWindow.isVisible)
             controlRow(icon: "number", label: "Show count on menu bar", isOn: $statusBar.showCount)
             controlRow(icon: "bubble.left", label: "Show chat on menu bar", isOn: $statusBar.showChatOnMenuBar)
+            controlRow(icon: "cursorarrow", label: "Dodge mouse cursor", isOn: $pet.dodgeMouse)
+            controlRow(icon: "keyboard", label: "Dodge text cursor", isOn: $pet.dodgeTextCursor)
+            if pet.dodgeMouse || pet.dodgeTextCursor {
+                sensitivityRow
+            }
             sizeRow
             if pet.showChat {
                 chatFrequencyRow
             }
         }
+    }
+
+    private var sensitivityRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "gauge.with.needle")
+                .foregroundStyle(.white.opacity(0.8)).frame(width: 16)
+            Text("Dodge range").font(.system(size: 13)).foregroundStyle(.white)
+            Slider(value: $pet.dodgeSensitivity, in: 0...100)
+                .controlSize(.mini)
+                .tint(Color.systemAccent)
+            Text("\(Int(pet.dodgeSensitivity))%")
+                .font(.system(size: 11, weight: .medium)).monospacedDigit()
+                .foregroundStyle(.white.opacity(0.6)).fixedSize()
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
     }
 
     private var sizeRow: some View {
