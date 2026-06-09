@@ -122,6 +122,7 @@ private struct AboutTab: View {
     private let repo = URL(string: "https://github.com/ntd4996/agentpet")!
     private let profile = URL(string: "https://github.com/ntd4996")!
     private let coffee = URL(string: "https://buymeacoffee.com/ntd4996")!
+    private let discord = URL(string: "https://discord.gg/kzFJKsZav")!
 
     var body: some View {
         Form {
@@ -144,6 +145,12 @@ private struct AboutTab: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Color.systemAccent)
+                .controlSize(.large)
+
+                Button { openURL(discord) } label: {
+                    Label("Join the Discord", systemImage: "bubble.left.and.bubble.right.fill")
+                        .frame(maxWidth: .infinity)
+                }
                 .controlSize(.large)
 
                 Button { openURL(coffee) } label: {
