@@ -1,0 +1,73 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/Icon.astro";
+import Hero from "../components/Hero.astro";
+
+export const prerender = false;
+
+const REPO = "ntd4996/agentpet";
+
+// Baked snapshot, used if the GitHub API is unreachable or rate-limited.
+const FALLBACK = [
+  { login: "ntd4996", contributions: 257, avatar_url: "https://avatars.githubusercontent.com/u/46896275?v=4", html_url: "https://github.com/ntd4996" },
+  { login: "3xhvy", contributions: 27, avatar_url: "https://avatars.githubusercontent.com/u/127609002?v=4", html_url: "https://github.com/3xhvy" },
+  { login: "tranhuuhuy297", contributions: 2, avatar_url: "https://avatars.githubusercontent.com/u/46334604?v=4", html_url: "https://github.com/tranhuuhuy297" },
+  { login: "heo001997", contributions: 1, avatar_url: "https://avatars.githubusercontent.com/u/20258751?v=4", html_url: "https://github.com/heo001997" },
+  { login: "minhat-dg", contributions: 1, avatar_url: "https://avatars.githubusercontent.com/u/70907443?v=4", html_url: "https://github.com/minhat-dg" },
+];
+
+// Friendlier display names + roles for known contributors; others fall back to
+// their GitHub handle and a generic "Contributor" label.
+const NAMES: Record<string, string> = { ntd4996: "Nguyễn Thành Đạt", "3xhvy": "Hồ Hoàng Huy" };
+const ROLES: Record<string, string> = { ntd4996: "Creator & maintainer", "3xhvy": "Multi-agent bubble" };
+
+let contributors: any[] = FALLBACK;
+try {
+  const res = await fetch(`https://api.github.com/repos/${REPO}/contributors?per_page=100`, {
+    headers: { "User-Agent": "agentpet-site", Accept: "application/vnd.github+json" },
+  });
+  if (res.ok) {
+    const data: any = await res.json();
+    if (Array.isArray(data) && data.length) contributors = data.filter((c: any) => c.type !== "Bot");
+  }
+} catch {}
+
+const total = contributors.reduce((s, c) => s + (c.contributions || 0), 0);
+const name = (login: string) => NAMES[login] || login;
+const role = (login: string) => ROLES[login] || "Contributor";
+---
+<Base title="Contributors · AgentPet" description="The people who build AgentPet." active="contributors">
+  <Hero
+    eyebrow="Hall of fame"
+    icon="heart"
+    title="Built by"
+    accent="the community"
+    lead={`${contributors.length} people have shipped code to AgentPet across ${total.toLocaleString()} commits. Thank you for making the pet better.`}
+  >
+    <a href="https://github.com/ntd4996/agentpet" target="_blank" rel="noopener" class="btn-primary !px-6 !py-3"><Icon name="grid" class="h-5 w-5" /> View on GitHub</a>
+    <a href="https://github.com/ntd4996/agentpet/issues" target="_blank" rel="noopener" class="btn-ghost !px-6 !py-3"><Icon name="sparkles" class="h-5 w-5" /> Find an issue to fix</a>
+  </Hero>
+
+  <section class="px-4 pt-8 pb-16">
+    <div class="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {contributors.map((c) => (
+        <a href={c.html_url} target="_blank" rel="noopener"
+           class="card flex items-center gap-4 p-4 transition hover:-translate-y-0.5 hover:border-brand-300">
+          <img src={c.avatar_url} alt={c.login} width="56" height="56" loading="lazy"
+               class="h-14 w-14 shrink-0 rounded-2xl border border-line bg-white object-cover" />
+          <div class="min-w-0">
+            <div class="truncate font-display font-semibold text-ink">{name(c.login)}</div>
+            <div class="truncate text-sm text-muted">@{c.login}</div>
+            <div class="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-brand-600">
+              <Icon name="heart" class="h-3 w-3" />{role(c.login)} · {c.contributions} commit{c.contributions === 1 ? "" : "s"}
+            </div>
+          </div>
+        </a>
+      ))}
+    </div>
+    <p class="mx-auto mt-10 max-w-2xl text-center text-muted">
+      Want your face here? AgentPet is open source , send a pull request on
+      <a class="font-semibold text-brand-700 hover:underline" href="https://github.com/ntd4996/agentpet">GitHub</a>.
+    </p>
+  </section>
+</Base>
