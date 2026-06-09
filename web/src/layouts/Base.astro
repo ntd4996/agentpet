@@ -254,6 +254,16 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
             attrNodes.push({ el: el, attr: attr, en: el.getAttribute("data-i18n-" + attr) });
           });
         });
+        // Auto-translate common attributes whose value matches a known key
+        // (placeholders, titles, etc.) without needing explicit markup.
+        ["placeholder", "title", "aria-label", "alt"].forEach(function (attr) {
+          document.querySelectorAll("[" + attr + "]").forEach(function (el) {
+            var v = el.getAttribute(attr);
+            if (v && KNOWN[v.trim()] && !el.hasAttribute("data-i18n-" + attr)) {
+              attrNodes.push({ el: el, attr: attr, en: v.trim() });
+            }
+          });
+        });
         var walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
         var n;
         while ((n = walker.nextNode())) {
