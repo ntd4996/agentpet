@@ -72,3 +72,22 @@
 "Simple bubble" = "简单气泡";
 "All agents" = "所有 Agent";
 "Turn on multi-agent bubble above for per-agent rows with icons and activity." = "开启上方的多 Agent 气泡，即可为每个 Agent 显示带图标和活动的独立行。";
+
+/* About & Pet tab */
+"A desktop pet that watches your AI coding agents." = "盯着你的 AI 编码 Agent 的桌面宠物。";
+"Star on GitHub" = "在 GitHub 上点亮 Star";
+"Join the Discord" = "加入 Discord";
+"Buy me a coffee" = "请我喝杯咖啡";
+"If AgentPet helps your workflow, a star means a lot. Thank you!" = "如果 AgentPet 帮到了你，点个 Star 意义非凡。谢谢！";
+"Author" = "作者";
+"Version" = "版本";
+"Choose pet" = "选择宠物";
+"Animations" = "动画";
+"Size on screen" = "屏幕上的大小";
+"Browse pets…" = "浏览宠物…";
+"Create pet…" = "创建宠物…";
+"No pets yet. Tap Browse to add one." = "还没有宠物。点击“浏览”来添加。";
+"Hover a clip to preview it." = "将鼠标悬停在片段上即可预览。";
+"No pet selected" = "未选择宠物";
+"State" = "状态";
+"Pick a pet in the Pet tab" = "在“宠物”标签中选择一只宠物";

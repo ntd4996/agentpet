@@ -72,3 +72,22 @@
 "Simple bubble" = "Bong bóng đơn giản";
 "All agents" = "Tất cả agent";
 "Turn on multi-agent bubble above for per-agent rows with icons and activity." = "Bật bong bóng đa agent ở trên để có dòng riêng từng agent kèm icon và hoạt động.";
+
+/* About & Pet tab */
+"A desktop pet that watches your AI coding agents." = "Thú cưng desktop theo dõi các agent code AI của bạn.";
+"Star on GitHub" = "Star trên GitHub";
+"Join the Discord" = "Tham gia Discord";
+"Buy me a coffee" = "Mời tôi ly cà phê";
+"If AgentPet helps your workflow, a star means a lot. Thank you!" = "Nếu AgentPet giúp ích cho bạn, một ngôi sao có ý nghĩa rất lớn. Cảm ơn!";
+"Author" = "Tác giả";
+"Version" = "Phiên bản";
+"Choose pet" = "Chọn thú cưng";
+"Animations" = "Hoạt ảnh";
+"Size on screen" = "Kích thước trên màn hình";
+"Browse pets…" = "Duyệt thú cưng…";
+"Create pet…" = "Tạo thú cưng…";
+"No pets yet. Tap Browse to add one." = "Chưa có thú cưng. Bấm Duyệt để thêm.";
+"Hover a clip to preview it." = "Di chuột lên một clip để xem thử.";
+"No pet selected" = "Chưa chọn thú cưng";
+"State" = "Trạng thái";
+"Pick a pet in the Pet tab" = "Chọn thú cưng ở tab Pet";

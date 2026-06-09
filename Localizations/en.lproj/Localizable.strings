@@ -72,3 +72,22 @@
 "Simple bubble" = "Simple bubble";
 "All agents" = "All agents";
 "Turn on multi-agent bubble above for per-agent rows with icons and activity." = "Turn on multi-agent bubble above for per-agent rows with icons and activity.";
+
+/* About & Pet tab */
+"A desktop pet that watches your AI coding agents." = "A desktop pet that watches your AI coding agents.";
+"Star on GitHub" = "Star on GitHub";
+"Join the Discord" = "Join the Discord";
+"Buy me a coffee" = "Buy me a coffee";
+"If AgentPet helps your workflow, a star means a lot. Thank you!" = "If AgentPet helps your workflow, a star means a lot. Thank you!";
+"Author" = "Author";
+"Version" = "Version";
+"Choose pet" = "Choose pet";
+"Animations" = "Animations";
+"Size on screen" = "Size on screen";
+"Browse pets…" = "Browse pets…";
+"Create pet…" = "Create pet…";
+"No pets yet. Tap Browse to add one." = "No pets yet. Tap Browse to add one.";
+"Hover a clip to preview it." = "Hover a clip to preview it.";
+"No pet selected" = "No pet selected";
+"State" = "State";
+"Pick a pet in the Pet tab" = "Pick a pet in the Pet tab";
