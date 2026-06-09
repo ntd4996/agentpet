@@ -1,0 +1,7 @@
+/* AgentPet localizable strings , English (base). Keys are the English UI text. */
+
+/* Tabs */
+"General" = "General";
+"Pet" = "Pet";
+"Bubble" = "Bubble";
+"About" = "About";

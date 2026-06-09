@@ -31,6 +31,14 @@ SHORT_VERSION="$(/usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $SHORT_VERSION" "$APP/Contents/Info.plist"
 [ -f "$ROOT/scripts/AppIcon.icns" ] && cp "$ROOT/scripts/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
+# Localizations (en/vi/zh-Hans). Copied into the .app so Bundle.main picks the
+# user's system language automatically for SwiftUI Text + NSLocalizedString.
+if [ -d "$ROOT/Localizations" ]; then
+    for lproj in "$ROOT/Localizations"/*.lproj; do
+        [ -d "$lproj" ] && cp -R "$lproj" "$APP/Contents/Resources/"
+    done
+fi
+
 # Note: SwiftPM emits an empty AgentPet_AgentPetCore.bundle, but nothing uses
 # Bundle.module, so we deliberately do not copy it (it has no Info.plist and
 # would break code signing). The app needs no runtime resource bundle.

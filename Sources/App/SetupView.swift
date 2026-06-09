@@ -92,7 +92,7 @@ struct SetupView: View {
 
 private struct TabButton: View {
     let icon: String
-    let label: String
+    let label: LocalizedStringKey
     let selected: Bool
     let action: () -> Void
 

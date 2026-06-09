@@ -4,6 +4,14 @@
 <dict>
 	<key>CFBundleDisplayName</key>
 	<string>AgentPet</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>vi</string>
+		<string>zh-Hans</string>
+	</array>
 	<key>CFBundleExecutable</key>
 	<string>agentpet</string>
 	<key>CFBundleIconFile</key>
