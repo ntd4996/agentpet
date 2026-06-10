@@ -1,8 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit } from "@tauri-apps/api/event";
+import { getVersion } from "@tauri-apps/api/app";
+import { exit } from "@tauri-apps/plugin-process";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { loadCatalog, savedSlug, saveSlug, type Pet } from "./catalog";
 import { t, getLang, setLang, type Lang } from "./i18n";
+
+// ------------------------------------------------------------------ tabs ----
+function initTabs() {
+  const tabs = document.querySelectorAll<HTMLButtonElement>(".tabbar .tab");
+  tabs.forEach((b) => {
+    b.onclick = () => {
+      tabs.forEach((x) => x.classList.toggle("sel", x === b));
+      document.querySelectorAll<HTMLElement>(".page").forEach((p) => {
+        p.classList.toggle("sel", p.dataset.page === b.dataset.tab);
+      });
+    };
+  });
+}
 
 // ---------------------------------------------------------------- agents ----
 interface AgentInfo {
@@ -65,23 +80,51 @@ async function pick(p: Pet) {
   await emit("set-pet", { slug: p.slug, url: p.spritesheetUrl });
   currentPet = p;
   showCurrent();
-  results.innerHTML = "";
-  search.value = "";
+  results.querySelectorAll(".pet-item.sel").forEach((el) => el.classList.remove("sel"));
+  results.querySelector(`.pet-item[data-slug="${CSS.escape(p.slug)}"]`)?.classList.add("sel");
 }
 
 function showCurrent() {
   if (!catalog.length) { current.textContent = t("Couldn't load pets , check your internet connection."); return; }
-  current.textContent = `${t("Showing:")} ${currentPet ? currentPet.name : t("(default)")}`;
+  current.textContent = currentPet ? currentPet.name : t("(default)");
+  const hero = document.getElementById("hero-thumb") as HTMLCanvasElement;
+  const url = localStorage.getItem("ap_pet_custom") || currentPet?.spritesheetUrl;
+  if (url) drawThumb(hero, url);
 }
 
-function renderResults(list: Pet[]) {
+// Browsable grid: shows the whole catalog a page at a time. Thumbnails only
+// load when scrolled into view (the catalog is ~4000 spritesheets).
+const PAGE = 48;
+const more = document.getElementById("pet-more") as HTMLButtonElement;
+let view: Pet[] = [];
+let shown = 0;
+
+const thumbObserver = new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    const cv = e.target as HTMLCanvasElement;
+    thumbObserver.unobserve(cv);
+    drawThumb(cv, cv.dataset.url!);
+  }
+}, { root: results, rootMargin: "120px" });
+
+function setView(list: Pet[]) {
+  view = list;
+  shown = 0;
   results.innerHTML = "";
-  for (const p of list.slice(0, 24)) {
+  appendPage();
+}
+
+function appendPage() {
+  for (const p of view.slice(shown, shown + PAGE)) {
     const item = document.createElement("button");
     item.className = "pet-item";
+    item.dataset.slug = p.slug;
+    if (p.slug === savedSlug()) item.classList.add("sel");
     const cv = document.createElement("canvas");
     cv.width = 44; cv.height = 44; cv.className = "pet-thumb";
-    drawThumb(cv, p.spritesheetUrl);
+    cv.dataset.url = p.spritesheetUrl;
+    thumbObserver.observe(cv);
     const label = document.createElement("span");
     label.textContent = p.name;
     item.appendChild(cv);
@@ -89,6 +132,8 @@ function renderResults(list: Pet[]) {
     item.onclick = () => pick(p);
     results.appendChild(item);
   }
+  shown = Math.min(shown + PAGE, view.length);
+  more.style.display = shown < view.length ? "" : "none";
 }
 
 // Draws frame 0 (first column of the Idle row) of an 8x9 spritesheet as a preview.
@@ -118,14 +163,15 @@ async function initPet() {
   }
   currentPet = catalog.find((p) => p.slug === savedSlug());
   showCurrent();
+  setView(catalog);
   search.addEventListener("input", () => {
     const q = search.value.trim().toLowerCase();
-    if (!q) { results.innerHTML = ""; return; }
-    renderResults(catalog.filter((p) => p.name.toLowerCase().includes(q)));
+    setView(q ? catalog.filter((p) => p.name.toLowerCase().includes(q)) : catalog);
   });
   random.addEventListener("click", () => {
     if (catalog.length) pick(catalog[Math.floor(Math.random() * catalog.length)]);
   });
+  more.addEventListener("click", appendPage);
 }
 
 // ---------------------------------------------------------------- bubble ----
@@ -222,7 +268,8 @@ function initPetControls() {
       const url = String(reader.result);
       localStorage.setItem("ap_pet_custom", url);
       emit("set-pet", { slug: "local", url });
-      current.textContent = `${t("Showing:")} ${t("(your image)")}`;
+      current.textContent = t("(your image)");
+      drawThumb(document.getElementById("hero-thumb") as HTMLCanvasElement, url);
     };
     reader.readAsDataURL(f);
   };
@@ -262,23 +309,45 @@ async function initAutostart() {
 function applyStatic() {
   document.documentElement.lang = getLang();
   const set = (id: string, key: string) => { const el = document.getElementById(id); if (el) el.textContent = t(key); };
-  set("t-pet", "Your pet");
+  // tabs
+  set("tab-general", "General");
+  set("tab-pet", "Pet");
+  set("tab-bubble", "Bubble");
+  set("tab-about", "About");
+  // general
+  set("t-lang", "Language");
+  set("t-lang2", "Language");
+  set("t-startup", "Startup");
+  set("t-autostart", "Launch at login");
+  set("t-autostart-sub", "AgentPet starts automatically when you sign in.");
+  set("t-notif", "Notifications");
+  set("t-notify", "Notifications");
+  set("t-notify-sub", "Alerts when an agent finishes or needs input");
+  set("t-sound", "Play a sound");
+  set("t-agents", "Agent integrations");
+  set("t-app", "App");
+  set("t-version", "Version");
+  set("quit-btn", "Quit AgentPet");
+  // pet
   set("t-pet-sub", "Pick the companion that floats on your desktop.");
-  set("t-bubble", "Bubble");
+  set("t-choose", "Choose pet");
+  set("pet-more", "Show more");
+  set("import-pet", "Use my own spritesheet…");
+  set("t-size", "Size on screen");
+  set("t-petsize", "Pet size");
+  set("t-fx", "Idle bobbing animation");
+  // bubble
+  set("t-bubble2", "Bubble");
   set("t-theme", "Theme");
   set("t-opacity", "Opacity");
-  set("t-msg-help", "Custom messages (one per line, leave empty for default)");
-  set("o-dark", "Dark");
-  set("o-light", "Light");
   set("t-fontsize", "Text size");
   set("t-font", "Font");
+  set("o-dark", "Dark");
+  set("o-light", "Light");
+  set("o-theme-system", "System");
   set("o-system", "System");
   set("o-rounded", "Rounded");
   set("o-mono", "Monospace");
-  set("t-msg-agent", "For agent");
-  const allOpt = document.querySelector<HTMLOptionElement>('#msg-agent option[value="all"]');
-  if (allOpt) allOpt.textContent = t("All agents");
-  set("o-theme-system", "System");
   set("t-phrases", "Activity phrases");
   set("o-ph-off", "Off");
   set("o-ph-chef", "Chef");
@@ -286,25 +355,41 @@ function applyStatic() {
   set("o-ph-scientist", "Scientist");
   set("o-ph-explorer", "Explorer");
   set("t-idle", "Show idle chatter");
-  set("t-petsize", "Pet size");
-  set("t-fx", "Idle bobbing animation");
-  set("import-pet", "Use my own spritesheet…");
-  set("t-preview", "Live preview");
+  set("t-messages", "Custom messages");
+  set("t-msg-help", "Custom messages (one per line, leave empty for default)");
+  set("t-msg-agent", "For agent");
+  const allOpt = document.querySelector<HTMLOptionElement>('#msg-agent option[value="all"]');
+  if (allOpt) allOpt.textContent = t("All agents");
+  document.querySelectorAll<HTMLElement>(".msg-label").forEach((el) => {
+    if (el.dataset.label) el.textContent = t(el.dataset.label);
+  });
+  // about
+  set("t-tagline", "A desktop pet that watches your AI coding agents.");
+  set("t-star", "Star on GitHub");
+  set("t-discord", "Join the Discord");
+  set("t-coffee", "Buy me a coffee");
+  set("t-author", "Author");
+  set("t-version2", "Version");
+  // bottom bar
   set("t-preview-sub", "Try the bubble without running an agent.");
   set("t-pv-working", "Working");
   set("t-pv-waiting", "Needs you");
   set("t-pv-done", "Done");
-  set("t-sound", "Play a sound");
-  document.querySelectorAll<HTMLElement>(".msg-label").forEach((el) => {
-    if (el.dataset.label) el.textContent = t(el.dataset.label);
-  });
-  set("t-agents", "Agent integrations");
-  set("t-agents-sub", "Install a hook so AgentPet can see when an agent works, finishes, or needs you.");
-  set("t-notif", "Notifications");
-  set("t-notify", "Notify when an agent finishes or needs you");
-  set("t-startup", "Startup");
-  set("t-autostart", "Start AgentPet when Windows starts");
   search.placeholder = t("Search pets by name...");
+}
+
+// ------------------------------------------------- version / quit / links ----
+function initMisc() {
+  getVersion().then((v) => {
+    const a = document.getElementById("app-version");
+    const b = document.getElementById("app-version2");
+    if (a) a.textContent = v;
+    if (b) b.textContent = v;
+  }).catch(() => {});
+  (document.getElementById("quit-btn") as HTMLButtonElement).onclick = () => { exit(0); };
+  document.querySelectorAll<HTMLElement>("[data-url]").forEach((el) => {
+    el.addEventListener("click", () => invoke("open_url", { url: el.dataset.url }).catch(() => {}));
+  });
 }
 
 function initLang() {
@@ -327,20 +412,24 @@ function esc(s: string): string {
   return s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c] || c));
 }
 
-// Paint the filled-left part of every slider (drives the --fill CSS variable).
+// Paint the filled-left part of every slider (drives the --fill CSS variable)
+// and the numeric value label next to it.
 function initSliders() {
   document.querySelectorAll<HTMLInputElement>('input[type="range"]').forEach((r) => {
+    const val = document.getElementById(`${r.id}-val`);
     const paint = () => {
       const min = Number(r.min) || 0;
       const max = Number(r.max) || 100;
       const pct = ((Number(r.value) - min) / (max - min)) * 100;
       r.style.setProperty("--fill", `${pct}%`);
+      if (val) val.textContent = r.value;
     };
     r.addEventListener("input", paint);
     paint();
   });
 }
 
+initTabs();
 initLang();
 loadAgents();
 initPet();
@@ -350,3 +439,4 @@ initPreview();
 initNotify();
 initAutostart();
 initSliders();
+initMisc();

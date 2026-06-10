@@ -119,10 +119,30 @@ fn open_settings(app: tauri::AppHandle) {
         return;
     }
     let _ = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("settings.html".into()))
-        .title("AgentPet , Settings")
-        .inner_size(460.0, 640.0)
-        .resizable(true)
+        .title("AgentPet")
+        .inner_size(640.0, 620.0)
+        .resizable(false)
         .build();
+}
+
+/// Open an external link in the default browser (About tab buttons).
+#[tauri::command]
+fn open_url(url: String) {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return;
+    }
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("cmd").args(["/c", "start", "", &url]).spawn();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("open").arg(&url).spawn();
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&url).spawn();
+    }
 }
 
 /// Persist the chosen language (for the tray on next launch) and re-label the
@@ -142,6 +162,12 @@ fn set_lang(app: tauri::AppHandle, code: String) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Must be the first plugin: a second launch (double-clicking the
+        // shortcut while the app runs) exits immediately and the running
+        // instance opens Settings instead , no duplicate pets.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            open_settings(app.clone());
+        }))
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
@@ -154,6 +180,7 @@ pub fn run() {
             is_installed,
             toggle_install,
             open_settings,
+            open_url,
             set_lang,
             set_hit_rect
         ])
@@ -184,8 +211,8 @@ pub fn run() {
                 } else if let Ok(Some(mon)) = win.primary_monitor() {
                     let s = mon.scale_factor();
                     let sz = mon.size();
-                    let x = (sz.width as f64 / s) - 200.0 - 40.0;
-                    let y = (sz.height as f64 / s) - 220.0 - 70.0;
+                    let x = (sz.width as f64 / s) - 260.0 - 40.0;
+                    let y = (sz.height as f64 / s) - 320.0 - 70.0;
                     let _ = win.set_position(tauri::LogicalPosition::new(x.max(0.0), y.max(0.0)));
                 }
             }

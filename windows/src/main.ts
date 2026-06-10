@@ -73,11 +73,12 @@ function applyBubble() {
 }
 applyBubble();
 
-// Pet size + idle bob FX.
+// Pet size + idle bob FX. Sized via layout (not transform) so the bubble
+// always sits above the sprite instead of being painted over by it.
 function applyPet() {
   const size = (parseInt(localStorage.getItem("ap_pet_size") || "100", 10) || 100) / 100;
-  canvas.style.transform = `scale(${size})`;
-  canvas.style.transformOrigin = "bottom center";
+  canvas.style.width = `${Math.round(160 * size)}px`;
+  canvas.style.height = `${Math.round(180 * size)}px`;
   canvas.classList.toggle("bob", localStorage.getItem("ap_fx") !== "0");
 }
 
@@ -135,15 +136,18 @@ function customLine(state: string, seed: string, agent?: string): string | null 
 })();
 
 // --- render loop for state + bubble ------------------------------------------
+let idleUntil = 0; // while in the future, the idle-chatter line owns the bubble
+let lastBubbleHtml = ""; // skip DOM rewrites when nothing changed (no flicker)
 function render() {
   const active = store.active().filter((s) => s.state !== "idle");
   pet.setState(active[0]?.state ?? "idle");
 
   if (active.length) {
+    idleUntil = 0;
     // Show every active agent (multi-agent), one row each, capped. Seed the
     // phrase by session + current tool so the line changes as the agent moves
     // between tools (like the macOS per-tool phrases).
-    bubble.innerHTML = active.slice(0, 4).map((s) => {
+    const html = active.slice(0, 4).map((s) => {
       const label = t(STATE_LABEL[s.state] ?? "");
       const msg = msgFor(s.state, `${s.session}:${s.tool}`, s.agent, s.message);
       const proj = s.project ? s.project.split(/[\\/]/).pop() : "";
@@ -153,9 +157,13 @@ function render() {
         `${esc(msg)}${clock ? `<span class="clock">${clock}</span>` : ""}` +
         `<span class="state">${esc(label)}</span></div>`;
     }).join("");
+    if (html !== lastBubbleHtml) { bubble.innerHTML = html; lastBubbleHtml = html; }
     bubble.hidden = false;
+  } else if (Date.now() < idleUntil) {
+    // idle chatter is on screen , don't blink it away on the next tick
   } else {
     bubble.hidden = true;
+    lastBubbleHtml = "";
   }
 }
 
@@ -238,6 +246,8 @@ setInterval(() => {
       customLine("idle", "idle") ||
       (theme !== "off" ? themePhrase(theme, "idle", String(Date.now())) : null) ||
       t(IDLE_LINES[Math.floor(Date.now() / 1000) % IDLE_LINES.length]);
+    lastBubbleHtml = "";
+    idleUntil = Date.now() + 4000; // keep render() from hiding it mid-display
     bubble.hidden = false;
     setTimeout(() => { if (store.topState() === "idle") bubble.hidden = true; }, 4000);
   }
