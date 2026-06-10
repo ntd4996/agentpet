@@ -21,6 +21,11 @@ const DICT: Record<Exclude<Lang, "en">, Record<string, string>> = {
     "After enabling, run /hooks in Codex and Trust the AgentPet hook":
       "Sau khi bật, chạy /hooks trong Codex và Trust hook AgentPet",
     "Copilot CLI only (~/.copilot/hooks)": "Chỉ Copilot CLI (~/.copilot/hooks)",
+    "No \"needs input\" alerts (Windsurf has no such hook)":
+      "Không có cảnh báo \"cần nhập\" (Windsurf không có hook đó)",
+    "No \"needs input\" alerts (Antigravity has no notification hook)":
+      "Không có cảnh báo \"cần nhập\" (Antigravity không có hook thông báo)",
+    "Hooks the default Kiro CLI agent": "Gắn vào agent mặc định của Kiro CLI",
     "Startup": "Khởi động",
     "Start AgentPet when Windows starts": "Chạy AgentPet khi khởi động Windows",
     "Couldn't load pets , check your internet connection.":
@@ -51,6 +56,11 @@ const DICT: Record<Exclude<Lang, "en">, Record<string, string>> = {
     "After enabling, run /hooks in Codex and Trust the AgentPet hook":
       "启用后，在 Codex 中运行 /hooks 并信任 AgentPet hook",
     "Copilot CLI only (~/.copilot/hooks)": "仅限 Copilot CLI (~/.copilot/hooks)",
+    "No \"needs input\" alerts (Windsurf has no such hook)":
+      "没有\"需要输入\"提醒（Windsurf 没有该 hook）",
+    "No \"needs input\" alerts (Antigravity has no notification hook)":
+      "没有\"需要输入\"提醒（Antigravity 没有通知 hook）",
+    "Hooks the default Kiro CLI agent": "挂接 Kiro CLI 的默认 agent",
     "Startup": "启动",
     "Start AgentPet when Windows starts": "Windows 启动时运行 AgentPet",
     "Couldn't load pets , check your internet connection.": "无法加载宠物 , 请检查网络连接。",
