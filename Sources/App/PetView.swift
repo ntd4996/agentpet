@@ -767,6 +767,14 @@ private struct AgentRow: View {
             Text(session.state.rawValue.capitalized)
                 .font(.system(size: secondaryPt, weight: .regular))
                 .foregroundStyle(textColor(0.55))
+        case .model:
+            if let model = session.model {
+                Text(model)
+                    .font(.system(size: secondaryPt, weight: .regular))
+                    .foregroundStyle(textColor(0.55))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
         case .elapsed:
             // Tick every second so the elapsed time counts up live instead of
             // freezing at the value sampled when the row was last re-rendered.
@@ -781,6 +789,7 @@ private struct AgentRow: View {
 
     private func tokenHasValue(_ token: BubbleToken) -> Bool {
         if token == .title { return session.title != nil }
+        if token == .model { return session.model != nil }
         return true
     }
 
