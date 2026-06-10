@@ -6,6 +6,19 @@ import { loadCatalog, savedSlug, saveSlug } from "./catalog";
 import { t, setLang, type Lang } from "./i18n";
 import { themePhrase } from "./activity";
 import { sendNotification, isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
+
+// Auto-update on launch (no-op offline / when no signed release is published).
+(async () => {
+  try {
+    const update = await check();
+    if (update) {
+      await update.downloadAndInstall();
+      await relaunch();
+    }
+  } catch {}
+})();
 
 function msgFor(state: string, seed: string, agent: string | undefined, live: string): string {
   const custom = customLine(state, seed, agent);
