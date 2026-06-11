@@ -639,8 +639,14 @@ private struct BubbleRowPreview: View {
                 .foregroundStyle(.secondary)
         case .model:
             Text(mockModel)
-                .font(.system(size: settings.fontSize.secondaryPt))
+                .font(.system(size: settings.fontSize.secondaryPt, weight: .semibold))
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(
+                    Capsule()
+                        .fill(Color.secondary.opacity(0.12))
+                )
         case .elapsed:
             Text(mockElapsed)
                 .font(.system(size: settings.fontSize.secondaryPt))

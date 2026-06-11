@@ -770,10 +770,17 @@ private struct AgentRow: View {
         case .model:
             if let model = session.model {
                 Text(model)
-                    .font(.system(size: secondaryPt, weight: .regular))
-                    .foregroundStyle(textColor(0.55))
+                    .font(.system(size: secondaryPt, weight: .semibold))
+                    .foregroundStyle(textColor(0.5))
                     .lineLimit(1)
                     .truncationMode(.tail)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(
+                        Capsule()
+                            .fill(textColor(0.08))
+                    )
+                    .layoutPriority(-1)
             }
         case .elapsed:
             // Tick every second so the elapsed time counts up live instead of
