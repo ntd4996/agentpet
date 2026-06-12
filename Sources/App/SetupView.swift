@@ -13,7 +13,7 @@ struct SetupView: View {
     /// panel can slide in on the right. Provided by SettingsWindowController.
     var onResize: (CGFloat) -> Void = { _ in }
 
-    enum Tab { case general, pet, bubble, about }
+    enum Tab { case general, pet, care, bubble, about }
     @State private var tab: Tab = .general
     @State private var demoOpen = false
 
@@ -55,6 +55,8 @@ struct SetupView: View {
                     GeneralTab(model: model, pet: pet)
                 case .pet:
                     PetTab(pet: pet, imagePets: imagePets, model: model, selectedPack: selectedPack)
+                case .care:
+                    CareTabView()
                 case .bubble:
                     BubbleSettingsView()
                 case .about:
@@ -85,6 +87,7 @@ struct SetupView: View {
         HStack(spacing: 8) {
             TabButton(icon: "gearshape.fill", label: "General", selected: tab == .general) { tab = .general }
             TabButton(icon: "pawprint.fill", label: "Pet", selected: tab == .pet) { tab = .pet }
+            TabButton(icon: "fork.knife", label: "Care", selected: tab == .care) { tab = .care }
             TabButton(icon: "bubble.left.and.bubble.right.fill", label: "Bubble", selected: tab == .bubble) { tab = .bubble }
             TabButton(icon: "heart.fill", label: "About", selected: tab == .about) { tab = .about }
         }
