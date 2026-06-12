@@ -77,7 +77,9 @@ struct CareTabView: View {
                 }
                 LabeledContent("Sessions finished", value: "\(care.state.mealsToday)")
                 LabeledContent("Streak") {
-                    Text(String(format: NSLocalizedString("%d days", comment: "streak"), care.state.streakDays))
+                    Text(care.state.streakDays == 1
+                         ? NSLocalizedString("1 day", comment: "streak singular")
+                         : String(format: NSLocalizedString("%d days", comment: "streak"), care.state.streakDays))
                 }
             }
 
