@@ -13,8 +13,6 @@ struct CareTabView: View {
 
     /// Ticks so hunger and "today" counters stay fresh while the panel is open.
     @State private var now = Date()
-    @State private var pairCode = ""
-    @State private var pairing = false
     private let tick = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     private static let stageIcons = ["leaf.fill", "pawprint.fill", "binoculars.fill", "shield.fill", "crown.fill"]
@@ -115,7 +113,11 @@ struct CareTabView: View {
                 if sync.linked {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text("Connected to your profile")
+                            if let login = sync.linkedLogin, !login.isEmpty {
+                                Text(String(format: NSLocalizedString("Connected as %@", comment: ""), login))
+                            } else {
+                                Text("Connected to your profile")
+                            }
                             if let at = sync.lastSyncAt {
                                 Text(String(format: NSLocalizedString("Last synced %@", comment: ""),
                                             at.formatted(.relative(presentation: .named))))
@@ -126,36 +128,29 @@ struct CareTabView: View {
                             }
                         }
                         Spacer()
+                        Button("Open profile") {
+                            openURL(URL(string: "https://agentpet.thenightwatcher.online/profile")!)
+                        }
+                        .controlSize(.small)
                         Button("Disconnect") { sync.disconnect() }.controlSize(.small)
                     }
                 } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Show your companions on your web profile")
-                        Text("Sign in on the site, open your profile, and enter the pairing code here.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        HStack(spacing: 8) {
-                            TextField("Pairing code", text: $pairCode)
-                                .textFieldStyle(.roundedBorder)
-                                .frame(width: 140)
-                            Button(pairing ? "Connecting…" : "Connect") {
-                                let code = pairCode
-                                pairing = true
-                                Task { @MainActor in
-                                    if await sync.pair(code: code) { pairCode = "" }
-                                    pairing = false
-                                }
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Show your companions on your web profile")
+                            Text("Your browser opens GitHub sign-in; the app links automatically.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            if let err = sync.lastError {
+                                Text(err).font(.caption).foregroundStyle(.red)
                             }
-                            .disabled(pairCode.trimmingCharacters(in: .whitespaces).count < 4 || pairing)
-                            Button("Open profile") {
-                                openURL(URL(string: "https://agentpet.thenightwatcher.online/profile")!)
-                            }
-                            .controlSize(.small)
                         }
-                        if let err = sync.lastError {
-                            Text(err).font(.caption).foregroundStyle(.red)
+                        Spacer()
+                        Button {
+                            sync.beginLink()
+                        } label: {
+                            Label("Sign in with GitHub", systemImage: "person.crop.circle.badge.checkmark")
                         }
                     }
-                    .padding(.vertical, 2)
                 }
             }
 

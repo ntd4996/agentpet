@@ -35,6 +35,17 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.agentpet.app</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>agentpet</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
 	<key>NSPrincipalClass</key>

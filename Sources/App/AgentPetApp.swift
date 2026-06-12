@@ -38,4 +38,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DefaultPetBootstrap.installIfNeeded()
         SettingsWindowController.shared.showOnFirstLaunch()
     }
+
+    /// Handles `agentpet://link?token=…&login=…` — the tail of the web's
+    /// GitHub sign-in, which links this app to the user's profile with no
+    /// manual code entry.
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls where url.scheme == "agentpet" && url.host == "link" {
+            let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            let token = items.first(where: { $0.name == "token" })?.value ?? ""
+            let login = items.first(where: { $0.name == "login" })?.value ?? ""
+            guard !token.isEmpty else { continue }
+            CareSyncController.shared.adopt(token: token, login: login)
+        }
+    }
 }
