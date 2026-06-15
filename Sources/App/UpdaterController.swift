@@ -90,6 +90,13 @@ extension UpdaterController: SPUStandardUserDriverDelegate {
         Task { @MainActor in Self.activateForUpdateUI() }
     }
 
+    /// Sparkle's session is over (the update was dismissed/installed, or the
+    /// "you're up to date" alert was closed). Drop the Dock icon we added in
+    /// `activateForUpdateUI`, unless a Settings/onboarding window still needs it.
+    nonisolated func standardUserDriverWillFinishUpdateSession() {
+        Task { @MainActor in Self.deactivateAfterUpdateUI() }
+    }
+
     @MainActor private static func activateForUpdateUI() {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -97,5 +104,12 @@ extension UpdaterController: SPUStandardUserDriverDelegate {
         DispatchQueue.main.async {
             NSApp.windows.first { $0.isVisible && $0.canBecomeKey }?.makeKeyAndOrderFront(nil)
         }
+    }
+
+    @MainActor private static func deactivateAfterUpdateUI() {
+        // Keep the Dock icon if Settings is open; otherwise return to a pure
+        // menu-bar accessory so no stray icon lingers in the Dock.
+        guard !SettingsWindowController.shared.hasOpenWindow else { return }
+        NSApp.setActivationPolicy(.accessory)
     }
 }

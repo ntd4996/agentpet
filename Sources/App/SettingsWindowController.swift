@@ -9,6 +9,12 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
     private var window: NSWindow?
 
+    /// True while a Settings or onboarding window is open (and therefore the
+    /// app should keep its `.regular` activation policy / Dock icon). Other
+    /// transient `.regular` switches (e.g. Sparkle's update UI) check this
+    /// before dropping back to `.accessory`.
+    var hasOpenWindow: Bool { window != nil || onboardingWindow != nil }
+
     func show() {
         SettingsModel.shared.refresh()
 
