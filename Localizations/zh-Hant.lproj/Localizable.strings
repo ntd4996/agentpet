@@ -1,0 +1,377 @@
+/* AgentPet , 正體中文 */
+
+/* Tabs */
+"General" = "通用";
+"Pet" = "寵物";
+"Bubble" = "氣泡";
+"About" = "關於";
+
+/* General / common */
+"Launch" = "啟動";
+"Launch at login" = "登入時啟動";
+"AgentPet starts automatically when you sign in." = "登入時自動啟動 AgentPet。";
+"Notifications" = "通知";
+"Show chat bubble" = "顯示聊天氣泡";
+"Messages" = "訊息";
+"System" = "系統";
+"Custom" = "自定義";
+"One message per line; a random one is shown." = "每行一句；隨機顯示其中一句。";
+"Reset to defaults" = "恢復預設";
+"Reset to default" = "恢復預設";
+"Sounds" = "聲音";
+"Agent integrations" = "Agent 整合";
+"Hook installed" = "已安裝 Hook";
+"Coming soon" = "即將推出";
+"Enable" = "啟用";
+"Open Settings" = "開啟設定";
+"Quit AgentPet" = "退出 AgentPet";
+"Upload…" = "上傳…";
+"Default" = "預設";
+"Working" = "工作中";
+"Waiting" = "等待中";
+"Done" = "完成";
+"Celebrate" = "慶祝";
+"Idle" = "空閒";
+
+/* Bubble tab */
+"Bubble mode" = "氣泡模式";
+"Multi-agent bubble" = "多 Agent 氣泡";
+"Structured rows with icons, state dots, and activity messages." = "帶圖示、狀態點和活動訊息的結構化行。";
+"Appearance" = "外觀";
+"Theme" = "主題";
+"Font size" = "字號";
+"Opacity" = "不透明度";
+"Show idle message" = "顯示空閒訊息";
+"The pet's chatter while no agent is running." = "沒有 Agent 執行時寵物的碎碎念。";
+"Display" = "顯示";
+"Rows" = "行";
+"Sessions" = "會話";
+"Filter" = "篩選";
+"Include states" = "包含狀態";
+"Which session states appear in the bubble." = "氣泡中顯示哪些會話狀態。";
+"Visible agents" = "可見 Agent";
+"Row content" = "行內容";
+"Preview" = "預覽";
+"Presets" = "預設";
+"Original" = "原始";
+"Standard" = "標準";
+"Detailed" = "詳細";
+"Tap a chip above to add tokens" = "點選上方的標籤新增元素";
+"All tokens are in use" = "所有元素都已使用";
+"Preview updates as you add, remove, or reorder tokens below." = "在下方新增、刪除或重新排序元素時，預覽會實時更新。";
+"Style" = "樣式";
+"Separator" = "分隔符";
+"State dot" = "狀態點";
+"Agent icons" = "Agent 圖示";
+"Brand logos" = "品牌標誌";
+"SF Symbols" = "SF Symbols";
+"Change…" = "更改…";
+"Activity messages" = "活動訊息";
+"Vocabulary" = "詞彙風格";
+"Bubble messages" = "氣泡訊息";
+"Simple bubble" = "簡單氣泡";
+"All agents" = "所有 Agent";
+"Turn on multi-agent bubble above for per-agent rows with icons and activity." = "開啟上方的多 Agent 氣泡，即可為每個 Agent 顯示帶圖示和活動的獨立行。";
+
+/* About & Pet tab */
+"A desktop pet that watches your AI coding agents." = "盯著你的 AI 編碼 Agent 的桌面寵物。";
+"Star on GitHub" = "在 GitHub 上點亮 Star";
+"Join the Discord" = "加入 Discord";
+"Buy me a coffee" = "請我喝杯咖啡";
+"If AgentPet helps your workflow, a star means a lot. Thank you!" = "如果 AgentPet 幫到了你，點個 Star 意義非凡。謝謝！";
+"Author" = "作者";
+"Version" = "版本";
+"Choose pet" = "選擇寵物";
+"Animations" = "動畫";
+"Size on screen" = "螢幕上的大小";
+"Browse pets…" = "瀏覽寵物…";
+"Create pet…" = "建立寵物…";
+"No pets yet. Tap Browse to add one." = "還沒有寵物。點選“瀏覽”來新增。";
+"Hover a clip to preview it." = "將滑鼠懸停在片段上即可預覽。";
+"No pet selected" = "未選擇寵物";
+"State" = "狀態";
+"Pick a pet in the Pet tab" = "在“寵物”標籤中選擇一隻寵物";
+
+/* Bubble pickers / tokens */
+"All rows" = "全部行";
+"Carousel" = "輪播";
+"Compact" = "緊湊";
+"All sessions" = "所有會話";
+"Grouped by agent" = "按 Agent 分組";
+"All states" = "所有狀態";
+"Done and above" = "完成及以上";
+"Working & Waiting" = "工作中和等待中";
+"Working only" = "僅工作中";
+"One row at a time. Auto-cycles every 3 s — swipe or drag to browse." = "每次一行，每 3 秒自動輪換，可滑動或拖動瀏覽。";
+"One row per agent kind (×N when multiple)" = "每種 Agent 一行（多個時顯示 ×N）";
+"One row per session" = "每個會話一行";
+"Show every row at once, up to the max below." = "一次顯示所有行，上限見下方。";
+"Summary header, first two rows, then fold the rest." = "摘要標題、前兩行，其餘摺疊。";
+"Plain dot" = "普通圓點";
+"Claude style" = "Claude 風格";
+"Flat color-coded circle" = "扁平彩色圓點";
+"Spinning ✻ asterisk while active" = "活動時旋轉的 ✻ 星號";
+"Agent icon" = "Agent 圖示";
+"Chat title" = "聊天標題";
+"Project folder" = "專案資料夾";
+"Activity message" = "活動訊息";
+"State label" = "狀態標籤";
+"Elapsed time" = "已用時間";
+"Title" = "標題";
+"Project" = "專案";
+"Message" = "訊息";
+"Elapsed" = "耗時";
+"Icon" = "圖示";
+"Dot" = "圓點";
+
+/* Theme & activity vocabulary names */
+"Light" = "淺色";
+"Dark" = "深色";
+"Chef" = "廚師";
+"Engineer" = "工程師";
+"Wizard" = "巫師";
+"Explorer" = "探險家";
+"Scientist" = "科學家";
+
+/* Demo panel, notifications, sounds, footers */
+"Live preview" = "實時預覽";
+"Hide live preview" = "隱藏實時預覽";
+"Fire webhooks for many agents with your current settings" = "用當前設定為多個 Agent 觸發 webhook";
+"Add webhook" = "新增 Webhook";
+"Add" = "新增";
+"Quick scenarios" = "快捷場景";
+"Spawn 3 working" = "生成 3 個工作中";
+"Finish all" = "全部完成";
+"Clear all" = "清除全部";
+"Active webhooks" = "活動 Webhook";
+"No webhooks yet. Add one from the right →" = "還沒有 Webhook。從右側新增 →";
+"Preview mood" = "預覽狀態";
+"Shows your Simple-bubble message for each state." = "顯示每個狀態下你的簡單氣泡訊息。";
+"Add agents here, then change each webhook's state or delete it in the list on the left." = "在此新增 Agent，然後在左側列表中更改各 Webhook 的狀態或刪除它。";
+"Turn on Multi-agent bubble to add agents here. In Simple mode, use the Preview mood buttons on the left." = "開啟多 Agent 氣泡以在此新增 Agent。簡單模式下，請使用左側的預覽狀態按鈕。";
+"Webhooks are for the multi-agent bubble." = "Webhook 用於多 Agent 氣泡。";
+"Notifications on" = "通知已開啟";
+"Notifications muted" = "通知已靜音";
+"Notifications denied" = "通知被拒絕";
+"Notifications unavailable" = "通知不可用";
+"Enable notifications" = "啟用通知";
+"Available once installed as AgentPet.app" = "以 AgentPet.app 安裝後可用";
+"Turn on in System Settings to get alerts" = "在系統設定中開啟以接收提醒";
+"Alerts when an agent finishes or needs input" = "Agent 完成或需要輸入時提醒";
+"Muted, the toggle turns alerts back on" = "已靜音，撥動開關重新開啟提醒";
+"When an agent finishes" = "當 Agent 完成時";
+"When an agent needs input" = "當 Agent 需要輸入時";
+"Per-agent overrides win over \"All agents\". A custom line replaces the live/theme text and the real pet honours it." = "針對單個 Agent 的設定優先於\"所有 Agent\"。自定義文案會替換實時/主題文字，真實寵物也會生效。";
+"Whimsical phrases shown while agents work, e.g. \"Brewing…\" or \"Compiling…\"." = "Agent 工作時顯示的趣味短語，例如 \"Brewing…\" 或 \"Compiling…\"。";
+
+/* Pet chat & idle messages */
+"Thinking…" = "思考中…";
+"Working on it…" = "處理中…";
+"On it!" = "馬上做！";
+"Crunching code…" = "埋頭敲程式碼…";
+"Hmm, let me see…" = "嗯，讓我看看…";
+"Cooking something up…" = "正在醞釀…";
+"Deep in thought…" = "陷入沉思…";
+"Brain go brrr…" = "大腦高速運轉…";
+"Almost there…" = "快好了…";
+"Wiring it up…" = "正在接線…";
+"I need you!" = "需要你！";
+"Your turn 👀" = "該你了 👀";
+"Waiting on you…" = "在等你…";
+"Can you check this?" = "能幫我看看這個嗎？";
+"Psst, need input!" = "嘿，需要你的輸入！";
+"Awaiting orders…" = "等待指令…";
+"Help me out?" = "幫幫我？";
+"Stuck, need you!" = "卡住了，需要你！";
+"All done! ✅" = "全部完成！✅";
+"Finished!" = "完成！";
+"Ta-da!" = "噠噠！";
+"Done and dusted!" = "大功告成！";
+"Nailed it!" = "搞定！";
+"That's a wrap!" = "收工！";
+"Mission complete!" = "任務完成！";
+"🎉 Woohoo!" = "🎉 哇哦！";
+"We did it!" = "我們做到了！";
+"Victory!" = "勝利！";
+"Yesss!" = "太棒了！";
+"High five! 🙌" = "擊掌！🙌";
+"Champion!" = "冠軍！";
+"Let's grill some bugs." = "來抓幾隻 bug 吧。";
+"I miss you. Open a branch for me." = "想你了，給我開個分支吧。";
+"Tiny commit, tiny dopamine." = "小提交，小確幸。";
+"The build is quiet. Too quiet." = "構建很安靜，安靜得可疑。";
+"Ship something small. Future you is watching." = "釋出點小東西吧，未來的你正看著呢。";
+"Your TODOs are pretending not to see us." = "你的 TODO 正假裝沒看見我們。";
+"No agents running. The keyboard has entered standby drama." = "沒有 Agent 在跑，鍵盤開始上演待機大戲。";
+"Turn coffee into code. Carefully." = "把咖啡變成程式碼，小心點。";
+"Open one file. Intimidate it professionally." = "開啟一個檔案，專業地震懾它。";
+"The repo is calm. Suspicious, but calm." = "倉庫很平靜。可疑，但平靜。";
+"Refactor lightly. Leave with dignity." = "輕輕重構，體面收場。";
+"One clean diff can fix the whole afternoon." = "一個乾淨的 diff 能救活整個下午。";
+"Waiting for your input" = "等待你的輸入";
+"Your turn — over to you" = "輪到你了";
+"Needs your input" = "需要你的輸入";
+
+/* App language picker */
+"Language" = "語言";
+
+/* App: onboarding, create-pet, browser, menu */
+"A desktop pet that watches your AI coding agents. Two quick steps to get going." = "盯著你的 AI 編碼 Agent 的桌面寵物。兩步即可開始。";
+"Added" = "已新增";
+"Browse pets" = "瀏覽寵物";
+"Cancel" = "取消";
+"Category" = "分類";
+"Choose image…" = "選擇圖片…";
+"Community" = "社群";
+"Create" = "建立";
+"Create pet" = "建立寵物";
+"Get alerted when an agent finishes or needs input." = "Agent 完成或需要輸入時收到提醒。";
+"Get started" = "開始";
+"Install a hook so AgentPet can see when an agent works, finishes, or needs you." = "安裝 hook，讓 AgentPet 知道 Agent 何時工作、完成或需要你。";
+"Loading pets…" = "正在載入寵物…";
+"Nothing running right now." = "當前沒有執行中的 Agent。";
+"Pet info" = "寵物資訊";
+"Pet size" = "寵物大小";
+"Retry" = "重試";
+"Sort by agent kind" = "按 Agent 型別排序";
+"Spritesheet" = "精靈圖";
+"Use the same 8×9 transparent spritesheet format as downloaded pets." = "使用與下載寵物相同的 8×9 透明精靈圖格式。";
+"Welcome to AgentPet" = "歡迎使用 AgentPet";
+
+/* Codex connection help */
+"Connect Codex" = "連線 Codex";
+"The hook is installed. Codex blocks unknown command hooks until you trust them once , a Codex security feature, not an AgentPet bug. Do this one time:" = "Hook 已安裝。Codex 會攔截未知的命令 hook，直到你信任一次 , 這是 Codex 的安全機制，並非 AgentPet 的問題。只需操作一次：";
+"Open Terminal and run: codex (launches the Codex CLI)" = "開啟終端並執行：codex（啟動 Codex CLI）";
+"Type /hooks and press Enter to list the hooks." = "輸入 /hooks 並回車以列出 hook。";
+"Press t to Trust all hooks." = "按 t 鍵信任所有 hook。";
+"Quit and reopen Codex (both the CLI and the desktop app)." = "退出並重新開啟 Codex（CLI 和桌面應用都要）。";
+"Run any prompt , your pet now shows the Codex session." = "執行任意提示 , 寵物就會顯示 Codex 會話。";
+"Trust is shared, so trusting once in the CLI also covers the Codex desktop app. If /hooks shows nothing, add  [features] hooks = true  to ~/.codex/config.toml, then retry." = "信任是共享的，在 CLI 中信任一次，Codex 桌面應用也會生效。如果 /hooks 沒有任何內容，請在 ~/.codex/config.toml 中新增  [features] hooks = true  後重試。";
+"Codex hooks docs" = "Codex hooks 文件";
+"Got it" = "知道了";
+"How to connect Codex" = "如何連線 Codex";
+"Installed , needs a one-time trust (tap ?)" = "已安裝 , 需要一次性信任（點選 ?）";
+
+/* Care (tamagotchi) */
+"Care" = "養成";
+"Companion" = "夥伴";
+"Hunger" = "飢餓度";
+"Today" = "今天";
+"Lifetime" = "累計";
+"Food sources" = "食物來源";
+"Hatchling" = "初生";
+"Scout" = "偵察兵";
+"Hero" = "英雄";
+"Legend" = "傳奇";
+"Full" = "吃飽了";
+"Satisfied" = "滿足";
+"Peckish" = "有點餓";
+"Hungry" = "餓了";
+"Starving" = "餓壞了";
+"Last fed %@" = "上次進食 %@";
+"%@ / %@ XP to next level" = "%@ / %@ 經驗升級";
+"The pet eats real work: tokens burnt by your agents and finished sessions." = "寵物吃的是真實工作：Agent 消耗的 token 和完成的會話。";
+"Tokens eaten" = "已吃 token";
+"Full! The daily bowl is empty." = "吃飽啦！今天的碗空了。";
+"Sessions finished" = "完成的會話";
+"Streak" = "連續天數";
+"%d days" = "%d 天";
+"Total tokens eaten" = "累計吃掉的 token";
+"Total sessions" = "累計會話";
+"Claude Code transcripts" = "Claude Code 會話記錄";
+"Token usage is read locally when a turn ends." = "每輪結束時在本地讀取 token 用量。";
+"Connected: subscription limits below." = "已連線：訂閱額度見下方。";
+"Optional: install OpenUsage to track every provider's limits." = "可選：安裝 OpenUsage 以跟蹤所有服務商的額度。";
+"Active" = "已啟用";
+"Connected" = "已連線";
+"Get it" = "去安裝";
+"left" = "剩餘";
+"Level up! Lv %d ⭐" = "升級啦！Lv %d ⭐";
+"Getting hungry… run an agent?" = "有點餓了……跑個 Agent 吧？";
+"A little snack? One small task?" = "來點小零食？一個小任務就行？";
+"My tummy is rumbling…" = "肚子咕咕叫了……";
+"Feed me some tokens, please." = "請餵我一點 token 吧。";
+"Starving… nothing to eat for days…" = "餓壞了……好幾天沒吃東西了……";
+"So weak… one tiny session, please…" = "好虛弱……求一個小小的會話……";
+"No tokens… no energy…" = "沒有 token……沒有能量……";
+"Remember me? Your pet? The hungry one?" = "還記得我嗎？你的寵物？那隻餓著的？";
+"Careful… your AI budget is almost gone." = "小心……你的 AI 預算快用完了。";
+"Low fuel: a usage limit is nearly reached!" = "燃料不足：某個用量額度快到上限了！";
+"Maybe save some tokens for tomorrow…" = "要不給明天留點 token 吧……";
+"1 day" = "1 天";
+
+/* Care v2: per-pet + web sync + popover */
+"Your pet" = "你的寵物";
+"Every pet levels up on its own: experience belongs to the companion you raise it with." = "每隻寵物獨立升級：經驗屬於陪你一起成長的那隻夥伴。";
+"All companions" = "所有夥伴";
+"Each companion keeps its own experience. Switch pets in the Pet tab to raise another one." = "每隻夥伴都有自己的經驗。在寵物標籤頁切換，去養另一隻吧。";
+"Raising" = "養成中";
+"Web profile" = "網頁主頁";
+"Connected to your profile" = "已連線到你的主頁";
+"Last synced %@" = "上次同步 %@";
+"Your companions appear on your profile page." = "你的夥伴會顯示在主頁上。";
+"Disconnect" = "斷開連線";
+"Show your companions on your web profile" = "在網頁主頁上展示你的夥伴";
+"Sign in on the site, open your profile, and enter the pairing code here." = "在網站登入，開啟主頁，然後在這裡輸入配對碼。";
+"Pairing code" = "配對碼";
+"Connecting…" = "連線中……";
+"Connect" = "連線";
+"Open profile" = "開啟主頁";
+"Code not recognized. Codes expire after 10 minutes." = "無法識別該配對碼。配對碼 10 分鐘後過期。";
+"Could not reach the server." = "無法連線伺服器。";
+"Sync failed, will retry." = "同步失敗，稍後重試。";
+"Today %@ tokens · %d meals" = "今天 %@ token · %d 餐";
+"Today %@ tokens · 1 meal" = "今天 %@ token · 1 餐";
+
+/* Care v3: GitHub link + stats popover */
+"Connected as %@" = "已連線為 %@";
+"Your browser opens GitHub sign-in; the app links automatically." = "瀏覽器會開啟 GitHub 登入；應用自動完成關聯。";
+"Sign in with GitHub" = "用 GitHub 登入";
+"Last fed" = "上次進食";
+"%@ tokens · 1 meal" = "%@ token · 1 餐";
+"%@ tokens · %d meals" = "%@ token · %d 餐";
+"%@ tokens · %d sessions" = "%@ token · %d 會話";
+
+/* Care HUD */
+"Burn, last 7 days" = "近 7 天消耗";
+"Limits" = "額度";
+"days fed" = "天有進食";
+"tokens eaten" = "已吃 token";
+"completed" = "已完成";
+"1 meal" = "1 餐";
+"%d meals" = "%d 餐";
+
+/* Care v5: native limits + to-next-level */
+"≈ %@ tokens to Lv %d" = "≈ %@ token 升到 Lv %d";
+"Subscription limits" = "訂閱額度";
+"Read directly from your Claude Code / Codex sign-ins." = "直接從你的 Claude Code / Codex 登入讀取。";
+"Read directly from your Claude Code / Codex sign-ins. None found yet." = "直接從你的 Claude Code / Codex 登入讀取。暫未找到。";
+"Connected: adds limits for every other provider." = "已連線：補充其他所有服務商的額度。";
+
+/* Care v6: quota used + reset */
+"%d%% used" = "已用 %d%%";
+"resets in %dd" = "%d 天后重置";
+"resets in %dh" = "%d 小時後重置";
+"resets in %dm" = "%d 分鐘後重置";
+
+/* Coffee / donate */
+"Thanks for using AgentPet" = "感謝使用 AgentPet";
+"It's free and open source. If it makes your day a little nicer, a coffee is always appreciated, never expected." = "本應用免費開源。如果它讓你的一天更愉快，一杯咖啡總是受歡迎的，但絕不強求。";
+"Quét mã bằng app ngân hàng bất kỳ" = "用任意銀行 App 掃碼";
+"Sao chép số tài khoản" = "複製賬號";
+"Close" = "關閉";
+
+/* Privacy clarity */
+"Connecting is optional. Your pet, its level and all stats live on this Mac whether or not you sign in, nothing leaves your machine until you connect." = "連線是可選的。無論是否登入，寵物、等級和所有資料都儲存在這臺 Mac 上；在你連線之前，任何資料都不會離開本機。";
+
+/* Coffee methods */
+"International" = "國際";
+"Việt Nam" = "越南";
+"Opens buymeacoffee.com in your browser." = "在瀏覽器開啟 buymeacoffee.com。";
+"Quét bằng app ngân hàng bất kỳ (VPBank · NGUYEN THANH DAT)" = "用任意銀行 App 掃碼（VPBank · NGUYEN THANH DAT）";
+
+/* HUD footer */
+"Settings" = "設定";
+"Updates" = "更新";
+"Quit" = "退出";
+"Checking…" = "檢查中…";

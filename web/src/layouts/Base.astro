@@ -116,6 +116,7 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
             <button type="button" data-lang-btn="en" class="lang-item"><span>English</span><Icon name="check" class="lang-check h-4 w-4 text-brand-600" /></button>
             <button type="button" data-lang-btn="vi" class="lang-item"><span>Tiếng Việt</span><Icon name="check" class="lang-check h-4 w-4 text-brand-600" /></button>
             <button type="button" data-lang-btn="zh" class="lang-item"><span>中文</span><Icon name="check" class="lang-check h-4 w-4 text-brand-600" /></button>
+            <button type="button" data-lang-btn="zh-TW" class="lang-item"><span>正體中文</span><Icon name="check" class="lang-check h-4 w-4 text-brand-600" /></button>
           </div>
         </div>
         <a href={DISCORD} target="_blank" rel="noopener" aria-label="Discord" class="hidden rounded-full p-2.5 text-muted transition hover:bg-brand-50 hover:text-brand-700 sm:inline-flex">
@@ -146,6 +147,7 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
           <button type="button" data-lang-btn="en" class="lang-seg flex-1">EN</button>
           <button type="button" data-lang-btn="vi" class="lang-seg flex-1">Tiếng Việt</button>
           <button type="button" data-lang-btn="zh" class="lang-seg flex-1">中文</button>
+          <button type="button" data-lang-btn="zh-TW" class="lang-seg flex-1">正體中文</button>
         </div>
       </div>
     </div>
@@ -239,8 +241,8 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
        (static + SSR). Remembers the choice in localStorage for next visit. -->
   <script is:inline define:vars={{ DICT }}>
     (function () {
-      var LANGS = ["en", "vi", "zh"];
-      var HTML_LANG = { en: "en", vi: "vi", zh: "zh-Hans" };
+      var LANGS = ["en", "vi", "zh", "zh-TW"];
+      var HTML_LANG = { en: "en", vi: "vi", zh: "zh-Hans", "zh-TW": "zh-Hant" };
       var STORE_KEY = "ap_lang";
       var ATTRS = ["placeholder", "title", "aria-label", "alt", "content", "value"];
       var SKIP = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, CODE: 1, PRE: 1, TEXTAREA: 1, INPUT: 1, SELECT: 1, OPTION: 1, SVG: 1, svg: 1 };
@@ -249,6 +251,7 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
         try { var s = localStorage.getItem(STORE_KEY); if (s && LANGS.indexOf(s) >= 0) return s; } catch (e) {}
         var l = (navigator.language || "").toLowerCase();
         if (l.indexOf("vi") === 0) return "vi";
+        if (l === "zh-tw" || l === "zh-hk" || l === "zh-mo" || l.indexOf("zh-hant") === 0) return "zh-TW";
         if (l.indexOf("zh") === 0) return "zh";
         return "en";
       }
@@ -315,7 +318,7 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
           textList.push(n);
         }
       }
-      var SHORT = { en: "EN", vi: "VI", zh: "中" };
+      var SHORT = { en: "EN", vi: "VI", zh: "中", "zh-TW": "繁" };
       function updateSwitcher(lang) {
         document.querySelectorAll("[data-lang-btn]").forEach(function (b) {
           var on = b.getAttribute("data-lang-btn") === lang;
