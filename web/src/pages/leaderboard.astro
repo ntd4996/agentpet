@@ -128,7 +128,11 @@ import Hero from "../components/Hero.astro";
       img.onload = () => { const f = firstFrame(img); if (!f) return; const s = Math.min(cv.width / f.w, cv.height / f.h) * 0.9, dw = f.w * s, dh = f.h * s; ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(img, f.x, f.y, f.w, f.h, (cv.width - dw) / 2, (cv.height - dh) / 2, dw, dh); cv.parentElement?.classList.remove("ap-skel"); };
       img.src = "/api/sprite/" + slug;
     }
-    const esc = (s: string) => String(s).replace(/[^a-zA-Z0-9 ._-]/g, "");
+    // Display text: escape HTML but KEEP Unicode (so non-Latin pet names like
+    // "问鼎王林" render instead of being stripped to empty).
+    const esc = (s: string) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] || c));
+    // URL/attribute-safe (ids, GitHub logins): keep ASCII slug chars only.
+    const slug = (s: string) => String(s).replace(/[^a-zA-Z0-9 ._-]/g, "");
     const tokenLabel = (n: number) => n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "k" : String(n);
 
     // ----- tabs -----
@@ -171,7 +175,7 @@ import Hero from "../components/Hero.astro";
         const initial = (p.name || "?").charAt(0).toUpperCase();
         const preview = p.thumb
           ? `<img src="${p.thumb}" alt="" class="pixel-art h-10 w-10 object-contain" />`
-          : `<span class="care-fallback absolute font-display text-sm font-bold" style="color:${color}">${esc(initial)}</span><canvas class="care-thumb relative h-10 w-10" width="80" height="80" data-slug="${esc(p.id || "")}"></canvas>`;
+          : `<span class="care-fallback absolute font-display text-sm font-bold" style="color:${color}">${esc(initial)}</span><canvas class="care-thumb relative h-10 w-10" width="80" height="80" data-slug="${slug(p.id || "")}"></canvas>`;
         const ownerTag = owner
           ? `<a href="https://github.com/${owner}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-muted hover:text-brand-700">${p.ownerAvatar ? `<img src="${p.ownerAvatar}" class="h-4 w-4 rounded-full" alt="" />` : ""}${owner}</a>`
           : `<span class="text-xs text-faint">someone</span>`;
