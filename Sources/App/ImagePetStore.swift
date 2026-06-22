@@ -16,10 +16,13 @@ final class ImagePetStore: ObservableObject {
         packs.first { $0.id == id }
     }
 
-    /// Deletes an installed pet's folder from disk and reloads.
+    /// Deletes an installed pet's folder from disk. Drops it from the in-memory
+    /// list directly instead of a full `reload()`: reload re-slices every other
+    /// pack's spritesheet on the main actor (heavy pixel-scan per sheet), which
+    /// froze the UI when deleting with many pets installed.
     func delete(_ pack: ImagePetPack) {
         try? FileManager.default.removeItem(at: pack.directory)
-        reload()
+        packs.removeAll { $0.id == pack.id }
     }
 
     func reload() {
