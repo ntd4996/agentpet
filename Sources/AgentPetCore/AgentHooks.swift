@@ -19,6 +19,10 @@ public enum HookStyle: Sendable {
     /// into the agent file as `{"hooks": {event: [{"command": ...}]}}` (plain
     /// command items, no extra keys). Other agent fields are preserved.
     case kiroFlat
+    /// Pi (pi.dev): a TypeScript extension file dropped in
+    /// `~/.pi/agent/extensions/`. Like opencode, the extension hardcodes its own
+    /// `pi.on(...)` handlers and reports state through the `agentpet hook` CLI.
+    case piExtension
 }
 
 /// Where and which lifecycle events to register for an agent.
@@ -103,6 +107,16 @@ public enum AgentHooks {
                 kind: .droid, style: .claudeNested,
                 events: ["SessionStart", "UserPromptSubmit", "PreToolUse", "Notification", "Stop", "SubagentStop", "SessionEnd"],
                 settingsPath: home + "/.factory/hooks.json")
+        case .pi:
+            // Pi has no Claude-style command hooks; its native mechanism is a TS
+            // extension auto-discovered in ~/.pi/agent/extensions/. The extension
+            // hardcodes its own pi.on() handlers, so no event list is registered
+            // through the generic installer. Pi has no built-in approval gate, so
+            // only working/done/registered are reported (no "waiting").
+            return AgentHookSpec(
+                kind: .pi, style: .piExtension,
+                events: [],
+                settingsPath: home + "/.pi/agent/extensions/agentpet.ts")
         case .cli, .unknown:
             return nil
         }

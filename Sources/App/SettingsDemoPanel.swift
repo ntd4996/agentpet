@@ -358,6 +358,7 @@ struct SettingsDemoPanel: View {
         case .windsurf: return "dashboard"
         case .antigravity: return "mobile-app"
         case .droid: return "backend"
+        case .pi: return "scripts"
         default: return "project"
         }
     }
@@ -402,6 +403,7 @@ struct SettingsDemoPanel: View {
         case .cursor:      return ("run_terminal_cmd", nil)
         case .antigravity: return ("codebase_search", nil)
         case .droid:       return ("Execute", nil)
+        case .pi:          return ("Bash", nil)
         case .opencode:    return ("Grep", nil)
         case .windsurf:    return ("Write", "src/dashboard.tsx")
         default:           return ("Read", "README.md")

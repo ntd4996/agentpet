@@ -232,6 +232,7 @@ private func sfSymbol(for kind: AgentKind) -> String {
     case .copilot:     return "airplane"
     case .kiroCLI:     return "k.circle.fill"
     case .droid:       return "cpu.fill"
+    case .pi:          return "pi"
     case .cli:         return "terminal.fill"
     case .unknown:     return "questionmark.circle"
     }

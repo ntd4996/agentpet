@@ -110,6 +110,16 @@ public enum StateMapper {
             case "SubagentStop": return nil
             default: return nil
             }
+        case .pi:
+            // The Pi extension sends normalised state names directly (handled by
+            // the AgentState(rawValue:) check above). These map Pi's native event
+            // names too, as a fallback. Pi has no approval gate, so no "waiting".
+            switch eventName {
+            case "session_start": return .registered
+            case "agent_start", "turn_start", "tool_execution_start": return .working
+            case "agent_end", "session_shutdown": return .done
+            default: return nil
+            }
         case .cli, .unknown:
             return nil
         }

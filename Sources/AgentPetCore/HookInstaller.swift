@@ -212,9 +212,40 @@ public enum HookInstaller {
         """
     }
 
-    /// JSON-encodes a string for safe embedding in JS source.
+    // MARK: - Pi TypeScript extension
+
+    static func piExtension(binary: String) -> String {
+        """
+        // AgentPet integration (auto-generated, safe to delete to uninstall).
+        // Reports Pi session lifecycle to AgentPet's menu bar app.
+        import { spawn } from "node:child_process"
+        const AGENTPET_BIN = \(jsString(binary))
+        export default function (pi) {
+          const send = (state, ctx) => {
+            try {
+              const cwd = (ctx && ctx.cwd) || process.cwd()
+              const file = ctx && ctx.sessionManager && ctx.sessionManager.getSessionFile
+                ? ctx.sessionManager.getSessionFile() : null
+              const sid = "pi:" + (file || cwd)
+              const p = spawn(AGENTPET_BIN, ["hook", "--agent", "pi",
+                "--event", state, "--session", sid, "--project", cwd], { stdio: "ignore" })
+              if (p && p.unref) p.unref()
+            } catch (e) {}
+          }
+          pi.on("session_start", async (_e, ctx) => send("registered", ctx))
+          pi.on("agent_start", async (_e, ctx) => send("working", ctx))
+          pi.on("agent_end", async (_e, ctx) => send("done", ctx))
+          pi.on("session_shutdown", async (_e, ctx) => send("done", ctx))
+        }
+        """
+    }
+
+    /// JSON-encodes a string for safe embedding in JS source. Slashes are left
+    /// unescaped so embedded file paths stay readable (`"/a/b"`, not `"\/a\/b"`).
     private static func jsString(_ s: String) -> String {
-        if let data = try? JSONEncoder().encode(s), let str = String(data: data, encoding: .utf8) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .withoutEscapingSlashes
+        if let data = try? encoder.encode(s), let str = String(data: data, encoding: .utf8) {
             return str
         }
         return "\"\(s)\""
@@ -256,11 +287,12 @@ public enum HookInstaller {
             try writeSettings(s, path: path)
         case .antigravityNested:
             try writeSettings(installAntigravity(into: readSettings(path: path), command: command, events: events), path: path)
-        case .opencodePlugin:
+        case .opencodePlugin, .piExtension:
             let dir = (path as NSString).deletingLastPathComponent
             try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-            let js = opencodePlugin(binary: binaryPath(fromCommand: command))
-            try Data(js.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
+            let bin = binaryPath(fromCommand: command)
+            let source = style == .piExtension ? piExtension(binary: bin) : opencodePlugin(binary: bin)
+            try Data(source.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
         }
     }
 
@@ -273,7 +305,7 @@ public enum HookInstaller {
             try writeSettings(uninstallFlat(from: readSettings(path: path), events: events), path: path)
         case .antigravityNested:
             try writeSettings(uninstallAntigravity(from: readSettings(path: path), events: events), path: path)
-        case .opencodePlugin:
+        case .opencodePlugin, .piExtension:
             if isInstalledOnDisk(path: path, events: events, style: style) {
                 try? FileManager.default.removeItem(atPath: path)
             }
@@ -289,7 +321,7 @@ public enum HookInstaller {
             return isInstalledFlat(in: (try? readSettings(path: path)) ?? [:], events: events)
         case .antigravityNested:
             return isInstalledAntigravity(in: (try? readSettings(path: path)) ?? [:], events: events)
-        case .opencodePlugin:
+        case .opencodePlugin, .piExtension:
             guard let s = try? String(contentsOfFile: path, encoding: .utf8) else { return false }
             return isOurs(s)
         }

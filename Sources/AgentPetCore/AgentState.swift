@@ -28,6 +28,8 @@ public enum AgentKind: String, Codable, Sendable {
     case kiroCLI
     /// Factory Droid CLI (`droid`).
     case droid
+    /// Pi Coding Agent (pi.dev).
+    case pi
     /// Any CLI agent launched via the `agentpet run` wrapper.
     case cli
     case unknown

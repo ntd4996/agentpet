@@ -35,5 +35,7 @@ public enum AgentCatalog {
                          note: "Hooks the default Kiro CLI agent"),
         AgentIntegration(kind: .droid, displayName: "Factory Droid", isSupported: true,
                          note: "Factory Droid CLI (~/.factory/hooks.json)"),
+        AgentIntegration(kind: .pi, displayName: "Pi", isSupported: true,
+                         note: "Pi (pi.dev) extension; no \"needs input\" alerts (Pi has no approval gate by default)"),
     ]
 }
