@@ -133,6 +133,7 @@ private struct AboutTab: View {
     private let profile = URL(string: "https://github.com/ntd4996")!
     private let coffee = URL(string: "https://buymeacoffee.com/ntd4996")!
     private let discord = URL(string: "https://discord.gg/kzFJKsZav")!
+    private let homepage = URL(string: "https://agentpet.thenightwatcher.online")!
 
     var body: some View {
         Form {
@@ -143,6 +144,11 @@ private struct AboutTab: View {
                     Text("AgentPet").font(.title2.bold())
                     Text("A desktop pet that watches your AI coding agents.")
                         .font(.callout).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Link(destination: homepage) {
+                        Label("agentpet.thenightwatcher.online", systemImage: "globe")
+                            .font(.callout)
+                    }
+                    .padding(.top, 2)
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
