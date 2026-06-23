@@ -151,23 +151,6 @@ struct PetStatsView: View {
 
     // MARK: - Achievements
 
-    private static let achievementSymbols: [Achievement: String] = [
-        .firstMeal:   "fork.knife",
-        .sessions100: "trophy",
-        .sessions500: "trophy.fill",
-        .tokens1M:    "flame",
-        .tokens10M:   "flame.fill",
-        .tokens50M:   "bolt.fill",
-        .level5:      "star",
-        .level10:     "star.fill",
-        .level20:     "shield.fill",
-        .level35:     "crown.fill",
-        .streak7:     "calendar",
-        .streak14:    "calendar.badge.clock",
-        .streak30:    "calendar.badge.checkmark",
-        .nightOwl:    "moon.fill",
-    ]
-
     private var achievementBlock: some View {
         let unlocked = care.achievements
         let total = Achievement.allCases.count
@@ -182,7 +165,7 @@ struct PetStatsView: View {
             }
             HStack(spacing: 2) {
                 ForEach(Achievement.allCases, id: \.self) { a in
-                    let symbol = Self.achievementSymbols[a] ?? "star"
+                    let symbol = PetCare.achievementSymbol(a)
                     let isUnlocked = unlocked.contains(a)
                     Image(systemName: symbol)
                         .font(.system(size: 11))

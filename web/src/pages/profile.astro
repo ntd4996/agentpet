@@ -118,22 +118,37 @@ export const prerender = false;
       </svg>`;
     }
 
-    // Achievements — keys + emoji + hint mirror the app (PetCare.Achievement).
+    // Achievements — keys, an SVG glyph matching the app's SF Symbol, name and
+    // hint, mirroring PetCare.Achievement / PetCare.achievementSymbol. Glyph
+    // paths are Lucide (MIT), the closest open equivalents to the SF Symbols.
+    const ICON: Record<string, string> = {
+      "fork.knife": '<path d="M3 2v7c0 1.1.9 2 2 2a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/>',
+      "trophy": '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
+      "flame": '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+      "bolt": '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+      "star": '<path d="M11.5 2.3a.5.5 0 0 1 .95 0l2.3 4.68a2.1 2.1 0 0 0 1.6 1.16l5.17.76a.53.53 0 0 1 .29.9l-3.74 3.64a2.1 2.1 0 0 0-.6 1.88l.88 5.14a.53.53 0 0 1-.77.56l-4.62-2.43a2.1 2.1 0 0 0-1.97 0L6.4 21a.53.53 0 0 1-.77-.56l.88-5.14a2.1 2.1 0 0 0-.61-1.88L2.16 9.8a.53.53 0 0 1 .29-.9l5.17-.76a2.1 2.1 0 0 0 1.6-1.16z"/>',
+      "shield": '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+      "crown": '<path d="M11.56 3.27a.5.5 0 0 1 .88 0l2.95 5.6a1 1 0 0 0 1.52.3l4.28-3.67a.5.5 0 0 1 .8.52l-2.84 10.25a1 1 0 0 1-.95.73H5.81a1 1 0 0 1-.96-.73L2.02 6.02a.5.5 0 0 1 .8-.52l4.28 3.67a1 1 0 0 0 1.52-.3z"/><path d="M5 21h14"/>',
+      "calendar": '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+      "calendar.clock": '<path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h5"/><circle cx="16" cy="16" r="6"/><path d="M16 14v2l1.5 1.2"/>',
+      "calendar.check": '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/><path d="m9 16 2 2 4-4"/>',
+      "moon": '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+    };
     const ACHIEVEMENTS: [string, string, string, string][] = [
-      ["firstMeal", "🍽️", "First Meal", "Finish your first agent session"],
-      ["sessions100", "🏅", "100 Sessions", "Finish 100 agent sessions"],
-      ["sessions500", "🎖️", "500 Sessions", "Finish 500 agent sessions"],
-      ["tokens1M", "🔥", "1M Tokens", "Burn 1M tokens"],
-      ["tokens10M", "💥", "10M Tokens", "Burn 10M tokens"],
-      ["tokens50M", "☄️", "50M Tokens", "Burn 50M tokens"],
-      ["level5", "⭐", "Level 5", "Reach Level 5"],
-      ["level10", "🌟", "Level 10", "Reach Level 10"],
-      ["level20", "🛡️", "Level 20", "Reach Level 20"],
-      ["level35", "👑", "Level 35", "Reach Level 35 (Legend)"],
-      ["streak7", "📅", "7-Day Streak", "Feed your pet 7 days in a row"],
-      ["streak14", "🗓️", "14-Day Streak", "Feed your pet 14 days in a row"],
-      ["streak30", "✅", "30-Day Streak", "Feed your pet 30 days in a row"],
-      ["nightOwl", "🌙", "Night Owl", "Finish a session after midnight"],
+      ["firstMeal", "fork.knife", "First Meal", "Finish your first agent session"],
+      ["sessions100", "trophy", "100 Sessions", "Finish 100 agent sessions"],
+      ["sessions500", "trophy", "500 Sessions", "Finish 500 agent sessions"],
+      ["tokens1M", "flame", "1M Tokens", "Burn 1M tokens"],
+      ["tokens10M", "flame", "10M Tokens", "Burn 10M tokens"],
+      ["tokens50M", "bolt", "50M Tokens", "Burn 50M tokens"],
+      ["level5", "star", "Level 5", "Reach Level 5"],
+      ["level10", "star", "Level 10", "Reach Level 10"],
+      ["level20", "shield", "Level 20", "Reach Level 20"],
+      ["level35", "crown", "Level 35", "Reach Level 35 (Legend)"],
+      ["streak7", "calendar", "7-Day Streak", "Feed your pet 7 days in a row"],
+      ["streak14", "calendar.clock", "14-Day Streak", "Feed your pet 14 days in a row"],
+      ["streak30", "calendar.check", "30-Day Streak", "Feed your pet 30 days in a row"],
+      ["nightOwl", "moon", "Night Owl", "Finish a session after midnight"],
     ];
 
     // Authoritative set is what the app synced; fall back to deriving from stats
@@ -158,14 +173,19 @@ export const prerender = false;
       return s;
     }
 
+    // Mirrors the app's right-click HUD badge row: a strip of icon-only badges,
+    // unlocked tinted in the stage color, locked dimmed. Native hover tooltip
+    // shows the name + how to unlock it.
     function badgeRow(p: any, color: string): string {
       const have = unlockedSet(p);
-      const chips = ACHIEVEMENTS.map(([key, emoji, name, hint]) => {
+      const chips = ACHIEVEMENTS.map(([key, icon, name, hint]) => {
         const on = have.has(key);
         const title = `${name} — ${on ? "Unlocked" : hint}`;
+        const svg = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICON[icon] || ICON.star}</svg>`;
         return `<span title="${esc(title)}" aria-label="${esc(title)}"
-          class="grid h-7 w-7 place-items-center rounded-lg text-sm transition ${on ? "" : "grayscale"}"
-          style="background:${on ? color + "1f" : "#0000000a"};opacity:${on ? 1 : 0.4}">${emoji}</span>`;
+          class="grid h-7 w-7 place-items-center rounded-lg transition"
+          style="background:${on ? color + "1f" : "#00000008"};color:${on ? color : "#9aa3b2"};opacity:${on ? 1 : 0.45}">${svg}</span>`;
       }).join("");
       return `
         <div class="mt-3">
@@ -173,7 +193,7 @@ export const prerender = false;
             <span class="text-[10px] font-semibold uppercase tracking-wide text-faint">Badges</span>
             <span class="text-[10px] font-semibold" style="color:${color}">${have.size} / ${ACHIEVEMENTS.length}</span>
           </div>
-          <div class="mt-1.5 flex flex-wrap gap-1">${chips}</div>
+          <div class="mt-1.5 flex flex-wrap gap-1.5">${chips}</div>
         </div>`;
     }
 

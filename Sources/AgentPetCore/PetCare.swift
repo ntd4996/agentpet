@@ -327,6 +327,27 @@ public enum PetCare {
         }
     }
 
+    /// SF Symbol name for an achievement. One source of truth so the HUD,
+    /// the Care tab, and any other surface show the same icon.
+    public static func achievementSymbol(_ a: Achievement) -> String {
+        switch a {
+        case .firstMeal:   return "fork.knife"
+        case .sessions100: return "trophy"
+        case .sessions500: return "trophy.fill"
+        case .tokens1M:    return "flame"
+        case .tokens10M:   return "flame.fill"
+        case .tokens50M:   return "bolt.fill"
+        case .level5:      return "star"
+        case .level10:     return "star.fill"
+        case .level20:     return "shield.fill"
+        case .level35:     return "crown.fill"
+        case .streak7:     return "calendar"
+        case .streak14:    return "calendar.badge.clock"
+        case .streak30:    return "calendar.badge.checkmark"
+        case .nightOwl:    return "moon.fill"
+        }
+    }
+
     private static func markFed(_ state: inout PetCareState, now: Date, calendar: Calendar) {
         state.lastFedAt = now
         let today = dayKey(for: now, calendar: calendar)
