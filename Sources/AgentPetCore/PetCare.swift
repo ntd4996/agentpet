@@ -306,6 +306,27 @@ public enum PetCare {
         }
     }
 
+    /// How to unlock an achievement, localised. Shown on hover so users know
+    /// what each badge takes.
+    public static func achievementDescription(_ a: Achievement) -> String {
+        switch a {
+        case .firstMeal:   return NSLocalizedString("Finish your first agent session", comment: "achievement hint")
+        case .sessions100: return NSLocalizedString("Finish 100 agent sessions", comment: "achievement hint")
+        case .sessions500: return NSLocalizedString("Finish 500 agent sessions", comment: "achievement hint")
+        case .tokens1M:    return NSLocalizedString("Burn 1M tokens", comment: "achievement hint")
+        case .tokens10M:   return NSLocalizedString("Burn 10M tokens", comment: "achievement hint")
+        case .tokens50M:   return NSLocalizedString("Burn 50M tokens", comment: "achievement hint")
+        case .level5:      return NSLocalizedString("Reach Level 5", comment: "achievement hint")
+        case .level10:     return NSLocalizedString("Reach Level 10", comment: "achievement hint")
+        case .level20:     return NSLocalizedString("Reach Level 20", comment: "achievement hint")
+        case .level35:     return NSLocalizedString("Reach Level 35 (Legend)", comment: "achievement hint")
+        case .streak7:     return NSLocalizedString("Feed your pet 7 days in a row", comment: "achievement hint")
+        case .streak14:    return NSLocalizedString("Feed your pet 14 days in a row", comment: "achievement hint")
+        case .streak30:    return NSLocalizedString("Feed your pet 30 days in a row", comment: "achievement hint")
+        case .nightOwl:    return NSLocalizedString("Finish a session after midnight", comment: "achievement hint")
+        }
+    }
+
     private static func markFed(_ state: inout PetCareState, now: Date, calendar: Calendar) {
         state.lastFedAt = now
         let today = dayKey(for: now, calendar: calendar)

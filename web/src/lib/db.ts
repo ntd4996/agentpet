@@ -49,6 +49,7 @@ export async function ensureSchema(db: any): Promise<void> {
   // care_pets predates the thumb/week columns in prod; additive + idempotent.
   try { await db.prepare("ALTER TABLE care_pets ADD COLUMN thumb TEXT").run(); } catch {}
   try { await db.prepare("ALTER TABLE care_pets ADD COLUMN week TEXT").run(); } catch {}
+  try { await db.prepare("ALTER TABLE care_pets ADD COLUMN achievements TEXT").run(); } catch {}
   ready = true;
 }
 

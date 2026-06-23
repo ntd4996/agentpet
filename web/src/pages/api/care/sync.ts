@@ -46,13 +46,20 @@ export const POST: APIRoute = async ({ request }) => {
     const nums = p.week.slice(0, 7).map((n: any) => Math.max(0, Math.floor(Number(n) || 0)));
     return JSON.stringify(nums);
   };
+  const achievementsOf = (p: any): string | null => {
+    if (!Array.isArray(p?.achievements)) return null;
+    const keys = p.achievements
+      .filter((k: any) => typeof k === "string" && /^[a-zA-Z0-9]{1,40}$/.test(k))
+      .slice(0, 40);
+    return JSON.stringify(keys);
+  };
   const statements = pets
     .filter((p) => typeof p?.id === "string" && p.id.length > 0 && p.id.length <= 120)
     .map((p) =>
       db
         .prepare(
-          `INSERT INTO care_pets (user_id, pet_id, name, xp, tokens, meals, streak, last_fed_at, updated_at, thumb, week)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?)
+          `INSERT INTO care_pets (user_id, pet_id, name, xp, tokens, meals, streak, last_fed_at, updated_at, thumb, week, achievements)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
            ON CONFLICT (user_id, pet_id) DO UPDATE SET
              name=excluded.name,
              xp=MAX(care_pets.xp, excluded.xp),
@@ -62,7 +69,8 @@ export const POST: APIRoute = async ({ request }) => {
              last_fed_at=excluded.last_fed_at,
              updated_at=excluded.updated_at,
              thumb=COALESCE(excluded.thumb, care_pets.thumb),
-             week=COALESCE(excluded.week, care_pets.week)`
+             week=COALESCE(excluded.week, care_pets.week),
+             achievements=COALESCE(excluded.achievements, care_pets.achievements)`
         )
         .bind(
           device.user_id,
@@ -75,7 +83,8 @@ export const POST: APIRoute = async ({ request }) => {
           p.lastFedAt ? int(p.lastFedAt) * 1000 : null,
           now,
           thumbOf(p),
-          weekOf(p)
+          weekOf(p),
+          achievementsOf(p)
         )
     );
   if (statements.length) await db.batch(statements);

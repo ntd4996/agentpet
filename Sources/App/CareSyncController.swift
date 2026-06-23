@@ -123,6 +123,7 @@ final class CareSyncController: ObservableObject {
                 "lastFedAt": s.lastFedAt.map { Int($0.timeIntervalSince1970) } as Any,
                 "thumb": Self.thumbDataURL(for: id) as Any,
                 "week": week,
+                "achievements": Array(s.unlockedAchievements ?? []).map { $0.rawValue },
             ]
         }
 

@@ -48,11 +48,16 @@ final class ImagePetStore: ObservableObject {
         let rest = dirs.filter { $0 != priorityDir }
         guard !rest.isEmpty else { return }
         Task { @MainActor in
+            // Slice the rest into a local accumulator and publish ONCE at the end.
+            // Re-assigning `packs` per pet made PetView (which observes the store)
+            // re-render on every pet, stuttering the sprite animation at launch.
+            var acc = packs
             for dir in rest {
                 await Task.yield()   // let the menu bar + pet paint first
                 guard let pack = SpriteSlicer.loadPack(directory: dir) else { continue }
-                packs = (packs + [pack]).sorted { $0.displayName < $1.displayName }
+                acc.append(pack)
             }
+            packs = acc.sorted { $0.displayName < $1.displayName }
         }
     }
 

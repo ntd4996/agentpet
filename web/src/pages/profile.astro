@@ -118,6 +118,65 @@ export const prerender = false;
       </svg>`;
     }
 
+    // Achievements — keys + emoji + hint mirror the app (PetCare.Achievement).
+    const ACHIEVEMENTS: [string, string, string, string][] = [
+      ["firstMeal", "🍽️", "First Meal", "Finish your first agent session"],
+      ["sessions100", "🏅", "100 Sessions", "Finish 100 agent sessions"],
+      ["sessions500", "🎖️", "500 Sessions", "Finish 500 agent sessions"],
+      ["tokens1M", "🔥", "1M Tokens", "Burn 1M tokens"],
+      ["tokens10M", "💥", "10M Tokens", "Burn 10M tokens"],
+      ["tokens50M", "☄️", "50M Tokens", "Burn 50M tokens"],
+      ["level5", "⭐", "Level 5", "Reach Level 5"],
+      ["level10", "🌟", "Level 10", "Reach Level 10"],
+      ["level20", "🛡️", "Level 20", "Reach Level 20"],
+      ["level35", "👑", "Level 35", "Reach Level 35 (Legend)"],
+      ["streak7", "📅", "7-Day Streak", "Feed your pet 7 days in a row"],
+      ["streak14", "🗓️", "14-Day Streak", "Feed your pet 14 days in a row"],
+      ["streak30", "✅", "30-Day Streak", "Feed your pet 30 days in a row"],
+      ["nightOwl", "🌙", "Night Owl", "Finish a session after midnight"],
+    ];
+
+    // Authoritative set is what the app synced; fall back to deriving from stats
+    // for pets synced before achievements existed (Night Owl can't be derived).
+    function unlockedSet(p: any): Set<string> {
+      if (Array.isArray(p.achievements)) return new Set(p.achievements);
+      const dispLv = Math.max(0, levelFor(p.xp) - 1);
+      const s = new Set<string>();
+      if (p.meals >= 1) s.add("firstMeal");
+      if (p.meals >= 100) s.add("sessions100");
+      if (p.meals >= 500) s.add("sessions500");
+      if (p.tokens >= 1_000_000) s.add("tokens1M");
+      if (p.tokens >= 10_000_000) s.add("tokens10M");
+      if (p.tokens >= 50_000_000) s.add("tokens50M");
+      if (dispLv >= 5) s.add("level5");
+      if (dispLv >= 10) s.add("level10");
+      if (dispLv >= 20) s.add("level20");
+      if (dispLv >= 35) s.add("level35");
+      if (p.streak >= 7) s.add("streak7");
+      if (p.streak >= 14) s.add("streak14");
+      if (p.streak >= 30) s.add("streak30");
+      return s;
+    }
+
+    function badgeRow(p: any, color: string): string {
+      const have = unlockedSet(p);
+      const chips = ACHIEVEMENTS.map(([key, emoji, name, hint]) => {
+        const on = have.has(key);
+        const title = `${name} — ${on ? "Unlocked" : hint}`;
+        return `<span title="${esc(title)}" aria-label="${esc(title)}"
+          class="grid h-7 w-7 place-items-center rounded-lg text-sm transition ${on ? "" : "grayscale"}"
+          style="background:${on ? color + "1f" : "#0000000a"};opacity:${on ? 1 : 0.4}">${emoji}</span>`;
+      }).join("");
+      return `
+        <div class="mt-3">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] font-semibold uppercase tracking-wide text-faint">Badges</span>
+            <span class="text-[10px] font-semibold" style="color:${color}">${have.size} / ${ACHIEVEMENTS.length}</span>
+          </div>
+          <div class="mt-1.5 flex flex-wrap gap-1">${chips}</div>
+        </div>`;
+    }
+
     function petCard(p: any): string {
       const lv = levelFor(p.xp);
       const dispLv = Math.max(0, lv - 1);
@@ -178,6 +237,7 @@ export const prerender = false;
             </div>
           </dl>
           ${sparkline(p.week, color)}
+          ${badgeRow(p, color)}
           ${fed ? `<p class="mt-3 text-xs text-faint">Last fed ${fed}</p>` : ""}
         </div>`;
     }
