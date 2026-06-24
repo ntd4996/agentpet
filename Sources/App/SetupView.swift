@@ -281,26 +281,6 @@ private struct GeneralTab: View {
             Section("Pet display") {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Split pet")
-                        Text("Spawn one pet per active project instead of one shared pet.")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    ColorSwitch(isOn: $pet.splitPet)
-                }
-                if pet.splitPet {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Hide idle project pets")
-                            Text("Show a configured project's pet only while it's working; hide it when idle.")
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        ColorSwitch(isOn: $pet.hideIdleProjectPets)
-                    }
-                }
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
                         Text("Animate pets")
                         Text("Turn off to freeze pet/bubble animation (lower CPU).")
                             .font(.caption).foregroundStyle(.secondary)
@@ -473,13 +453,28 @@ private struct PetTab: View {
     @ObservedObject var imagePets: ImagePetStore
     @ObservedObject var model: SettingsModel
     let selectedPack: ImagePetPack?
+    @ObservedObject private var projectSettings = ProjectPetSettings.shared
     @State private var browsing = false
     @State private var creating = false
     @State private var petQuery = ""
     @State private var renameText = ""
 
-    enum PetSubTab { case `default`, project }
-    @State private var petSubTab: PetSubTab = .default
+    private enum PetSlot: Hashable {
+        case defaultPet
+        case project(String)
+    }
+    @State private var selectedSlot: PetSlot = .defaultPet
+
+    private var selectedSlotPetID: String? {
+        switch selectedSlot {
+        case .defaultPet: return pet.selectedPetID
+        case .project(let path): return projectSettings.petID(forProject: path)
+        }
+    }
+
+    private var selectedSlotPack: ImagePetPack? {
+        selectedSlotPetID.flatMap { imagePets.pack(id: $0) }
+    }
 
     private var filteredPacks: [ImagePetPack] {
         guard !petQuery.isEmpty else { return imagePets.packs }
@@ -488,144 +483,305 @@ private struct PetTab: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            Picker("", selection: $petSubTab) {
-                Text("Default pet").tag(PetSubTab.default)
-                Text("Project pets").tag(PetSubTab.project)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .padding(.horizontal, 16)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
-
-            Divider()
-
-            Group {
-                if petSubTab == .default {
-                    defaultContent
-                } else {
-                    ProjectPetsView()
-                }
-            }
-            .frame(maxHeight: .infinity)
-        }
-        .sheet(isPresented: $browsing) {
-            BrowsePetsView(onClose: { browsing = false })
-        }
-        .sheet(isPresented: $creating) {
-            CreatePetView(
-                onCreate: { id in
-                    creating = false
-                    imagePets.reload()
-                    pet.selectedPetID = id
-                },
-                onCancel: { creating = false }
-            )
-        }
-    }
-
-    private var defaultContent: some View {
         Form {
+            // Hero card for selected slot
             Section {
-                HStack(spacing: 14) {
-                    petPreview
-                        .frame(width: 84, height: 84)
-                        .background(RoundedRectangle(cornerRadius: 12).fill(.quaternary))
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Text(imagePets.displayName(for: pet.selectedPetID))
-                                .font(.title3.weight(.semibold))
-                            if let pack = selectedPack {
-                                Text(verbatim: "Lv \(PetCare.displayLevel(forXP: PetCareController.shared.states[pack.id]?.xp ?? 0))")
-                                    .font(.caption.weight(.bold))
-                                    .padding(.horizontal, 7).padding(.vertical, 2)
-                                    .background(Capsule().fill(Color.systemAccent.opacity(0.2)))
-                                    .foregroundStyle(Color.systemAccent)
-                            }
-                        }
-                        if let desc = selectedPack?.description {
-                            Text(desc).font(.callout).foregroundStyle(.secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+                heroCard
+            }
+
+            // Split pet toggle
+            Section {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Split pet")
+                        Text("Spawn one pet per active project instead of one shared pet.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
+                    ColorSwitch(isOn: $pet.splitPet)
                 }
-            }
-
-            if let id = pet.selectedPetID {
-                Section {
+                if pet.splitPet {
                     HStack {
-                        TextField("Pet name", text: $renameText)
-                            .textFieldStyle(.roundedBorder)
-                            .onSubmit { imagePets.rename(id, to: renameText) }
-                        Button("Save") { imagePets.rename(id, to: renameText) }
-                            .disabled(renameText.trimmingCharacters(in: .whitespaces).isEmpty)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Hide idle project pets")
+                            Text("Show a configured project's pet only while it's working; hide it when idle.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        ColorSwitch(isOn: $pet.hideIdleProjectPets)
                     }
-                } header: {
-                    Text("Name")
-                } footer: {
-                    Text("Give your companion a custom name. Clear it to use the original.")
-                }
-                .onAppear { renameText = imagePets.displayName(for: id) }
-                .onChange(of: pet.selectedPetID) { _ in
-                    renameText = imagePets.displayName(for: pet.selectedPetID)
                 }
             }
 
-            Section("Choose pet") {
-                if imagePets.packs.isEmpty {
-                    Text("No pets yet. Tap Browse to add one.").foregroundStyle(.secondary)
-                } else {
-                    if imagePets.packs.count > 4 {
-                        NativeSearchField(text: $petQuery, placeholder: "Search your pets")
+            // Slot selector grid
+            Section {
+                slotGrid
+            }
+
+            // Config panel for selected slot
+            configPanel
+        }
+        .formStyle(.grouped)
+        .onChange(of: pet.splitPet) { _ in
+            if !pet.splitPet, case .project = selectedSlot {
+                selectedSlot = .defaultPet
+            }
+        }
+        .onChange(of: projectSettings.mappings) { _ in
+            if case .project(let path) = selectedSlot,
+               !projectSettings.mappings.contains(where: { $0.projectPath == path }) {
+                selectedSlot = .defaultPet
+            }
+        }
+        .sheet(isPresented: $browsing) { BrowsePetsView(onClose: { browsing = false }) }
+        .sheet(isPresented: $creating) {
+            CreatePetView(onCreate: { id in creating = false; imagePets.reload(); pet.selectedPetID = id },
+                          onCancel: { creating = false })
+        }
+    }
+
+    // MARK: - Hero card
+
+    @ViewBuilder private var heroCard: some View {
+        HStack(spacing: 14) {
+            slotPetPreview
+                .frame(width: 84, height: 84)
+                .background(RoundedRectangle(cornerRadius: 12).fill(.quaternary))
+            VStack(alignment: .leading, spacing: 4) {
+                switch selectedSlot {
+                case .defaultPet:
+                    HStack(spacing: 8) {
+                        Text(imagePets.displayName(for: pet.selectedPetID))
+                            .font(.title3.weight(.semibold))
+                        if let pack = selectedPack {
+                            levelBadge(for: pack.id)
+                        }
                     }
-                    PetPager(packs: filteredPacks, selectedID: pet.selectedPetID,
-                             onSelect: { pet.selectedPetID = $0 },
-                             onDelete: { pack in
-                                 let wasSelected = pet.selectedPetID == pack.id
-                                 imagePets.delete(pack)
-                                 if wasSelected { pet.selectedPetID = imagePets.packs.first?.id }
-                             })
+                    if let desc = selectedPack?.description {
+                        Text(desc).font(.callout).foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                case .project(let path):
+                    Text((path as NSString).lastPathComponent)
+                        .font(.title3.weight(.semibold))
+                    if let pack = selectedSlotPack {
+                        HStack(spacing: 8) {
+                            Text(pack.displayName).font(.callout).foregroundStyle(.secondary)
+                            levelBadge(for: pack.id)
+                        }
+                    }
+                    Text(path).font(.caption).foregroundStyle(.secondary)
+                        .lineLimit(1).truncationMode(.middle)
                 }
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: - Slot grid
+
+    private var slotGrid: some View {
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 12), count: 4),
+                  alignment: .leading, spacing: 12) {
+            slotButton(for: .defaultPet, petID: pet.selectedPetID,
+                       label: NSLocalizedString("Default", comment: "default pet slot"))
+            if pet.splitPet {
+                ForEach(projectSettings.mappings, id: \.projectPath) { mapping in
+                    slotButton(for: .project(mapping.projectPath), petID: mapping.petID,
+                               label: (mapping.projectPath as NSString).lastPathComponent)
+                }
+                addProjectSlot
+            }
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func slotButton(for slot: PetSlot, petID: String?, label: String) -> some View {
+        let isSelected = selectedSlot == slot
+        return Button { selectedSlot = slot } label: {
+            VStack(spacing: 4) {
+                Group {
+                    if let petID, let pack = imagePets.pack(id: petID), let frame = pack.clip(0).first {
+                        Image(nsImage: frame).resizable().interpolation(.high).scaledToFit()
+                    } else {
+                        Image(systemName: "pawprint.fill").font(.system(size: 20)).foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 48, height: 48)
+                Text(label).font(.caption).lineLimit(1).frame(width: 64)
+            }
+            .padding(6)
+            .background(RoundedRectangle(cornerRadius: 10)
+                .fill(isSelected ? Color.systemAccent.opacity(0.2) : .clear))
+            .overlay(RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(isSelected ? Color.systemAccent : .secondary.opacity(0.3),
+                              lineWidth: isSelected ? 2 : 1))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .topLeading) {
+            if let petID {
+                let level = PetCare.displayLevel(forXP: PetCareController.shared.states[petID]?.xp ?? 0)
+                Text(verbatim: "Lv \(level)")
+                    .font(.system(size: 9, weight: .bold))
+                    .padding(.horizontal, 5).padding(.vertical, 1.5)
+                    .background(Capsule().fill(level > 0 ? Color.systemAccent.opacity(0.85) : Color.secondary.opacity(0.45)))
+                    .foregroundStyle(.white)
+                    .offset(x: -3, y: -3)
+            }
+        }
+    }
+
+    private var addProjectSlot: some View {
+        Button { addProject() } label: {
+            VStack(spacing: 4) {
+                Image(systemName: "plus")
+                    .font(.system(size: 20)).foregroundStyle(.secondary)
+                    .frame(width: 48, height: 48)
+                Text("Add…").font(.caption).lineLimit(1).frame(width: 64)
+            }
+            .padding(6)
+            .overlay(RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(.secondary.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [5, 3])))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Config panel (switches on selected slot)
+
+    @ViewBuilder private var configPanel: some View {
+        switch selectedSlot {
+        case .defaultPet:
+            defaultPetConfig
+        case .project(let path):
+            projectPetConfig(path: path)
+        }
+    }
+
+    @ViewBuilder private var defaultPetConfig: some View {
+        if let id = pet.selectedPetID {
+            Section {
                 HStack {
-                    Button { browsing = true } label: {
-                        Label("Browse pets…", systemImage: "square.grid.2x2")
-                    }
-                    Button { creating = true } label: {
-                        Label("Create pet…", systemImage: "square.and.pencil")
-                    }
+                    TextField("Pet name", text: $renameText)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit { imagePets.rename(id, to: renameText) }
+                    Button("Save") { imagePets.rename(id, to: renameText) }
+                        .disabled(renameText.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
+            } header: {
+                Text("Name")
+            } footer: {
+                Text("Give your companion a custom name. Clear it to use the original.")
             }
+            .onAppear { renameText = imagePets.displayName(for: id) }
+            .onChange(of: pet.selectedPetID) { _ in
+                renameText = imagePets.displayName(for: pet.selectedPetID)
+            }
+        }
 
-            if let pack = selectedPack {
-                Section("Animations") {
-                    AnimationPicker(pack: pack)
+        Section("Choose pet") {
+            if imagePets.packs.isEmpty {
+                Text("No pets yet. Tap Browse to add one.").foregroundStyle(.secondary)
+            } else {
+                if imagePets.packs.count > 4 {
+                    NativeSearchField(text: $petQuery, placeholder: "Search your pets")
                 }
+                PetPager(packs: filteredPacks, selectedID: pet.selectedPetID,
+                         onSelect: { pet.selectedPetID = $0 },
+                         onDelete: { pack in
+                             let wasSelected = pet.selectedPetID == pack.id
+                             imagePets.delete(pack)
+                             if wasSelected { pet.selectedPetID = imagePets.packs.first?.id }
+                         })
             }
-
-            Section("Size on screen") {
-                HStack(spacing: 8) {
-                    Slider(value: $pet.petPoint, in: PetController.minPoint...PetController.maxPoint)
-                    Text("\(Int(pet.petPoint))")
-                        .monospacedDigit().foregroundStyle(.secondary).fixedSize()
-                    ForEach(PetController.presets, id: \.0) { preset in
-                        Button(preset.0) { pet.animateSize(to: preset.1) }
-                            .buttonStyle(.bordered)
-                    }
+            HStack {
+                Button { browsing = true } label: {
+                    Label("Browse pets…", systemImage: "square.grid.2x2")
+                }
+                Button { creating = true } label: {
+                    Label("Create pet…", systemImage: "square.and.pencil")
                 }
             }
         }
-        .formStyle(.grouped)
+
+        if let pack = selectedPack {
+            Section("Animations") {
+                AnimationPicker(pack: pack)
+            }
+        }
+
+        Section("Size on screen") {
+            HStack(spacing: 8) {
+                Slider(value: $pet.petPoint, in: PetController.minPoint...PetController.maxPoint)
+                Text("\(Int(pet.petPoint))")
+                    .monospacedDigit().foregroundStyle(.secondary).fixedSize()
+                ForEach(PetController.presets, id: \.0) { preset in
+                    Button(preset.0) { pet.animateSize(to: preset.1) }
+                        .buttonStyle(.bordered)
+                }
+            }
+        }
     }
 
-    @ViewBuilder private var petPreview: some View {
-        if let pack = selectedPack {
+    @ViewBuilder private func projectPetConfig(path: String) -> some View {
+        Section("Choose pet") {
+            if imagePets.packs.isEmpty {
+                Text("No pets installed.").foregroundStyle(.secondary)
+            } else {
+                PetPager(packs: imagePets.packs,
+                         selectedID: projectSettings.petID(forProject: path),
+                         onSelect: { projectSettings.setPet(projectPath: path, petID: $0) })
+            }
+        }
+
+        if let pack = selectedSlotPack {
+            Section("Animations") {
+                AnimationPicker(pack: pack)
+            }
+        }
+
+        Section {
+            Button(role: .destructive) {
+                projectSettings.remove(projectPath: path)
+            } label: {
+                Label("Remove project", systemImage: "trash")
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
+    @ViewBuilder private var slotPetPreview: some View {
+        if let pack = selectedSlotPack {
             ImageSpriteView(frames: pack.clip(0), mood: .idle,
                             fps: pet.spriteFPS(forMood: .idle), size: 78)
         } else {
             Image(systemName: "pawprint.fill").font(.system(size: 40)).foregroundStyle(.secondary)
         }
+    }
+
+    private func levelBadge(for packID: String) -> some View {
+        Text(verbatim: "Lv \(PetCare.displayLevel(forXP: PetCareController.shared.states[packID]?.xp ?? 0))")
+            .font(.caption.weight(.bold))
+            .padding(.horizontal, 7).padding(.vertical, 2)
+            .background(Capsule().fill(Color.systemAccent.opacity(0.2)))
+            .foregroundStyle(Color.systemAccent)
+    }
+
+    private func addProject() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose Project Folder"
+        panel.prompt = "Add"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        let petID = pet.selectedPetID ?? imagePets.packs.first?.id ?? ""
+        guard !petID.isEmpty else { return }
+        projectSettings.setPet(projectPath: url.path, petID: petID)
     }
 }
 
@@ -653,7 +809,7 @@ private struct PetPager: View {
     let packs: [ImagePetPack]
     let selectedID: String?
     let onSelect: (String) -> Void
-    let onDelete: (ImagePetPack) -> Void
+    var onDelete: ((ImagePetPack) -> Void)? = nil
     @State private var page = 0
 
     private let perPage = 8
@@ -700,7 +856,7 @@ private struct PetPager: View {
             ForEach(slice) { pack in
                 PetThumb(pack: pack, selected: selectedID == pack.id,
                          select: { onSelect(pack.id) },
-                         onDelete: { onDelete(pack) })
+                         onDelete: onDelete.map { d in { d(pack) } })
             }
         }
     }
