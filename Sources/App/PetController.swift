@@ -390,7 +390,19 @@ final class PetController: ObservableObject {
     /// Plans the per-project pet windows from the current sessions and reconciles
     /// the window registry. Single-pet mode (Split OFF) yields exactly one
     /// "default" window whose state mirrors today's aggregate behaviour.
+    private var syncScheduled = false
+
     private func syncWindows() {
+        guard !syncScheduled else { return }
+        syncScheduled = true
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            self.syncScheduled = false
+            self.performWindowSync()
+        }
+    }
+
+    private func performWindowSync() {
         let specs = PetWindowPlanner.plan(
             sessions: latestSessions,
             split: splitPet,

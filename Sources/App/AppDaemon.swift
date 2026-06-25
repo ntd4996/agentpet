@@ -245,6 +245,7 @@ final class AppDaemon: ObservableObject {
 
     private func prune() {
         store.prune(now: Date())
+        guard store.sorted != sessions else { return }
         refresh()
     }
 

@@ -107,11 +107,21 @@ final class StatusBarController: NSObject, ObservableObject {
     /// Builds the menu bar image: the paw alone, or the paw plus a count laid out
     /// as a centered row (both centered vertically by their bounding boxes, so the
     /// digit never sits high or low relative to the icon).
+    private static var cachedMenuBarCount: Int? = -1
+    private static var cachedMenuBarWaiting = false
+    private static var cachedMenuBarImage: NSImage?
+
     private static func menuBarImage(count: Int?, waiting: Bool) -> NSImage? {
+        if count == cachedMenuBarCount, waiting == cachedMenuBarWaiting,
+           let cached = cachedMenuBarImage { return cached }
+
         guard let paw = NSImage(systemSymbolName: "pawprint.fill", accessibilityDescription: "AgentPet") else { return nil }
 
         guard let count else {
             paw.isTemplate = true
+            cachedMenuBarCount = nil
+            cachedMenuBarWaiting = false
+            cachedMenuBarImage = paw
             return paw
         }
 
@@ -134,6 +144,9 @@ final class StatusBarController: NSObject, ObservableObject {
         }
         img.unlockFocus()
         img.isTemplate = !waiting
+        cachedMenuBarCount = count
+        cachedMenuBarWaiting = waiting
+        cachedMenuBarImage = img
         return img
     }
 
