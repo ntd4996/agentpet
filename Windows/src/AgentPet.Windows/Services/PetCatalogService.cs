@@ -12,7 +12,8 @@ public sealed class PetCatalogService
     public IReadOnlyList<PetCatalogItem> Load()
     {
         var items = new List<PetCatalogItem>();
-        foreach (var petsDir in AgentPetPaths.PetsDirs)
+        var seenPackIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var petsDir in PetSearchDirs())
         {
             if (!Directory.Exists(petsDir))
             {
@@ -21,9 +22,16 @@ public sealed class PetCatalogService
 
             foreach (var manifestPath in Directory.EnumerateFiles(petsDir, "pet.json", SearchOption.AllDirectories).OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
             {
+                var packId = Path.GetFileName(Path.GetDirectoryName(manifestPath));
+                if (string.IsNullOrWhiteSpace(packId) || seenPackIds.Contains(packId))
+                {
+                    continue;
+                }
+
                 if (TryLoadItem(manifestPath) is { } item)
                 {
                     items.Add(item);
+                    seenPackIds.Add(packId);
                 }
             }
         }
@@ -34,6 +42,16 @@ public sealed class PetCatalogService
         }
 
         return items;
+    }
+
+    private static IEnumerable<string> PetSearchDirs()
+    {
+        foreach (var petsDir in AgentPetPaths.PetsDirs)
+        {
+            yield return petsDir;
+        }
+
+        yield return Path.Combine(AppContext.BaseDirectory, "Assets", "Pets");
     }
 
     private static PetCatalogItem? TryLoadItem(string manifestPath)

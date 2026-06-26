@@ -1,0 +1,7 @@
+{
+  "displayName": "Fox",
+  "description": "Local AgentPet starter pet",
+  "spritesheetPath": "spritesheet.png",
+  "source": "openpets",
+  "slug": "fox-openpets"
+}

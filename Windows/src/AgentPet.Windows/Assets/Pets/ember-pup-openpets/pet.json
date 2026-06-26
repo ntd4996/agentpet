@@ -1,0 +1,7 @@
+{
+  "displayName": "Ember Pup",
+  "description": "Local AgentPet starter pet",
+  "spritesheetPath": "spritesheet.png",
+  "source": "openpets",
+  "slug": "ember-pup-openpets"
+}

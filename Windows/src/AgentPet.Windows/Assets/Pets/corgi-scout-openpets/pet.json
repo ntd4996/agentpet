@@ -1,0 +1,7 @@
+{
+  "displayName": "Corgi Scout",
+  "description": "Local AgentPet starter pet",
+  "spritesheetPath": "spritesheet.png",
+  "source": "openpets",
+  "slug": "corgi-scout-openpets"
+}

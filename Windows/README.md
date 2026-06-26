@@ -46,6 +46,7 @@ The release script:
 - runs the Windows .NET tests unless `-SkipTests` is passed
 - publishes `AgentPet.Windows.exe` self-contained for `win-x64`
 - publishes and stages the `agentpet.exe` CLI helper beside the app
+- publishes bundled pet packs from `Assets\Pets` so fresh installs include the pet library
 - verifies `AgentPet.Windows.exe`, `agentpet.exe`, and `Assets\app.ico`
 - builds `Windows\publish\installer\AgentPet-Setup-x64.exe` when Inno Setup is installed
 - supports optional code signing with `-Sign` and a certificate thumbprint

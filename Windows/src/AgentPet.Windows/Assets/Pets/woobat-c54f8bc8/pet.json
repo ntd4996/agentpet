@@ -1,0 +1,7 @@
+{
+  "id": "woobat",
+  "displayName": "Woobat",
+  "description": "Its habitat is dark forests and caves. It emits ultrasonic waves from its nose to learn about its surroundings.",
+  "spritesheetPath": "spritesheet.png",
+  "category": "asian"
+}

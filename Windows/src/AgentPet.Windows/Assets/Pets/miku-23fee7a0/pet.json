@@ -1,0 +1,7 @@
+{
+  "id": "miku",
+  "displayName": "Miku",
+  "description": "based on hatsune miku.",
+  "spritesheetPath": "spritesheet.png",
+  "category": "asian"
+}

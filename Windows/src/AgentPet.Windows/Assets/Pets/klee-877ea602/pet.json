@@ -1,0 +1,7 @@
+{
+  "id": "klee",
+  "displayName": "Klee",
+  "description": "A tiny red-capped spark pet inspired by the uploaded Klee character art.",
+  "spritesheetPath": "spritesheet.png",
+  "category": "asian"
+}

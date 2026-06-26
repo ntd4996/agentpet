@@ -1,0 +1,7 @@
+{
+  "id": "frieren",
+  "displayName": "Frieren",
+  "description": "A tiny Codex digital pet inspired by Frieren, a white-haired elf mage simplified into a compact pixel mascot.",
+  "spritesheetPath": "spritesheet.png",
+  "category": "asian"
+}

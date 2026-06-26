@@ -1,0 +1,7 @@
+{
+  "id": "zubat",
+  "displayName": "Zubat",
+  "description": "It checks its surroundings and location using reflections of the ultrasonic waves from its mouth.",
+  "spritesheetPath": "spritesheet.png",
+  "category": "asian"
+}

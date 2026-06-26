@@ -1,0 +1,7 @@
+{
+  "displayName": "Pip Mouse",
+  "description": "Local AgentPet starter pet",
+  "spritesheetPath": "spritesheet.png",
+  "source": "openpets",
+  "slug": "pip-mouse-openpets"
+}

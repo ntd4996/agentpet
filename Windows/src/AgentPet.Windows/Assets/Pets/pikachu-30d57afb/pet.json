@@ -1,0 +1,7 @@
+{
+  "id": "pikachu",
+  "displayName": "Pikachu",
+  "description": "A chibi Pikachu-style Codex pet.",
+  "spritesheetPath": "spritesheet.png",
+  "category": "asian"
+}

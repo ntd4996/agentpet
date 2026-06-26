@@ -1,0 +1,7 @@
+{
+  "displayName": "Fixer",
+  "description": "Local AgentPet starter pet",
+  "spritesheetPath": "spritesheet.png",
+  "source": "openpets",
+  "slug": "fixer-openpets"
+}

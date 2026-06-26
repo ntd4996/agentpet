@@ -1,0 +1,7 @@
+{
+  "displayName": "Pika",
+  "description": "Local AgentPet starter pet",
+  "spritesheetPath": "spritesheet.png",
+  "source": "openpets",
+  "slug": "pika-a9b95ac8"
+}

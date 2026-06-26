@@ -1,0 +1,7 @@
+{
+  "id": "ash-ketchum",
+  "displayName": "Ash Ketchum",
+  "description": "A chibi Ash Ketchum-style Codex pet.",
+  "spritesheetPath": "spritesheet.png",
+  "category": "asian"
+}

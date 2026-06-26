@@ -1,5 +1,15 @@
 # AgentPet Windows changelog
 
+## 0.1.1 - 2026-06-26
+
+### Added
+
+- Bundled the local pet pack library into the Windows app installer so fresh installs show all available pets instead of only the Claude fallback pet.
+
+### Fixed
+
+- Pet catalog now scans bundled `{app}\Assets\Pets` packs after user-local `%LOCALAPPDATA%\AgentPet\pets` packs, while de-duplicating pack folders so user-local packs can override bundled packs.
+
 ## 0.1.0 - 2026-06-26
 
 First self-contained Windows WPF prototype release build.

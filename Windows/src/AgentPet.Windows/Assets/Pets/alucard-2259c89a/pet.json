@@ -1,0 +1,7 @@
+{
+  "id": "alucard",
+  "displayName": "Alucard",
+  "description": "A chibi Alucard-style Codex pet.",
+  "spritesheetPath": "spritesheet.png",
+  "category": "asian"
+}

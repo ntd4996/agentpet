@@ -1,0 +1,7 @@
+{
+  "displayName": "Claude",
+  "description": "Local AgentPet starter pet",
+  "spritesheetPath": "spritesheet.png",
+  "source": "openpets",
+  "slug": "claude-f187e74a"
+}

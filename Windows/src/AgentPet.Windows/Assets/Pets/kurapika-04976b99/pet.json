@@ -1,0 +1,7 @@
+{
+  "id": "kurapika",
+  "displayName": "Kurapika",
+  "description": "A chibi Kurapika-style Codex pet.",
+  "spritesheetPath": "spritesheet.png",
+  "category": "asian"
+}
