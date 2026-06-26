@@ -2,8 +2,11 @@ import XCTest
 @testable import AgentPetCore
 
 final class EventSocketServerTests: XCTestCase {
+    #if !os(Windows)
     func testReceivesEventOverSocket() throws {
-        let path = "/tmp/agentpet-\(UUID().uuidString).sock"
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agentpet-\(UUID().uuidString).sock")
+            .path
         let server = EventSocketServer(path: path)
         defer { server.stop() }
 
@@ -25,11 +28,22 @@ final class EventSocketServerTests: XCTestCase {
         wait(for: [exp], timeout: 2)
         XCTAssertEqual(box.value, event)
     }
+    #endif
+
+    #if os(Windows)
+    func testStartThrowsUnsupportedPlatformOnWindows() throws {
+        let server = EventSocketServer(path: AgentPetPaths.socketPath)
+        XCTAssertThrowsError(try server.start { _ in }) { error in
+            XCTAssertEqual(error as? SocketError, .unsupportedPlatform)
+        }
+    }
+    #endif
 
     func testDrainQueueEmitsAndRemovesFiles() throws {
-        let dir = NSTemporaryDirectory() + "agentpet-q-\(UUID().uuidString)"
-        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(atPath: dir) }
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agentpet-q-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
 
         let event = AgentEvent(
             sessionId: "s2", agentKind: .claude, eventName: "Notification",
@@ -37,14 +51,14 @@ final class EventSocketServerTests: XCTestCase {
         )
         var data = try EventCoding.encoder.encode(event)
         data.append(0x0A)
-        let file = dir + "/0001.json"
-        try data.write(to: URL(fileURLWithPath: file))
+        let file = dir.appendingPathComponent("0001.json")
+        try data.write(to: file)
 
         var received: [AgentEvent] = []
-        EventSocketServer.drainQueue(directory: dir) { received.append($0) }
+        EventSocketServer.drainQueue(directory: dir.path) { received.append($0) }
 
         XCTAssertEqual(received, [event])
-        XCTAssertFalse(FileManager.default.fileExists(atPath: file), "queue file removed after drain")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: file.path), "queue file removed after drain")
     }
 
     // MARK: - Helpers
@@ -53,6 +67,7 @@ final class EventSocketServerTests: XCTestCase {
         var value: AgentEvent?
     }
 
+    #if !os(Windows)
     private func sendToUnixSocket(path: String, data: Data) throws {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         XCTAssertGreaterThanOrEqual(fd, 0)
@@ -78,4 +93,5 @@ final class EventSocketServerTests: XCTestCase {
             XCTAssertEqual(written, raw.count)
         }
     }
+    #endif
 }

@@ -1,0 +1,36 @@
+<Window x:Class="AgentPet.Windows.Windows.TrayFlyoutWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="AgentPet" Width="360" Height="420"
+        WindowStartupLocation="Manual"
+        ResizeMode="NoResize"
+        Topmost="True"
+        ShowInTaskbar="False"
+        Background="#FF151821">
+    <Border Padding="16" Background="#FF151821">
+        <DockPanel LastChildFill="True">
+            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12">
+                <TextBlock Text="AgentPet" Foreground="White" FontSize="22" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding Summary}" Foreground="#FFB8C0D9" Margin="0,4,0,0" />
+            </StackPanel>
+
+            <ListBox ItemsSource="{Binding Sessions}" Background="Transparent" BorderThickness="0" Foreground="White">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Margin="0,0,0,8" Padding="10" CornerRadius="10" Background="#FF242A38">
+                            <StackPanel>
+                                <DockPanel>
+                                    <TextBlock Text="{Binding Agent}" Foreground="White" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding State}" DockPanel.Dock="Right" Foreground="#FF8BD3FF" />
+                                </DockPanel>
+                                <TextBlock Text="{Binding Project}" Foreground="#FFB8C0D9" Margin="0,3,0,0" />
+                                <TextBlock Text="{Binding Message}" Foreground="White" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                <TextBlock Text="{Binding UpdatedAt}" Foreground="#FF6F7890" FontSize="11" Margin="0,6,0,0" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+    </Border>
+</Window>

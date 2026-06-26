@@ -50,8 +50,9 @@
 
 - **macOS 13 Ventura 或更高版本**（推荐 macOS 14 Sonoma 及以上；关闭键盘焦点环使用了 macOS 14+ 的 API）。
 - 同时支持 **Apple Silicon（M1/M2/M3/M4）与 Intel Mac**。
-- 按设计仅支持 macOS，没有 Windows 或 Linux 版本。
+- 已发布的桌面应用目前仅支持 macOS；还没有打包发布的 Windows 或 Linux 版本。
 - 从源码构建需要：Xcode 16 / Swift 6。
+- Windows 贡献者可以构建/测试 Swift `AgentPetCore`。源码构建的 Windows 原型位于 [`Windows/`](../../Windows/)，使用原生 C# WPF UI；SwiftUI/AppKit 与 Sparkle 仍仅限 macOS。
 
 ## 安装
 

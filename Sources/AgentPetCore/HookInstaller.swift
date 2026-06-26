@@ -28,7 +28,7 @@ public enum HookInstaller {
     ]
 
     public static func defaultSettingsPath() -> String {
-        NSHomeDirectory() + "/.claude/settings.json"
+        AgentPetPaths.homePath(".claude", "settings.json")
     }
 
     static func isOurs(_ command: String) -> Bool {

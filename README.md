@@ -51,8 +51,9 @@ Running multiple agents in parallel means constantly switching windows to check 
 
 - **macOS 13 Ventura or later** (macOS 14 Sonoma+ recommended; the keyboard-focus-ring cleanup uses APIs available on macOS 14+).
 - **Apple Silicon (M1/M2/M3/M4) and Intel Macs** are both supported.
-- macOS only, by design. There is no Windows or Linux version.
-- To build from source: Xcode 16 / Swift 6.
+- The signed public desktop release is macOS only today; there is no signed public Windows or Linux release yet.
+- To build the macOS app from source: Xcode 16 / Swift 6.
+- Windows contributors can build and test the portable Swift `AgentPetCore`. A Windows WPF prototype lives under [`Windows/`](Windows/) with a native C# UI, a self-contained x64 installer build path, and the same event/state model. The AppKit/SwiftUI desktop app and Sparkle updater remain macOS-only.
 
 ## Install
 
@@ -68,12 +69,45 @@ Grab the latest `AgentPet.dmg` from [Releases](https://github.com/ntd4996/agentp
 
 ### Build from source
 
+macOS desktop app:
+
 ```bash
 git clone https://github.com/ntd4996/agentpet.git
 cd agentpet
 ./scripts/build-app.sh release
 open build/AgentPet.app
 ```
+
+Windows core build/test for contributors:
+
+```powershell
+$env:SDKROOT = "$env:LOCALAPPDATA\Programs\Swift\Platforms\6.3.2\Windows.platform\Developer\SDKs\Windows.sdk"
+swift package describe
+swift build --target AgentPetCore
+swift test --filter AgentPetCoreTests
+```
+
+Windows prototype from source:
+
+```powershell
+& "C:\Program Files\dotnet\dotnet.exe" build "Windows\AgentPet.sln"
+```
+
+Windows self-contained installer for maintainers:
+
+```powershell
+.\Windows\scripts\build-release.ps1 -Version 0.1.0
+```
+
+This produces `Windows\publish\installer\AgentPet-Setup-x64.exe` for Windows x64 machines without requiring .NET/runtime/build tools on the target machine. The build machine needs .NET SDK 8 and Inno Setup.
+
+To build only the WPF desktop shell:
+
+```powershell
+& "C:\Program Files\dotnet\dotnet.exe" build "Windows\src\AgentPet.Windows\AgentPet.Windows.csproj"
+```
+
+If SwiftPM reports `Invalid manifest fatalError` or `unable to load standard library` on Windows, set `SDKROOT` to the Swift Windows SDK path above and run from a Visual Studio developer shell with VC tools available. If the WPF app is running while you rebuild, stop it first or build with a temporary `BaseOutputPath` to avoid locked `bin` files.
 
 Builds are Developer ID-signed and notarized by Apple, so they open without a Gatekeeper warning. AgentPet also updates itself: it checks for new versions automatically, and you can update in-app from the menu bar **Updates** button.
 
@@ -120,7 +154,7 @@ A starter pet is installed automatically on first launch. AgentPet bundles no pe
 
 ## Tech
 
-Swift + SwiftUI, a Unix-socket daemon for agent events, and a tiny CLI helper, all in one SwiftPM package. See [`docs/specs`](docs/specs) for the design.
+The macOS app is Swift + SwiftUI, a Unix-socket daemon for agent events, and a tiny CLI helper, all in one SwiftPM package. Portable state/event logic stays in `AgentPetCore`; platform UI stays separate. The Windows prototype uses a native C# WPF shell under [`Windows/`](Windows/) instead of trying to port SwiftUI/AppKit. See [`docs/specs`](docs/specs) for the design.
 
 ## Support
 

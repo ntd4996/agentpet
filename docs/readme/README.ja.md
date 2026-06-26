@@ -50,8 +50,9 @@
 
 - **macOS 13 Ventura 以降**（macOS 14 Sonoma 以降を推奨。キーボードのフォーカスリング無効化に macOS 14+ の API を使用）。
 - **Apple Silicon（M1/M2/M3/M4）と Intel Mac** の両方に対応。
-- 設計上 macOS 専用です。Windows / Linux 版はありません。
+- リリース済みのデスクトップアプリは現在 macOS 専用です。パッケージ化された Windows / Linux 版はまだありません。
 - ソースからビルドするには: Xcode 16 / Swift 6。
+- Windows コントリビューターは Swift `AgentPetCore` をビルド/テストできます。ソースビルドの Windows プロトタイプは [`Windows/`](../../Windows/) にあり、ネイティブ C# WPF UI を使います。SwiftUI/AppKit と Sparkle は macOS 専用のままです。
 
 ## インストール
 

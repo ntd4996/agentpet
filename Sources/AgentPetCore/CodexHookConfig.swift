@@ -10,7 +10,7 @@ import Foundation
 /// atomic file IO. It never adds a duplicate key and never edits unrelated keys.
 public enum CodexHookConfig {
     public static func defaultConfigPath() -> String {
-        NSHomeDirectory() + "/.codex/config.toml"
+        AgentPetPaths.homePath(".codex", "config.toml")
     }
 
     /// True if some uncommented line already enables hooks (either key truthy).

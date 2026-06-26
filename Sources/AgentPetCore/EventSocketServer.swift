@@ -5,6 +5,7 @@ public enum SocketError: Error, Equatable {
     case bind(Int32)
     case listen(Int32)
     case pathTooLong
+    case unsupportedPlatform
 }
 
 /// Listens on a Unix domain socket for newline-delimited `AgentEvent` JSON.
@@ -14,9 +15,12 @@ public enum SocketError: Error, Equatable {
 /// undecodable lines are skipped.
 public final class EventSocketServer: @unchecked Sendable {
     private let path: String
+
+    #if !os(Windows)
     private var listenFD: Int32 = -1
     private let acceptQueue = DispatchQueue(label: "agentpet.socket.accept")
     private var running = false
+    #endif
 
     public init(path: String) {
         self.path = path
@@ -24,6 +28,14 @@ public final class EventSocketServer: @unchecked Sendable {
 
     deinit { stop() }
 
+    #if os(Windows)
+    public func start(onEvent: @escaping @Sendable (AgentEvent) -> Void) throws {
+        _ = onEvent
+        throw SocketError.unsupportedPlatform
+    }
+
+    public func stop() {}
+    #else
     public func start(onEvent: @escaping @Sendable (AgentEvent) -> Void) throws {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { throw SocketError.create(errno) }
@@ -89,19 +101,20 @@ public final class EventSocketServer: @unchecked Sendable {
         }
         Self.decodeLines(buffer, onEvent: onEvent)
     }
+    #endif
 
     /// Drains a directory of queued event files written while the daemon was
     /// down, emitting each event and removing the file. Files are processed in
     /// name order.
     public static func drainQueue(directory: String, onEvent: (AgentEvent) -> Void) {
         let fm = FileManager.default
-        guard let names = try? fm.contentsOfDirectory(atPath: directory) else { return }
-        for name in names.sorted() {
-            let full = (directory as NSString).appendingPathComponent(name)
-            if let data = fm.contents(atPath: full) {
+        let directoryURL = URL(fileURLWithPath: directory, isDirectory: true)
+        guard let urls = try? fm.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil) else { return }
+        for url in urls.sorted(by: { $0.lastPathComponent < $1.lastPathComponent }) {
+            if let data = try? Data(contentsOf: url) {
                 decodeLines(data, onEvent: onEvent)
             }
-            try? fm.removeItem(atPath: full)
+            try? fm.removeItem(at: url)
         }
     }
 

@@ -50,8 +50,11 @@ final class RunArgumentsTests: XCTestCase {
 }
 
 final class EventSenderTests: XCTestCase {
+    #if !os(Windows)
     func testSenderDeliversOverSocket() throws {
-        let path = "/tmp/agentpet-\(UUID().uuidString).sock"
+        let path = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agentpet-\(UUID().uuidString).sock")
+            .path
         let server = EventSocketServer(path: path)
         defer { server.stop() }
 
@@ -61,25 +64,32 @@ final class EventSenderTests: XCTestCase {
 
         let event = AgentEvent(sessionId: "s9", agentKind: .claude, eventName: "Notification",
                                timestamp: Date(timeIntervalSince1970: 42))
-        let delivered = EventSender.send(event, socketPath: path, queueDir: "/tmp/unused-\(UUID().uuidString)")
+        let queueDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agentpet-unused-\(UUID().uuidString)", isDirectory: true)
+            .path
+        let delivered = EventSender.send(event, socketPath: path, queueDir: queueDir)
 
         wait(for: [exp], timeout: 2)
         XCTAssertTrue(delivered)
         XCTAssertEqual(box.value, event)
     }
+    #endif
 
     func testSenderFallsBackToQueueWhenNoServer() throws {
-        let socketPath = "/tmp/agentpet-missing-\(UUID().uuidString).sock"
-        let queueDir = NSTemporaryDirectory() + "agentpet-q-\(UUID().uuidString)"
-        defer { try? FileManager.default.removeItem(atPath: queueDir) }
+        let socketPath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agentpet-missing-\(UUID().uuidString).sock")
+            .path
+        let queueDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("agentpet-q-\(UUID().uuidString)", isDirectory: true)
+        defer { try? FileManager.default.removeItem(at: queueDir) }
 
         let event = AgentEvent(sessionId: "s10", agentKind: .claude, eventName: "Stop",
                                timestamp: Date(timeIntervalSince1970: 7))
-        let delivered = EventSender.send(event, socketPath: socketPath, queueDir: queueDir)
-        XCTAssertFalse(delivered, "no server, should queue")
+        let delivered = EventSender.send(event, socketPath: socketPath, queueDir: queueDir.path)
+        XCTAssertFalse(delivered, "undelivered events should be queued")
 
         var received: [AgentEvent] = []
-        EventSocketServer.drainQueue(directory: queueDir) { received.append($0) }
+        EventSocketServer.drainQueue(directory: queueDir.path) { received.append($0) }
         XCTAssertEqual(received, [event])
     }
 

@@ -8,7 +8,11 @@ Trạng thái: Approved (brainstorm)
 AgentPet là app menu bar macOS native (Swift/SwiftUI): một con pet sống trên desktop phản ứng theo trạng thái các AI coding agent đang chạy (Claude Code, Codex, ...). App cho biết agent nào đang chạy, con nào đã xong, con nào đang chờ người dùng nhập input. Mục tiêu: vừa vui và dễ lan truyền (như Petdex), vừa là tiện ích thật cho dev chạy nhiều agent song song. Dự án open-source, định hướng kéo sao GitHub.
 
 Quyết định nền tảng (chốt trong brainstorm):
-- macOS only, native thật (Swift/SwiftUI).
+- Bản phát hành desktop hiện tại là macOS native (Swift/SwiftUI).
+- Không port SwiftUI/AppKit sang Windows; Apple UI framework không có trên Windows.
+- Giữ logic thuần Swift trong `AgentPetCore` để build/test được trên Windows khi toolchain hỗ trợ.
+- Prototype Windows dùng UI native riêng bằng C# WPF trong `Windows/`, dùng cùng event/state model thay vì chia sẻ UI macOS.
+- SwiftWin32 chỉ là hướng nghiên cứu tương lai, không phải đường UI Windows chính hiện tại.
 - Pet phản ứng theo trạng thái agent; cả hai surface: floating pet (tắt được) + menu bar list.
 - Phát hiện trạng thái: hook tích hợp là chính, quan sát process thụ động là fallback.
 - Pet built-in trước; format pet "mở" sẵn cho v2 (dex cộng đồng + import pet pack).
@@ -88,11 +92,13 @@ Notification:
 - Khi agent chuyển sang `waiting` hoặc `done` → native notification + (tuỳ chọn) âm thanh + animation pet.
 
 ## 6. Tech stack
-- Swift + SwiftUI, `MenuBarExtra` (macOS 13+).
-- Pet window: `NSPanel` non-activating, level floating.
+- macOS app: Swift + SwiftUI, `MenuBarExtra` (macOS 13+).
+- macOS pet window: `NSPanel` non-activating, level floating.
+- Portable Swift core: `AgentPetCore` giữ session state, event model, hook parsing/installing, queue fallback; không import AppKit/SwiftUI/Sparkle.
+- Windows prototype: C# WPF shell trong `Windows/src/AgentPet.Windows/`, Windows CLI trong `Windows/src/AgentPet.Cli/`, shared Windows event/state model trong `Windows/src/AgentPet.Core/`.
 - Animation: chốt ở giai đoạn plan (ứng viên: SpriteKit hoặc Lottie). MVP có thể dùng sprite sheet đơn giản.
-- Helper: Swift CLI nhỏ, cùng repo.
-- Phát hành: DMG notarized + Homebrew cask.
+- Helper: Swift CLI nhỏ cho macOS SwiftPM package; Windows prototype có CLI riêng dùng cùng event contract.
+- Phát hành macOS: DMG notarized + Homebrew cask. Windows packaging là việc tương lai, chưa phải bản phát hành desktop chính thức.
 
 ## 7. Phạm vi
 

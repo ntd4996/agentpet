@@ -7,11 +7,17 @@ public enum EventSender {
     @discardableResult
     public static func send(_ event: AgentEvent, socketPath: String, queueDir: String) -> Bool {
         guard let line = try? encodeLine(event) else { return false }
+
+        #if os(Windows)
+        writeToQueue(line, dir: queueDir)
+        return false
+        #else
         if writeToSocket(line, path: socketPath) {
             return true
         }
         writeToQueue(line, dir: queueDir)
         return false
+        #endif
     }
 
     static func encodeLine(_ event: AgentEvent) throws -> Data {
@@ -20,6 +26,7 @@ public enum EventSender {
         return data
     }
 
+    #if !os(Windows)
     static func writeToSocket(_ data: Data, path: String) -> Bool {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         guard fd >= 0 else { return false }
@@ -52,12 +59,14 @@ public enum EventSender {
             return true
         }
     }
+    #endif
 
     static func writeToQueue(_ data: Data, dir: String) {
         let fm = FileManager.default
-        try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let directoryURL = URL(fileURLWithPath: dir, isDirectory: true)
+        try? fm.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         let name = "\(Int(Date().timeIntervalSince1970))-\(UUID().uuidString).json"
-        let full = (dir as NSString).appendingPathComponent(name)
-        try? data.write(to: URL(fileURLWithPath: full))
+        let fileURL = directoryURL.appendingPathComponent(name)
+        try? data.write(to: fileURL)
     }
 }

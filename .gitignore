@@ -16,6 +16,29 @@ xcuserdata/
 # Brainstorm scratch
 .superpowers/
 
+# Claude Code local worktrees and generated verification artifacts
+.claude/worktrees/
+.claude/dotnet-build*/
+.claude/candidate-pets/
+.claude/*-analysis.json
+.claude/*contact*.png
+.claude/windows-build.log
+.claude/*.log
+.claude/*report*.md
+.claude/*inventory*.json
+.claude/*inventory*.csv
+.claude/smoke-queue/
+
+# IDE local settings
+.vscode/
+
+# .NET build outputs
+bin/
+obj/
+Windows/**/bin/
+Windows/**/obj/
+Windows/publish/
+
 # Cloudflare Pages local dev state
 landing/.wrangler/
 landing/node_modules/

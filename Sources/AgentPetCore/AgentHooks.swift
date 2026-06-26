@@ -27,40 +27,39 @@ public struct AgentHookSpec {
 
 public enum AgentHooks {
     public static func spec(for kind: AgentKind) -> AgentHookSpec? {
-        let home = NSHomeDirectory()
         switch kind {
         case .claude:
             return AgentHookSpec(
                 kind: .claude, style: .claudeNested,
                 events: ["SessionStart", "UserPromptSubmit", "PreToolUse", "Notification", "Stop", "SubagentStop", "SessionEnd"],
-                settingsPath: home + "/.claude/settings.json")
+                settingsPath: AgentPetPaths.homePath(".claude", "settings.json"))
         case .codex:
             return AgentHookSpec(
                 kind: .codex, style: .claudeNested,
                 events: ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "Stop", "SubagentStop"],
-                settingsPath: home + "/.codex/hooks.json")
+                settingsPath: AgentPetPaths.homePath(".codex", "hooks.json"))
         case .gemini:
             return AgentHookSpec(
                 kind: .gemini, style: .claudeNested,
                 events: ["SessionStart", "BeforeAgent", "BeforeTool", "AfterTool", "Notification", "AfterAgent", "SessionEnd"],
-                settingsPath: home + "/.gemini/settings.json")
+                settingsPath: AgentPetPaths.homePath(".gemini", "settings.json"))
         case .cursor:
             return AgentHookSpec(
                 kind: .cursor, style: .cursorFlat,
                 events: ["sessionStart", "beforeSubmitPrompt", "preToolUse", "stop", "subagentStop", "sessionEnd"],
-                settingsPath: home + "/.cursor/hooks.json")
+                settingsPath: AgentPetPaths.homePath(".cursor", "hooks.json"))
         case .windsurf:
             return AgentHookSpec(
                 kind: .windsurf, style: .windsurfFlat,
                 events: ["pre_user_prompt", "post_cascade_response"],
-                settingsPath: home + "/.codeium/windsurf/hooks.json")
+                settingsPath: AgentPetPaths.homePath(".codeium", "windsurf", "hooks.json"))
         case .opencode:
             // The JS plugin hardcodes its own session.created/session.idle hooks,
             // so no event list is registered through the generic installer.
             return AgentHookSpec(
                 kind: .opencode, style: .opencodePlugin,
                 events: [],
-                settingsPath: home + "/.config/opencode/plugin/agentpet.js")
+                settingsPath: AgentPetPaths.homePath(".config", "opencode", "plugin", "agentpet.js"))
         case .antigravity:
             // Antigravity has no session-start/notification hooks, so we register
             // for the model-call and tool lifecycle plus Stop. PreInvocation fires
@@ -68,7 +67,7 @@ public enum AgentHooks {
             return AgentHookSpec(
                 kind: .antigravity, style: .antigravityNested,
                 events: ["PreInvocation", "PreToolUse", "PostToolUse", "Stop"],
-                settingsPath: home + "/.gemini/config/hooks.json")
+                settingsPath: AgentPetPaths.homePath(".gemini", "config", "hooks.json"))
         case .cli, .unknown:
             return nil
         }

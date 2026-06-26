@@ -1,0 +1,106 @@
+<Window x:Class="AgentPet.Windows.Windows.PetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:AgentPet.Windows.Controls"
+        Width="{Binding PetWindowWidth}" Height="430"
+        MinWidth="420"
+        MinHeight="430"
+        SizeToContent="Manual"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        Topmost="True"
+        ShowInTaskbar="False"
+        WindowStartupLocation="Manual">
+    <Window.Resources>
+        <DropShadowEffect x:Key="BubbleShadow" BlurRadius="12" ShadowDepth="3" Opacity="0.22" Color="#66000000" />
+    </Window.Resources>
+
+    <Grid x:Name="RootChrome" Background="Transparent" Width="{Binding PetWindowWidth}" Height="420" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel x:Name="BubblePanel" Grid.Row="0" Visibility="{Binding BubbleVisibility}" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="10,0,10,4">
+            <Path x:Name="BubbleArrowUp"
+                  Data="M 7 0 L 14 8 L 0 8 Z"
+                  Fill="#F2FFFFFF"
+                  Width="14"
+                  Height="8"
+                  Stretch="Fill"
+                  HorizontalAlignment="Center"
+                  Visibility="Collapsed" />
+            <Border Background="#F2FFFFFF"
+                    BorderBrush="#12000000"
+                    BorderThickness="1"
+                    CornerRadius="18"
+                    Padding="13,9"
+                    Width="{Binding BubbleWidth}"
+                    Effect="{StaticResource BubbleShadow}">
+                <StackPanel>
+                    <ItemsControl ItemsSource="{Binding BubbleRows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Width="{Binding DataContext.BubbleContentWidth, RelativeSource={RelativeSource AncestorType=Window}}" Margin="0,0,0,5">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="14" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Ellipse Grid.Column="0"
+                                             Width="8"
+                                             Height="8"
+                                             Fill="{Binding DotBrush}"
+                                             VerticalAlignment="Top"
+                                             Margin="0,5,0,0" />
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Agent}"
+                                                   Foreground="#DD111827"
+                                                   FontSize="12"
+                                                   FontWeight="Bold"
+                                                   TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding Message}"
+                                                   Foreground="{Binding MessageBrush}"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold"
+                                                   LineHeight="18"
+                                                   TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="{Binding FooterText}"
+                               Visibility="{Binding FooterVisibility}"
+                               Foreground="#88111827"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+            <Path x:Name="BubbleArrowDown"
+                  Data="M 0 0 L 14 0 L 7 8 Z"
+                  Fill="#F2FFFFFF"
+                  Width="14"
+                  Height="8"
+                  Stretch="Fill"
+                  HorizontalAlignment="Center" />
+        </StackPanel>
+
+        <controls:SpritePetView x:Name="PetSprite"
+                                Grid.Row="1"
+                                Mood="{Binding Mood}"
+                                SpritesheetPath="{Binding SelectedPetSpritesheet}"
+                                Width="{Binding PetSize}"
+                                Height="{Binding PetSize}"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                RenderTransformOrigin="0.5,0.9">
+            <controls:SpritePetView.RenderTransform>
+                <ScaleTransform ScaleX="1" ScaleY="1" />
+            </controls:SpritePetView.RenderTransform>
+        </controls:SpritePetView>
+    </Grid>
+</Window>
