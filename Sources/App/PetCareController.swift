@@ -146,14 +146,26 @@ final class PetCareController: ObservableObject {
         var changed = 0
         for c in pets {
             let original = states[c.id]
+            // Skip pets the cloud has no progress for that we don't already track:
+            // restoring an empty state would just add clutter and inflate the count.
+            let cloudHasProgress = c.xp > 0 || c.tokens > 0 || c.meals > 0 || !(c.achievements ?? []).isEmpty
+            if original == nil && !cloudHasProgress { continue }
             var s = original ?? PetCareState()
+            // Lifetime counters are grow-only: never shrink a pet that is further
+            // along on this machine.
             s.xp = max(s.xp, c.xp)
             s.totalTokens = max(s.totalTokens, c.tokens)
             s.totalMeals = max(s.totalMeals, c.meals)
-            s.streakDays = max(s.streakDays, c.streak)
+            // Streak isn't monotonic (it resets when days are missed), so it follows
+            // the most recent feeding rather than max(), matching the server's
+            // last-write semantics. Only adopt the cloud streak when the cloud fed
+            // more recently than this machine.
             if let lf = c.lastFedAt {
-                let d = Date(timeIntervalSince1970: TimeInterval(lf))
-                if let cur = s.lastFedAt { if d > cur { s.lastFedAt = d } } else { s.lastFedAt = d }
+                let cloudFed = Date(timeIntervalSince1970: TimeInterval(lf))
+                if s.lastFedAt == nil || cloudFed > s.lastFedAt! {
+                    s.lastFedAt = cloudFed
+                    s.streakDays = c.streak
+                }
             }
             if let ach = c.achievements, !ach.isEmpty {
                 let set = Set(ach.compactMap { Achievement(rawValue: $0) })
