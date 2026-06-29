@@ -317,6 +317,11 @@
 "Connecting…" = "连接中……";
 "Connect" = "连接";
 "Open profile" = "打开主页";
+"Restore" = "恢复";
+"Restoring…" = "正在恢复…";
+"Restored %d pet(s) from the cloud." = "已从云端恢复 %d 个宠物。";
+"Already up to date." = "已是最新。";
+"Restore failed, try again." = "恢复失败，请重试。";
 "Code not recognized. Codes expire after 10 minutes." = "无法识别该配对码。配对码 10 分钟后过期。";
 "Could not reach the server." = "无法连接服务器。";
 "Sync failed, will retry." = "同步失败，稍后重试。";

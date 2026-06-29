@@ -14,6 +14,8 @@ struct CareTabView: View {
 
     /// Ticks so hunger and "today" counters stay fresh while the panel is open.
     @State private var now = Date()
+    /// Transient result of a manual cloud restore.
+    @State private var restoreNote: String?
     private let tick = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
 
     private static let stageIcons = ["leaf.fill", "pawprint.fill", "binoculars.fill", "shield.fill", "crown.fill"]
@@ -154,7 +156,9 @@ struct CareTabView: View {
                             } else {
                                 Text("Connected to your profile")
                             }
-                            if let at = sync.lastSyncAt {
+                            if let note = restoreNote {
+                                Text(note).font(.caption).foregroundStyle(.secondary)
+                            } else if let at = sync.lastSyncAt {
                                 Text(String(format: NSLocalizedString("Last synced %@", comment: ""),
                                             at.formatted(.relative(presentation: .named))))
                                     .font(.caption).foregroundStyle(.secondary)
@@ -164,6 +168,17 @@ struct CareTabView: View {
                             }
                         }
                         Spacer()
+                        Button("Restore") {
+                            restoreNote = NSLocalizedString("Restoring…", comment: "")
+                            Task {
+                                let n = await sync.restore(manual: true)
+                                restoreNote = n > 0
+                                    ? String(format: NSLocalizedString("Restored %d pet(s) from the cloud.", comment: ""), n)
+                                    : NSLocalizedString("Already up to date.", comment: "")
+                            }
+                        }
+                        .controlSize(.small)
+                        .disabled(sync.restoring)
                         Button("Open profile") {
                             openURL(URL(string: "https://agentpet.thenightwatcher.online/profile")!)
                         }

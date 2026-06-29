@@ -317,6 +317,11 @@
 "Connecting…" = "Đang kết nối…";
 "Connect" = "Kết nối";
 "Open profile" = "Mở hồ sơ";
+"Restore" = "Khôi phục";
+"Restoring…" = "Đang khôi phục…";
+"Restored %d pet(s) from the cloud." = "Đã khôi phục %d pet từ cloud.";
+"Already up to date." = "Đã là bản mới nhất.";
+"Restore failed, try again." = "Khôi phục thất bại, thử lại.";
 "Code not recognized. Codes expire after 10 minutes." = "Không nhận ra mã. Mã hết hạn sau 10 phút.";
 "Could not reach the server." = "Không kết nối được máy chủ.";
 "Sync failed, will retry." = "Đồng bộ thất bại, sẽ thử lại.";

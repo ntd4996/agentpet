@@ -137,6 +137,43 @@ final class PetCareController: ObservableObject {
     /// All achievements unlocked by the currently selected pet.
     var achievements: Set<Achievement> { current.unlockedAchievements ?? [] }
 
+    /// Merges cloud care stats (from another device) into local pets. Grow-only:
+    /// counters take the max, achievements union, so a restore never undoes
+    /// progress made on either machine. Silent (no celebrate flashes). Returns
+    /// how many pets changed.
+    @discardableResult
+    func mergeFromCloud(_ pets: [CareSyncController.CloudPet]) -> Int {
+        var changed = 0
+        for c in pets {
+            let original = states[c.id]
+            var s = original ?? PetCareState()
+            s.xp = max(s.xp, c.xp)
+            s.totalTokens = max(s.totalTokens, c.tokens)
+            s.totalMeals = max(s.totalMeals, c.meals)
+            s.streakDays = max(s.streakDays, c.streak)
+            if let lf = c.lastFedAt {
+                let d = Date(timeIntervalSince1970: TimeInterval(lf))
+                if let cur = s.lastFedAt { if d > cur { s.lastFedAt = d } } else { s.lastFedAt = d }
+            }
+            if let ach = c.achievements, !ach.isEmpty {
+                let set = Set(ach.compactMap { Achievement(rawValue: $0) })
+                s.unlockedAchievements = (s.unlockedAchievements ?? []).union(set)
+            }
+            // Reconcile any badges the higher stats now qualify for (no flashes).
+            PetCare.unlockNewAchievements(state: &s, now: Date())
+            if s != original {
+                states[c.id] = s
+                changed += 1
+            }
+            // Restore a custom name only when this machine hasn't named the pet.
+            if let name = c.name, !name.isEmpty, ImagePetStore.shared.nameOverrides[c.id] == nil {
+                ImagePetStore.shared.rename(c.id, to: name)
+            }
+        }
+        if changed > 0 { persist() }
+        return changed
+    }
+
     private func persist() {
         if let data = try? JSONEncoder().encode(states) {
             UserDefaults.standard.set(data, forKey: Self.storageKey)

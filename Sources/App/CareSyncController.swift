@@ -17,6 +17,8 @@ final class CareSyncController: ObservableObject {
     /// Last sync result, for the Care tab's status caption.
     @Published private(set) var lastSyncAt: Date?
     @Published private(set) var lastError: String?
+    /// True while a cloud restore is in flight (for the Care tab button).
+    @Published private(set) var restoring = false
 
     private static let tokenKey = "agentpet.care.syncToken"
     private static let loginKey = "agentpet.care.syncLogin"
@@ -55,7 +57,12 @@ final class CareSyncController: ObservableObject {
         }
         linked = true
         lastError = nil
-        scheduleSync(after: 1)
+        // A freshly linked machine pulls existing progress before pushing, so a
+        // new device restores its pets instead of starting from scratch.
+        Task { [weak self] in
+            await self?.restore()
+            self?.scheduleSync(after: 1)
+        }
     }
 
     func disconnect() {
@@ -162,5 +169,49 @@ final class CareSyncController: ObservableObject {
         let delay = delays[min(failCount - 1, delays.count - 1)]
         lastError = NSLocalizedString("Sync failed, will retry.", comment: "")
         scheduleSync(after: delay)
+    }
+
+    // MARK: - Restore
+
+    /// One pet's care stats as stored in the cloud (see /api/care/restore).
+    struct CloudPet: Decodable {
+        let id: String
+        let name: String?
+        let xp: Int
+        let tokens: Int
+        let meals: Int
+        let streak: Int
+        let lastFedAt: Int?
+        let achievements: [String]?
+    }
+    private struct RestoreResponse: Decodable { let pets: [CloudPet] }
+
+    /// Pulls the user's cloud care stats and merges them into local pets so a new
+    /// machine restores progress instead of starting over. Grow-only, so it never
+    /// shrinks a pet that is further along on this machine. Returns pets changed.
+    @discardableResult
+    func restore(manual: Bool = false) async -> Int {
+        guard let token = UserDefaults.standard.string(forKey: Self.tokenKey) else { return 0 }
+        restoring = true
+        defer { restoring = false }
+        var request = URLRequest(url: Self.base.appendingPathComponent("api/care/restore"))
+        request.timeoutInterval = 15
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if status == 401 { disconnect(); return 0 }
+            guard status == 200 else {
+                if manual { lastError = NSLocalizedString("Restore failed, try again.", comment: "") }
+                return 0
+            }
+            let decoded = try JSONDecoder().decode(RestoreResponse.self, from: data)
+            let changed = PetCareController.shared.mergeFromCloud(decoded.pets)
+            if manual { lastError = nil }
+            return changed
+        } catch {
+            if manual { lastError = NSLocalizedString("Restore failed, try again.", comment: "") }
+            return 0
+        }
     }
 }

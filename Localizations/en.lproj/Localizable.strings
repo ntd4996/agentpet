@@ -317,6 +317,11 @@
 "Connecting…" = "Connecting…";
 "Connect" = "Connect";
 "Open profile" = "Open profile";
+"Restore" = "Restore";
+"Restoring…" = "Restoring…";
+"Restored %d pet(s) from the cloud." = "Restored %d pet(s) from the cloud.";
+"Already up to date." = "Already up to date.";
+"Restore failed, try again." = "Restore failed, try again.";
 "Code not recognized. Codes expire after 10 minutes." = "Code not recognized. Codes expire after 10 minutes.";
 "Could not reach the server." = "Could not reach the server.";
 "Sync failed, will retry." = "Sync failed, will retry.";
