@@ -286,6 +286,45 @@ public enum PetCare {
         return newly
     }
 
+    // MARK: - Cross-device restore
+
+    /// One pet's care stats as held in the cloud, for restoring on another device.
+    public struct CloudCareStats: Sendable {
+        public let xp: Int
+        public let tokens: Int
+        public let meals: Int
+        public let streak: Int
+        public let lastFedAt: Date?
+        public let achievements: Set<Achievement>
+        public init(xp: Int, tokens: Int, meals: Int, streak: Int, lastFedAt: Date?, achievements: Set<Achievement>) {
+            self.xp = xp; self.tokens = tokens; self.meals = meals
+            self.streak = streak; self.lastFedAt = lastFedAt; self.achievements = achievements
+        }
+    }
+
+    /// Merges cloud stats into a local pet state. Grow-only: lifetime counters take
+    /// the max so a restore never undoes progress on either machine. Streak isn't
+    /// monotonic (it resets on missed days), so it follows the most recent feeding
+    /// rather than max(). Achievements union, then re-reconcile against the merged
+    /// stats. Returns the merged state (`local` unchanged if it already dominates).
+    public static func merging(_ local: PetCareState?, with cloud: CloudCareStats, now: Date) -> PetCareState {
+        var s = local ?? PetCareState()
+        s.xp = max(s.xp, cloud.xp)
+        s.totalTokens = max(s.totalTokens, cloud.tokens)
+        s.totalMeals = max(s.totalMeals, cloud.meals)
+        if let cloudFed = cloud.lastFedAt {
+            if s.lastFedAt == nil || cloudFed > s.lastFedAt! {
+                s.lastFedAt = cloudFed
+                s.streakDays = cloud.streak
+            }
+        }
+        if !cloud.achievements.isEmpty {
+            s.unlockedAchievements = (s.unlockedAchievements ?? []).union(cloud.achievements)
+        }
+        _ = unlockNewAchievements(state: &s, now: now)
+        return s
+    }
+
     /// Human-readable display name for an achievement, localised.
     public static func achievementDisplayName(_ a: Achievement) -> String {
         switch a {
