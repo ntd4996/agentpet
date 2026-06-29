@@ -80,4 +80,17 @@ public enum PetWindowPlanner {
         specs.append(defaultWindow(rest))
         return specs
     }
+
+    public static func windowKeys(forPetID petID: String, split: Bool,
+                                  mappings: [ProjectPetMapping],
+                                  selectedPetID: String?) -> [String] {
+        guard split else { return [defaultKey] }
+        var keys = mappings
+            .filter { $0.petID == petID }
+            .map { ProjectPetResolver.normalize($0.projectPath) }
+        if petID == selectedPetID {
+            keys.append(defaultKey)
+        }
+        return keys.isEmpty ? [defaultKey] : keys
+    }
 }

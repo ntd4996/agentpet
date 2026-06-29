@@ -190,8 +190,34 @@ struct MenuContentView: View {
             controlRow(icon: "number", label: "Show count on menu bar", isOn: $statusBar.showCount)
             controlRow(icon: "bubble.left", label: "Show chat on menu bar", isOn: $statusBar.showChatOnMenuBar)
             controlRow(icon: "list.bullet.rectangle", label: "Show bubble on menu bar", isOn: $statusBar.showBubbleOnMenuBar)
+            controlRow(icon: "square.split.2x1", label: "Split pet", isOn: $pet.splitPet)
+            animationRow
             sizeRow
         }
+    }
+
+    private var animationRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "play.fill")
+                .foregroundStyle(.white.opacity(0.8)).frame(width: 16)
+            Text("Animate pets").font(.system(size: 13)).foregroundStyle(.white)
+            Spacer()
+            if pet.animationsEnabled {
+                HStack(spacing: 4) {
+                    Slider(value: $pet.animationFPS, in: 1...12, step: 1)
+                        .controlSize(.mini)
+                        .tint(Color.systemAccent)
+                        .frame(width: 80)
+                    Text("\(Int(pet.animationFPS))")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.5))
+                        .fixedSize()
+                }
+            }
+            ColorSwitch(isOn: $pet.animationsEnabled)
+        }
+        .padding(.horizontal, 14).padding(.vertical, 8)
+        .animation(.easeInOut(duration: 0.2), value: pet.animationsEnabled)
     }
 
     private var sizeRow: some View {

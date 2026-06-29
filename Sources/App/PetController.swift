@@ -68,7 +68,6 @@ final class PetController: ObservableObject {
 
     private var lastResolved: PetMood = .idle
     private var latestSessions: [AgentSession] = []
-    private var celebrateTimer: Timer?
 
     /// Number of active agent lines currently shown; drives window height.
     @Published private(set) var chatLineCount: Int = 0
@@ -144,19 +143,18 @@ final class PetController: ObservableObject {
         if resolved == .done && lastResolved != .done {
             chatLineCount = 0
             activeAgentSessions = []
-            setMood(.celebrate)
-            celebrateTimer?.invalidate()
-            celebrateTimer = Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
-                Task { @MainActor [weak self] in self?.settleAfterCelebrate() }
+            let celebrateLine = chatLine(forMood: .celebrate)
+            celebratingKeys[PetWindowPlanner.defaultKey] = CelebrateFlash(line: celebrateLine, mood: .celebrate)
+            let key = PetWindowPlanner.defaultKey
+            Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
+                Task { @MainActor [weak self] in
+                    self?.celebratingKeys.removeValue(forKey: key)
+                    self?.syncWindows()
+                }
             }
             syncWindows()
             return
         }
-        if mood == .celebrate || mood == .levelup {
-            syncWindows()
-            return  // let the 3-second celebrate / level-up burst finish regardless of new state
-        }
-        celebrateTimer?.invalidate()
         setMood(resolved)
 
         if resolved == .working || resolved == .waiting {
@@ -188,6 +186,7 @@ final class PetController: ObservableObject {
     }
 
     private func settleAfterCelebrate() {
+        celebratingKeys.removeAll()
         setMood(MoodResolver.aggregate(latestSessions))
         syncWindows()
     }
@@ -195,16 +194,27 @@ final class PetController: ObservableObject {
     /// Plays a short celebrate burst with a custom line (e.g. an achievement
     /// unlock), then settles back to the aggregate mood. Sets `chatLine`
     /// directly — `setMood` would re-roll it from the message pools.
-    func flashCelebrate(line: String) {
-        celebrateTimer?.invalidate()
-        chatLineCount = 0
-        activeAgentSessions = []
-        mood = .celebrate
-        chatLine = line
-        StatusBarController.shared.refreshTitle()
-        celebrateTimer = Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
-            Task { @MainActor [weak self] in self?.settleAfterCelebrate() }
+    func flashCelebrate(line: String, petID: String? = nil) {
+        let resolvedPetID = petID ?? selectedPetID
+        let keys: [String]
+        if let pid = resolvedPetID {
+            keys = PetWindowPlanner.windowKeys(forPetID: pid, split: splitPet,
+                                               mappings: ProjectPetSettings.shared.mappings,
+                                               selectedPetID: selectedPetID)
+        } else {
+            keys = [PetWindowPlanner.defaultKey]
         }
+        for key in keys {
+            celebratingKeys[key] = CelebrateFlash(line: line, mood: .celebrate)
+            let k = key
+            Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
+                Task { @MainActor [weak self] in
+                    self?.celebratingKeys.removeValue(forKey: k)
+                    self?.syncWindows()
+                }
+            }
+        }
+        StatusBarController.shared.refreshTitle()
         syncWindows()
     }
 
@@ -212,16 +222,27 @@ final class PetController: ObservableObject {
     /// `.levelup` mood (a distinct clip from the done-celebrate), then settles
     /// back to the aggregate mood. Sets `chatLine` directly — `setMood` would
     /// re-roll it from the message pools.
-    func flashLevelUp(line: String) {
-        celebrateTimer?.invalidate()
-        chatLineCount = 0
-        activeAgentSessions = []
-        mood = .levelup
-        chatLine = line
-        StatusBarController.shared.refreshTitle()
-        celebrateTimer = Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
-            Task { @MainActor [weak self] in self?.settleAfterCelebrate() }
+    func flashLevelUp(line: String, petID: String? = nil) {
+        let resolvedPetID = petID ?? selectedPetID
+        let keys: [String]
+        if let pid = resolvedPetID {
+            keys = PetWindowPlanner.windowKeys(forPetID: pid, split: splitPet,
+                                               mappings: ProjectPetSettings.shared.mappings,
+                                               selectedPetID: selectedPetID)
+        } else {
+            keys = [PetWindowPlanner.defaultKey]
         }
+        for key in keys {
+            celebratingKeys[key] = CelebrateFlash(line: line, mood: .levelup)
+            let k = key
+            Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
+                Task { @MainActor [weak self] in
+                    self?.celebratingKeys.removeValue(forKey: k)
+                    self?.syncWindows()
+                }
+            }
+        }
+        StatusBarController.shared.refreshTitle()
         syncWindows()
     }
 
@@ -229,6 +250,7 @@ final class PetController: ObservableObject {
         guard showChat else { return }
         chatLine = line
         StatusBarController.shared.refreshTitle()
+        syncWindows()
     }
 
     private func setMood(_ newMood: PetMood) {
@@ -283,11 +305,12 @@ final class PetController: ObservableObject {
 
     /// The idle "doing nothing" chatter, care-coloured (hunger / budget anxiety).
     /// Shared by the aggregate `refreshChat` and per-project home windows.
-    private func idleLine() -> String {
+    private func idleLine(petID: String? = nil) -> String {
         let pool = BubbleSettings.shared.multiAgentBubbleEnabled
             ? BubbleMessages.shared.lines(for: nil, mood: .idle)
             : ChatSettings.shared.lines(for: .idle)
-        return CareChat.idlePool(base: pool).randomElement() ?? IdleBoost.line()
+        let hunger = PetCare.hunger(state: PetCareController.shared.state(for: petID), now: Date())
+        return CareChat.idlePool(base: pool, hunger: hunger).randomElement() ?? IdleBoost.line()
     }
 
     /// A fresh chat line for a non-idle mood, honouring the bubble source.
@@ -303,11 +326,11 @@ final class PetController: ObservableObject {
     /// multi-agent mode the structured `AgentBubble` carries the rows, so the
     /// `chatLine` is only the plain-text fallback (and stays empty so the
     /// bubble isn't double-drawn); otherwise a per-mood pool pick.
-    private func chatLine(forMood mood: PetMood, sessions: [AgentSession]) -> String {
+    private func chatLine(forMood mood: PetMood, sessions: [AgentSession], petID: String? = nil) -> String {
         switch mood {
         case .idle, .sleepy:
             guard showIdleMessage else { return "" }
-            return idleLine()
+            return idleLine(petID: petID)
         case .working, .waiting:
             if BubbleSettings.shared.multiAgentBubbleEnabled && !sessions.isEmpty {
                 return sessions.map { "• \(TickerFormatter.line(for: $0))" }.joined(separator: "\n")
@@ -339,11 +362,13 @@ final class PetController: ObservableObject {
 
     // MARK: - Window coordination (planner → PetWindowController)
 
-    /// Per-window mood from the previous sync, used to fire a celebrate burst
-    /// when a window's group transitions into `.done`.
+    private struct CelebrateFlash {
+        let line: String
+        let mood: PetMood
+    }
+
     private var lastMoodByKey: [String: PetMood] = [:]
-    /// Keys currently in a celebrate burst, with the line to display.
-    private var celebratingKeys: [String: String] = [:]
+    private var celebratingKeys: [String: CelebrateFlash] = [:]
 
     // MARK: - Break reminder (home pet rests)
 
@@ -421,11 +446,11 @@ final class PetController: ObservableObject {
         // In Split-ON mode the defaultKey window is a real project-less group and
         // must also get per-key celebrate; in Split-OFF the defaultKey celebrates
         // via the global mood mirror, so we exclude it here to avoid doubling.
-        for spec in specs where spec.key != PetWindowPlanner.defaultKey || splitPet {
+        for spec in specs {
             let prev = lastMoodByKey[spec.key]
             if spec.mood == .done && prev != nil && prev != .done {
                 let line = chatLine(forMood: .celebrate)
-                celebratingKeys[spec.key] = line
+                celebratingKeys[spec.key] = CelebrateFlash(line: line, mood: .celebrate)
                 let key = spec.key
                 Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
                     Task { @MainActor [weak self] in
@@ -467,39 +492,33 @@ final class PetController: ObservableObject {
                 petID: petID, mood: mood, sessions: [], count: 0, chatLine: line)
         }
 
-        // In single-window mode (splitPet OFF) the default spec IS the global
-        // aggregate, so mirror it verbatim — mood includes the transient
-        // celebrate burst, sessions and chatLine are already computed globally.
-        // With splitPet ON the planner emits a real spec for the project-less
-        // group; fall through so it resolves from that spec like any other key.
-        if spec.key == PetWindowPlanner.defaultKey && !splitPet {
+        if let flash = celebratingKeys[spec.key] {
             return PetWindowController.WindowState(
-                petID: petID,
-                mood: mood,
-                sessions: activeAgentSessions,
-                count: chatLineCount,
-                chatLine: chatLine
+                petID: petID, mood: flash.mood, sessions: [], count: spec.count, chatLine: flash.line
             )
         }
 
-        // A per-project window in a celebrate burst overrides its mood + line.
-        if let line = celebratingKeys[spec.key] {
-            return PetWindowController.WindowState(
-                petID: petID, mood: .celebrate, sessions: [], count: spec.count, chatLine: line
-            )
-        }
-
-        // Resolve full sessions for this group's bubble (sorted like the ticker).
         let ids = Set(spec.sessionIDs)
-        let groupSessions = TickerFormatter.sorted(
-            latestSessions.filter { ids.contains($0.id) && $0.state != .idle && $0.state != .registered }
-        )
+        let groupSessions: [AgentSession]
+        let lineCount: Int
+        let resolvedLine: String
+        if !splitPet && spec.key == PetWindowPlanner.defaultKey {
+            groupSessions = activeAgentSessions
+            lineCount = chatLineCount
+            resolvedLine = chatLine
+        } else {
+            groupSessions = TickerFormatter.sorted(
+                latestSessions.filter { ids.contains($0.id) && $0.state != .idle && $0.state != .registered }
+            )
+            lineCount = spec.count
+            resolvedLine = chatLine(forMood: spec.mood, sessions: groupSessions, petID: spec.petID)
+        }
         return PetWindowController.WindowState(
             petID: petID,
             mood: spec.mood,
             sessions: groupSessions,
-            count: spec.count,
-            chatLine: chatLine(forMood: spec.mood, sessions: groupSessions)
+            count: lineCount,
+            chatLine: resolvedLine
         )
     }
 }

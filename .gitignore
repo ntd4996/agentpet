@@ -23,3 +23,6 @@ landing/node_modules/
 
 # Local AI memory notes (not committed)
 .agent-memory/
+
+# Claude Code local tooling
+.claude/

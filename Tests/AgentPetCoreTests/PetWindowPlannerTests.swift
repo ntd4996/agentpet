@@ -125,4 +125,42 @@ final class PetWindowPlannerTests: XCTestCase {
             sessions: [], split: true, mappings: [cat], defaultPetID: "boba", forceDefault: true)
         XCTAssertEqual(specs.filter { $0.key == "default" }.count, 1)
     }
+
+    // MARK: - windowKeys
+
+    func testWindowKeysSplitOffAlwaysReturnsDefault() {
+        let keys = PetWindowPlanner.windowKeys(forPetID: "cat", split: false,
+                                               mappings: [cat], selectedPetID: "cat")
+        XCTAssertEqual(keys, ["default"])
+    }
+
+    func testWindowKeysSplitOnMappedPet() {
+        let keys = PetWindowPlanner.windowKeys(forPetID: "cat", split: true,
+                                               mappings: [cat], selectedPetID: "boba")
+        // cat mapped to /work/foo → normalized key
+        XCTAssertTrue(keys.contains(where: { $0.contains("foo") }))
+        XCTAssertFalse(keys.contains("default"))
+    }
+
+    func testWindowKeysSplitOnSelectedPetIncludesDefault() {
+        let keys = PetWindowPlanner.windowKeys(forPetID: "boba", split: true,
+                                               mappings: [cat], selectedPetID: "boba")
+        XCTAssertTrue(keys.contains("default"))
+    }
+
+    func testWindowKeysSplitOnSharedPetMultipleKeys() {
+        let m1 = ProjectPetMapping(projectPath: "/work/foo", petID: "cat")
+        let m2 = ProjectPetMapping(projectPath: "/work/bar", petID: "cat")
+        let keys = PetWindowPlanner.windowKeys(forPetID: "cat", split: true,
+                                               mappings: [m1, m2], selectedPetID: "boba")
+        XCTAssertEqual(keys.count, 2)
+        XCTAssertTrue(keys.contains(where: { $0.contains("foo") }))
+        XCTAssertTrue(keys.contains(where: { $0.contains("bar") }))
+    }
+
+    func testWindowKeysSplitOnUnknownPetFallsToDefault() {
+        let keys = PetWindowPlanner.windowKeys(forPetID: "unknown", split: true,
+                                               mappings: [cat], selectedPetID: "boba")
+        XCTAssertEqual(keys, ["default"])
+    }
 }

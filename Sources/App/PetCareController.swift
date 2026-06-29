@@ -110,7 +110,7 @@ final class PetCareController: ObservableObject {
                 format: NSLocalizedString("Level up! Lv %d ⭐", comment: "pet level-up celebrate line"),
                 levelAfter
             )
-            PetController.shared.flashLevelUp(line: line)
+            PetController.shared.flashLevelUp(line: line, petID: petID)
         }
         let achievementsAfter = s.unlockedAchievements ?? []
         let newAchievements = achievementsAfter.subtracting(achievementsBefore)
@@ -121,7 +121,7 @@ final class PetCareController: ObservableObject {
                 format: NSLocalizedString("%d achievements unlocked! 🏆", comment: "bulk achievement unlock celebrate line"),
                 newAchievements.count
             )
-            PetController.shared.flashCelebrate(line: line)
+            PetController.shared.flashCelebrate(line: line, petID: petID)
         } else {
             for achievement in newAchievements {
                 let name = PetCare.achievementDisplayName(achievement)
@@ -129,7 +129,7 @@ final class PetCareController: ObservableObject {
                     format: NSLocalizedString("Achievement unlocked: %@ 🏆", comment: "achievement unlock celebrate line"),
                     name
                 )
-                PetController.shared.flashCelebrate(line: line)
+                PetController.shared.flashCelebrate(line: line, petID: petID)
             }
         }
     }
@@ -169,9 +169,10 @@ enum CareChat {
     /// Mixes care lines into the idle pool: starving replaces it entirely,
     /// hungry and limit-anxiety blend in.
     @MainActor
-    static func idlePool(base: [String]) -> [String] {
+    static func idlePool(base: [String], hunger: PetHunger? = nil) -> [String] {
         var pool = base
-        switch PetCareController.shared.hunger {
+        let h = hunger ?? PetCareController.shared.hunger
+        switch h {
         case .starving:
             pool = starving.map { NSLocalizedString($0, comment: "starving pet line") }
         case .hungry:
