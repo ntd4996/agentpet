@@ -59,6 +59,7 @@ final class AppDaemon: ObservableObject {
     private func ingest(_ event: AgentEvent) {
         let before = store.session(id: event.sessionId)?.state
         guard let updated = store.apply(event, now: Date()) else {
+            feedSubagentTokens(for: event)
             refresh()
             return
         }
@@ -120,6 +121,25 @@ final class AppDaemon: ObservableObject {
             feedCodexTokens(for: event)
         default:
             return
+        }
+    }
+
+    private func feedSubagentTokens(for event: AgentEvent) {
+        guard event.eventName == "SubagentStop" || event.eventName == "subagentStop" else { return }
+        guard event.agentKind == .claude || event.agentKind == .droid else { return }
+        guard let agentId = event.subagentId else { return }
+        let parentPath = event.transcriptPath
+            ?? event.project.map { TranscriptReader.inferredPath(sessionId: event.sessionId, cwd: $0) }
+        guard let parentPath else { return }
+        let path = TranscriptReader.subagentTranscriptPath(parentTranscriptPath: parentPath, agentId: agentId)
+        let project = event.project
+        Task.detached(priority: .utility) {
+            let tokens = TranscriptReader.newUsageTokens(at: path) ?? 0
+            guard tokens > 0 else { return }
+            await MainActor.run {
+                PetCareController.shared.feedTokens(tokens,
+                    petID: AppDaemon.shared.careTarget(forProject: project))
+            }
         }
     }
 

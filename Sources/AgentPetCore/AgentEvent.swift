@@ -15,6 +15,8 @@ public struct AgentEvent: Codable, Sendable, Equatable {
     /// Path to the agent's conversation transcript file (e.g. Claude Code JSONL).
     /// Used to derive a human-readable title for the session.
     public var transcriptPath: String?
+    /// Subagent identifier from a `SubagentStop` event (e.g. `"agent-abc123"`).
+    public var subagentId: String?
     public var timestamp: Date
 
     public init(
@@ -25,6 +27,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         message: String? = nil,
         model: String? = nil,
         transcriptPath: String? = nil,
+        subagentId: String? = nil,
         timestamp: Date
     ) {
         self.sessionId = sessionId
@@ -34,6 +37,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         self.message = message
         self.model = model
         self.transcriptPath = transcriptPath
+        self.subagentId = subagentId
         self.timestamp = timestamp
     }
 }
