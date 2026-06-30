@@ -205,11 +205,11 @@ public enum TranscriptReader {
         return s.components(separatedBy: "\n").first
     }
 
-    /// Constructs the expected transcript path for a Claude Code session.
-    ///
-    /// Claude Code stores transcripts at `~/.claude/projects/<sanitized-cwd>/<session-id>.jsonl`
-    /// where the sanitized CWD replaces every `/` with `-` and prepends a leading `-`.
-    /// Use this when `transcript_path` is absent from the hook payload.
+    public static func subagentTranscriptPath(parentTranscriptPath: String, agentId: String) -> String {
+        let parentDir = (parentTranscriptPath as NSString).deletingPathExtension
+        return parentDir + "/subagents/" + agentId + ".jsonl"
+    }
+
     public static func inferredPath(sessionId: String, cwd: String) -> String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         // The leading '/' in an absolute path becomes the leading '-' after replacement,
