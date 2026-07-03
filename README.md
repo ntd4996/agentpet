@@ -1,6 +1,9 @@
 <div align="center">
   <img src="assets/banner.png" alt="AgentPet" width="100%" />
   <p>
+    <a href="https://trendshift.io/repositories/46602?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-46602" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/46602/daily?language=Swift" alt="ntd4996%2Fagentpet | Trendshift" width="250" height="55"/></a>
+  </p>
+  <p>
     <img src="https://img.shields.io/badge/platform-macOS%2013%2B%20%C2%B7%20Windows%2010%2F11-black" alt="macOS 13+ · Windows 10/11" />
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" />
     <img src="https://img.shields.io/badge/Swift-SwiftUI-orange" alt="Swift" />
