@@ -35,6 +35,7 @@ final class CareSyncController: ObservableObject {
     func start() {
         guard linked else { return }
         scheduleSync(after: 5)
+        if ProjectUsageStore.shared.hasPending { scheduleUsageSync(after: 8) }
     }
 
     // MARK: - Linking
@@ -62,6 +63,7 @@ final class CareSyncController: ObservableObject {
         Task { [weak self] in
             await self?.restore()
             self?.scheduleSync(after: 1)
+            self?.scheduleUsageSync(after: 2)
         }
     }
 
@@ -169,6 +171,46 @@ final class CareSyncController: ObservableObject {
         let delay = delays[min(failCount - 1, delays.count - 1)]
         lastError = NSLocalizedString("Sync failed, will retry.", comment: "")
         scheduleSync(after: delay)
+    }
+
+    // MARK: - Project usage sync
+
+    private var usageDebounce: Timer?
+
+    /// Debounced push of per-project usage rows. Safe to call freely.
+    func scheduleUsageSync(after seconds: TimeInterval = 30) {
+        guard linked else { return }
+        usageDebounce?.invalidate()
+        usageDebounce = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { _ in
+            Task { @MainActor [weak self] in await self?.pushUsage() }
+        }
+    }
+
+    func pushUsage() async {
+        guard let token = UserDefaults.standard.string(forKey: Self.tokenKey) else { return }
+        let snapshot = ProjectUsageStore.shared.pendingRows()
+        guard !snapshot.isEmpty else { return }
+        let rows: [[String: Any]] = snapshot.map { r in
+            ["projectId": r.projectId, "projectName": r.projectName, "agent": r.agent,
+             "day": r.day, "tokens": r.tokens, "sessions": r.sessions]
+        }
+        var request = URLRequest(url: Self.base.appendingPathComponent("api/usage/sync"))
+        request.httpMethod = "POST"
+        request.timeoutInterval = 15
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: ["rows": rows])
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+            if status == 200 {
+                ProjectUsageStore.shared.markSynced(snapshot)
+            } else if status == 401 {
+                disconnect()
+            }
+        } catch {
+            // Left dirty; the next record or launch retries.
+        }
     }
 
     // MARK: - Restore

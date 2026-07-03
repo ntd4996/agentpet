@@ -115,6 +115,7 @@ final class AppDaemon: ObservableObject {
                 await MainActor.run {
                     PetCareController.shared.feedTokens(tokens,
                         petID: AppDaemon.shared.careTarget(forProject: project))
+                    ProjectUsageStore.shared.recordTokens(tokens, project: project, agent: "claude")
                 }
             }
         case .codex:
@@ -133,12 +134,14 @@ final class AppDaemon: ObservableObject {
         guard let parentPath else { return }
         let path = TranscriptReader.subagentTranscriptPath(parentTranscriptPath: parentPath, agentId: agentId)
         let project = event.project
+        let agent = event.agentKind.rawValue
         Task.detached(priority: .utility) {
             let tokens = TranscriptReader.newUsageTokens(at: path) ?? 0
             guard tokens > 0 else { return }
             await MainActor.run {
                 PetCareController.shared.feedTokens(tokens,
                     petID: AppDaemon.shared.careTarget(forProject: project))
+                ProjectUsageStore.shared.recordTokens(tokens, project: project, agent: agent)
             }
         }
     }
@@ -165,6 +168,7 @@ final class AppDaemon: ObservableObject {
                 guard tokens > 0 else { return }
                 PetCareController.shared.feedTokens(tokens,
                     petID: AppDaemon.shared.careTarget(forProject: project))
+                ProjectUsageStore.shared.recordTokens(tokens, project: project, agent: "codex")
             }
         }
     }
@@ -192,6 +196,7 @@ final class AppDaemon: ObservableObject {
                 guard let self else { return }
                 PetCareController.shared.feedTokens(tokens,
                     petID: self.careTarget(forProject: project))
+                ProjectUsageStore.shared.recordTokens(tokens, project: project, agent: "claude")
                 if isQuestion {
                     self.store.refineState(id: sessionId, from: .done, to: .waiting, since: stateSince)
                 }
@@ -258,6 +263,7 @@ final class AppDaemon: ObservableObject {
                 title: "\(project) finished", body: "Agent completed its turn")
             SoundSettings.shared.play(.done)
             PetCareController.shared.recordMeal(petID: careTarget(forProject: session.project))
+            ProjectUsageStore.shared.recordSession(project: session.project, agent: session.agentKind.rawValue)
         default:
             break
         }
