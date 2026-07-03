@@ -47,6 +47,12 @@ export async function ensureSchema(db: any): Promise<void> {
     db.prepare("CREATE INDEX IF NOT EXISTS idx_care_pets_user ON care_pets (user_id)"),
     db.prepare("CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, type TEXT NOT NULL, title TEXT NOT NULL, body TEXT, link TEXT, slug TEXT, read INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (user_id, read, created_at)"),
+    // Per-project, per-agent token usage the desktop app logs by day. Monthly
+    // rollups are just GROUP BY substr(day,1,7). project_id is a stable hash of the
+    // full path; project_name is the last folder (what we actually show).
+    db.prepare("CREATE TABLE IF NOT EXISTS usage_daily (user_id INTEGER NOT NULL, project_id TEXT NOT NULL, project_name TEXT NOT NULL, agent TEXT NOT NULL, day TEXT NOT NULL, tokens INTEGER NOT NULL DEFAULT 0, sessions INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (user_id, project_id, agent, day))"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_usage_user_day ON usage_daily (user_id, day)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_usage_day ON usage_daily (day)"),
   ]);
   // care_pets predates the thumb/week columns in prod; additive + idempotent.
   try { await db.prepare("ALTER TABLE care_pets ADD COLUMN thumb TEXT").run(); } catch {}

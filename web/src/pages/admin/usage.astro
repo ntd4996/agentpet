@@ -1,0 +1,153 @@
+---
+import Base from "../../layouts/Base.astro";
+import Icon from "../../components/Icon.astro";
+import { adminUser } from "../../lib/admin";
+
+export const prerender = false;
+const user = await adminUser(Astro.cookies);
+---
+<Base title="Usage · Admin · AgentPet" description="Community token usage by project, agent and user." active="">
+  {!user ? (
+    <section class="px-4 py-24">
+      <div class="card mx-auto max-w-md p-8 text-center">
+        <h1 class="font-display text-2xl font-bold text-ink">Admin only</h1>
+        <a href="/api/auth/login?returnTo=/admin/usage" class="btn-primary mt-6 !px-6 !py-3"><Icon name="users" class="h-5 w-5" /> Sign in with GitHub</a>
+      </div>
+    </section>
+  ) : (
+    <section class="px-4 pt-8 pb-16">
+      <div class="mx-auto max-w-6xl">
+        <div class="flex items-center gap-2">
+          <a href="/admin" class="grid h-8 w-8 place-items-center rounded-full border border-line bg-white text-muted hover:border-brand-300 hover:text-brand-700"><Icon name="arrow" class="h-4 w-4 rotate-180" /></a>
+          <span class="grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-600"><Icon name="bolt" class="h-5 w-5" /></span>
+          <h1 class="font-display text-2xl font-bold text-ink">Usage</h1>
+          <span id="crumb" class="text-muted"></span>
+        </div>
+
+        <!-- stat cards -->
+        <div class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div class="card p-4"><div class="text-xs font-semibold uppercase tracking-wide text-faint">Total tokens</div><div id="s-tokens" class="mt-1 font-display text-2xl font-bold text-ink">—</div></div>
+          <div class="card p-4"><div class="text-xs font-semibold uppercase tracking-wide text-faint">Sessions</div><div id="s-sessions" class="mt-1 font-display text-2xl font-bold text-ink">—</div></div>
+          <div class="card p-4"><div class="text-xs font-semibold uppercase tracking-wide text-faint" id="c3-l">Users</div><div id="s-3" class="mt-1 font-display text-2xl font-bold text-ink">—</div></div>
+          <div class="card p-4"><div class="text-xs font-semibold uppercase tracking-wide text-faint" id="c4-l">Projects</div><div id="s-4" class="mt-1 font-display text-2xl font-bold text-ink">—</div></div>
+        </div>
+
+        <!-- chart -->
+        <div class="card mt-5 p-5">
+          <div class="flex items-baseline justify-between">
+            <h2 class="font-display text-lg font-bold text-ink">Tokens over time</h2>
+            <div class="inline-flex rounded-full border border-line bg-white p-1">
+              <button data-range="day" class="range-btn rounded-full px-4 py-1.5 text-sm font-semibold text-white bg-brand-600">Daily</button>
+              <button data-range="month" class="range-btn rounded-full px-4 py-1.5 text-sm font-semibold text-muted">Monthly</button>
+            </div>
+          </div>
+          <div id="chart" class="mt-4 flex h-48 items-end gap-1 overflow-x-auto"></div>
+        </div>
+
+        <div class="mt-5 grid gap-5 lg:grid-cols-2">
+          <div class="card p-5">
+            <h2 class="font-display text-lg font-bold text-ink" id="proj-title">By project</h2>
+            <div id="by-project" class="mt-4 space-y-3"></div>
+          </div>
+          <div class="card p-5">
+            <h2 class="font-display text-lg font-bold text-ink">By agent</h2>
+            <div id="by-agent" class="mt-4 space-y-3"></div>
+          </div>
+        </div>
+
+        <!-- user list (community view only) -->
+        <div id="users-card" class="card mt-5 p-5">
+          <h2 class="font-display text-lg font-bold text-ink">Users</h2>
+          <p class="mt-1 text-sm text-muted">Click a user to drill into their projects and agents.</p>
+          <div id="users" class="mt-4 space-y-2"></div>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <script>
+    (function () {
+      if (!document.getElementById("chart")) return;
+      const fmt = (n: number) => {
+        n = Number(n) || 0;
+        if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+        if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+        if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
+        return String(n);
+      };
+      const esc = (s: string) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+      const $ = (id: string) => document.getElementById(id)!;
+      let range = "day";
+      let currentUser: string | null = null;
+
+      function bars(data: any[], labelKey: string) {
+        const box = $("chart");
+        if (!data.length) { box.innerHTML = `<div class="m-auto text-sm text-faint">No data.</div>`; return; }
+        const max = Math.max(1, ...data.map((d) => d.tokens));
+        box.innerHTML = data.map((d) => `<div class="group flex min-w-[8px] flex-1 flex-col items-center justify-end" title="${esc(d[labelKey])}: ${fmt(d.tokens)} tokens">
+            <div class="w-full rounded-t bg-brand-400 transition group-hover:bg-brand-600" style="height:${Math.max(2, Math.round((d.tokens / max) * 100))}%"></div>
+          </div>`).join("");
+      }
+      function rows(box: string, items: any[], nameKey: string, sub?: (i: any) => string) {
+        const el = $(box);
+        const max = Math.max(1, ...items.map((i) => i.tokens));
+        el.innerHTML = items.length ? items.map((i) => `
+          <div>
+            <div class="flex items-baseline justify-between gap-2 text-sm">
+              <span class="truncate font-semibold text-ink">${esc(i[nameKey])}${sub ? ` <span class="font-normal text-faint">${sub(i)}</span>` : ""}</span>
+              <span class="shrink-0 text-muted">${fmt(i.tokens)}</span>
+            </div>
+            <div class="mt-1 h-2 rounded-full bg-mist"><div class="h-2 rounded-full bg-brand-500" style="width:${Math.round((i.tokens / max) * 100)}%"></div></div>
+          </div>`).join("") : `<div class="text-sm text-faint">Nothing yet.</div>`;
+      }
+
+      async function load() {
+        const q = currentUser ? "?user=" + encodeURIComponent(currentUser) : "";
+        const d: any = await fetch("/api/admin/usage.json" + q).then((r) => r.json()).catch(() => null);
+        if (!d) return;
+
+        $("s-tokens").textContent = fmt(d.totalTokens);
+        $("s-sessions").textContent = fmt(d.totalSessions);
+
+        if (currentUser) {
+          $("crumb").innerHTML = `· <b class="text-ink">${esc(d.user?.login || ("user " + currentUser))}</b> <a href="#" id="back" class="ml-2 text-sm font-semibold text-brand-600">← all users</a>`;
+          $("back")?.addEventListener("click", (e) => { e.preventDefault(); currentUser = null; load(); });
+          $("c3-l").textContent = "Projects"; $("s-3").textContent = String((d.byProject || []).length);
+          $("c4-l").textContent = "Agents"; $("s-4").textContent = String((d.byAgent || []).length);
+          $("users-card").classList.add("hidden");
+          $("proj-title").textContent = "By project";
+          rows("by-project", d.byProject || [], "name");
+          rows("by-agent", (d.byAgent || []).map((a: any) => ({ name: a.agent, tokens: a.tokens })), "name");
+        } else {
+          $("crumb").textContent = "· community-wide";
+          $("c3-l").textContent = "Users"; $("s-3").textContent = String(d.activeUsers || 0);
+          $("c4-l").textContent = "Projects"; $("s-4").textContent = String(d.projectCount || 0);
+          $("users-card").classList.remove("hidden");
+          $("proj-title").textContent = "Top projects";
+          rows("by-project", d.byProject || [], "name", (i) => `· ${i.users} user${i.users === 1 ? "" : "s"}`);
+          rows("by-agent", (d.byAgent || []).map((a: any) => ({ name: a.agent, tokens: a.tokens, users: a.users })), "name", (i) => `· ${i.users} user${i.users === 1 ? "" : "s"}`);
+          const ul = $("users");
+          ul.innerHTML = (d.users || []).map((u: any) => `
+            <button data-user="${esc(String(u.id))}" class="flex w-full items-center gap-3 rounded-2xl border border-line bg-white px-3 py-2 text-left transition hover:border-brand-300 hover:bg-brand-50/40">
+              ${u.avatar ? `<img src="${esc(u.avatar)}" alt="" class="h-8 w-8 shrink-0 rounded-full" />` : `<span class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-emerald-50 text-emerald-600 font-display text-sm font-bold">${esc((u.login || "?").charAt(0).toUpperCase())}</span>`}
+              <span class="min-w-0 flex-1 truncate font-display font-semibold text-ink">${esc(u.login || ("user " + u.id))}</span>
+              <span class="shrink-0 text-xs text-faint">${u.projects} proj</span>
+              <span class="shrink-0 text-sm font-semibold text-muted">${fmt(u.tokens)}</span>
+            </button>`).join("") || `<div class="text-sm text-faint">No usage synced yet.</div>`;
+          ul.querySelectorAll<HTMLElement>("[data-user]").forEach((b) => b.addEventListener("click", () => { currentUser = b.dataset.user!; load(); }));
+        }
+        bars(range === "day" ? d.daily : d.monthly, range === "day" ? "day" : "month");
+      }
+
+      document.querySelectorAll<HTMLElement>(".range-btn").forEach((b) => b.addEventListener("click", () => {
+        range = b.dataset.range!;
+        document.querySelectorAll<HTMLElement>(".range-btn").forEach((x) => {
+          const on = x.dataset.range === range;
+          x.classList.toggle("bg-brand-600", on); x.classList.toggle("text-white", on); x.classList.toggle("text-muted", !on);
+        });
+        load();
+      }));
+      load();
+    })();
+  </script>
+</Base>

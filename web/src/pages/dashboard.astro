@@ -1,0 +1,153 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/Icon.astro";
+import { currentUser } from "../lib/admin";
+
+export const prerender = false;
+const user = await currentUser(Astro.cookies);
+---
+<Base title="Usage dashboard · AgentPet" description="Your token usage by project and agent, day by day and month by month." active="">
+  <section class="px-4 pt-8 pb-16">
+    <div class="mx-auto max-w-5xl">
+      <div class="flex items-center gap-3">
+        <div class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Icon name="bolt" class="h-6 w-6" /></div>
+        <div>
+          <h1 class="font-display text-3xl font-bold text-ink">Usage dashboard</h1>
+          <p class="text-muted">Tokens your agents burned, per project, day by day and month by month.</p>
+        </div>
+      </div>
+
+      {!user ? (
+        <div class="card mt-8 p-8 text-center">
+          <p class="text-muted">Sign in with GitHub to see your project usage. Connect the desktop app to start logging it.</p>
+          <a href="/api/auth/login?returnTo=/dashboard" class="btn-primary mt-5 !px-6 !py-3"><Icon name="users" class="h-5 w-5" /> Sign in with GitHub</a>
+        </div>
+      ) : (
+        <div id="dash" class="mt-8">
+          <!-- filters -->
+          <div class="flex flex-wrap items-center gap-3">
+            <select id="f-project" class="rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-300"><option value="">All projects</option></select>
+            <select id="f-agent" class="rounded-xl border border-line bg-white px-3 py-2 text-sm text-ink outline-none focus:border-brand-300"><option value="">All agents</option></select>
+            <div class="ml-auto inline-flex rounded-full border border-line bg-white p-1">
+              <button data-range="day" class="range-btn rounded-full px-4 py-1.5 text-sm font-semibold text-white bg-brand-600">Daily</button>
+              <button data-range="month" class="range-btn rounded-full px-4 py-1.5 text-sm font-semibold text-muted">Monthly</button>
+            </div>
+          </div>
+
+          <!-- stat cards -->
+          <div class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div class="card p-4"><div class="text-xs font-semibold uppercase tracking-wide text-faint">Total tokens</div><div id="s-tokens" class="mt-1 font-display text-2xl font-bold text-ink">—</div></div>
+            <div class="card p-4"><div class="text-xs font-semibold uppercase tracking-wide text-faint">Sessions</div><div id="s-sessions" class="mt-1 font-display text-2xl font-bold text-ink">—</div></div>
+            <div class="card p-4"><div class="text-xs font-semibold uppercase tracking-wide text-faint">Projects</div><div id="s-projects" class="mt-1 font-display text-2xl font-bold text-ink">—</div></div>
+            <div class="card p-4"><div class="text-xs font-semibold uppercase tracking-wide text-faint">Agents</div><div id="s-agents" class="mt-1 font-display text-2xl font-bold text-ink">—</div></div>
+          </div>
+
+          <!-- chart -->
+          <div class="card mt-5 p-5">
+            <div class="flex items-baseline justify-between"><h2 class="font-display text-lg font-bold text-ink">Tokens over time</h2><span id="chart-hint" class="text-xs text-faint"></span></div>
+            <div id="chart" class="mt-4 flex h-48 items-end gap-1 overflow-x-auto"></div>
+          </div>
+
+          <div class="mt-5 grid gap-5 lg:grid-cols-2">
+            <div class="card p-5">
+              <h2 class="font-display text-lg font-bold text-ink">By project</h2>
+              <div id="by-project" class="mt-4 space-y-3"></div>
+            </div>
+            <div class="card p-5">
+              <h2 class="font-display text-lg font-bold text-ink">By agent</h2>
+              <div id="by-agent" class="mt-4 space-y-3"></div>
+            </div>
+          </div>
+
+          <div id="empty" class="hidden py-12 text-center text-muted">No usage logged yet. Update the desktop app to 1.11+ and run an agent, it logs tokens per project automatically.</div>
+        </div>
+      )}
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      if (!document.getElementById("dash")) return;
+      const fmt = (n: number) => {
+        n = Number(n) || 0;
+        if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+        if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+        if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
+        return String(n);
+      };
+      const esc = (s: string) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+      const $ = (id: string) => document.getElementById(id)!;
+      let range = "day";
+
+      function bars(data: any[], key: string, labelKey: string) {
+        const box = $("chart");
+        if (!data.length) { box.innerHTML = `<div class="m-auto text-sm text-faint">No data for this filter.</div>`; return; }
+        const max = Math.max(1, ...data.map((d) => d[key]));
+        box.innerHTML = data.map((d) => {
+          const h = Math.max(2, Math.round((d[key] / max) * 100));
+          return `<div class="group relative flex min-w-[8px] flex-1 flex-col items-center justify-end" title="${esc(d[labelKey])}: ${fmt(d[key])} tokens">
+            <div class="w-full rounded-t bg-brand-400 transition group-hover:bg-brand-600" style="height:${h}%"></div>
+          </div>`;
+        }).join("");
+        $("chart-hint").textContent = `${data.length} ${range === "day" ? "days" : "months"} · peak ${fmt(max)}`;
+      }
+
+      function rows(box: string, items: any[], nameKey: string, valKey: string) {
+        const el = $(box);
+        const max = Math.max(1, ...items.map((i) => i[valKey]));
+        el.innerHTML = items.length ? items.map((i) => `
+          <div>
+            <div class="flex items-baseline justify-between gap-2 text-sm">
+              <span class="truncate font-semibold text-ink">${esc(i[nameKey])}</span>
+              <span class="shrink-0 text-muted">${fmt(i[valKey])}</span>
+            </div>
+            <div class="mt-1 h-2 rounded-full bg-mist"><div class="h-2 rounded-full bg-brand-500" style="width:${Math.round((i[valKey] / max) * 100)}%"></div></div>
+          </div>`).join("") : `<div class="text-sm text-faint">Nothing yet.</div>`;
+      }
+
+      async function load() {
+        const project = ($("f-project") as HTMLSelectElement).value;
+        const agent = ($("f-agent") as HTMLSelectElement).value;
+        const q = new URLSearchParams();
+        if (project) q.set("project", project);
+        if (agent) q.set("agent", agent);
+        const d: any = await fetch("/api/usage/dashboard.json?" + q.toString()).then((r) => r.json()).catch(() => null);
+        if (!d) return;
+
+        const hasAny = (d.projects || []).length > 0;
+        $("empty").classList.toggle("hidden", hasAny);
+
+        $("s-tokens").textContent = fmt(d.totalTokens);
+        $("s-sessions").textContent = fmt(d.totalSessions);
+        $("s-projects").textContent = String((d.projects || []).length);
+        $("s-agents").textContent = String((d.agents || []).length);
+
+        // Fill dropdowns once (preserve current selection).
+        const psel = $("f-project") as HTMLSelectElement;
+        if (psel.dataset.filled !== "1") {
+          psel.insertAdjacentHTML("beforeend", (d.projects || []).map((p: any) => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join(""));
+          const asel = $("f-agent") as HTMLSelectElement;
+          asel.insertAdjacentHTML("beforeend", (d.agents || []).map((a: any) => `<option value="${esc(a.agent)}">${esc(a.agent)}</option>`).join(""));
+          psel.dataset.filled = "1";
+        }
+
+        bars(range === "day" ? d.daily : d.monthly, "tokens", range === "day" ? "day" : "month");
+        rows("by-project", d.projects || [], "name", "tokens");
+        rows("by-agent", (d.agents || []).map((a: any) => ({ name: a.agent, tokens: a.tokens })), "name", "tokens");
+      }
+
+      $("f-project").addEventListener("change", load);
+      $("f-agent").addEventListener("change", load);
+      document.querySelectorAll<HTMLElement>(".range-btn").forEach((b) => b.addEventListener("click", () => {
+        range = b.dataset.range!;
+        document.querySelectorAll<HTMLElement>(".range-btn").forEach((x) => {
+          const on = x.dataset.range === range;
+          x.classList.toggle("bg-brand-600", on); x.classList.toggle("text-white", on);
+          x.classList.toggle("text-muted", !on);
+        });
+        load();
+      }));
+      load();
+    })();
+  </script>
+</Base>

@@ -80,6 +80,7 @@ export const DICT: Record<"vi" | "zh" | "zh-TW", Record<string, string>> = {
     "What you need": "Bạn cần gì",
     "Windows is on the way": "Windows sắp ra mắt",
     "My pets": "Pet của tôi",
+    "Usage dashboard": "Bảng dùng token",
     // notifications
     "Notifications": "Thông báo", "No notifications yet.": "Chưa có thông báo.",
     "was approved": "đã được duyệt", "wasn't approved": "chưa được duyệt",
@@ -426,6 +427,7 @@ export const DICT: Record<"vi" | "zh" | "zh-TW", Record<string, string>> = {
     "What you need": "你需要什么",
     "Windows is on the way": "Windows 即将推出",
     "My pets": "我的宠物",
+    "Usage dashboard": "用量面板",
     // notifications
     "Notifications": "通知", "No notifications yet.": "暂无通知。",
     "was approved": "已通过审核", "wasn't approved": "未通过审核",
@@ -784,6 +786,7 @@ export const DICT: Record<"vi" | "zh" | "zh-TW", Record<string, string>> = {
     "What you need": "你需要什麼",
     "Windows is on the way": "Windows 即將推出",
     "My pets": "我的寵物",
+    "Usage dashboard": "用量面板",
     // notifications
     "Notifications": "通知", "No notifications yet.": "暫無通知。",
     "was approved": "已通過審核", "wasn't approved": "未通過審核",

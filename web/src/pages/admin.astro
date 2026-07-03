@@ -64,7 +64,8 @@ const STAGES = STAGE_DEFS.map(([name, startInternal, lastDisplay, open]) => {
         <div class="flex flex-wrap items-center gap-2">
           <span class="grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-600"><Icon name="wand" class="h-5 w-5" /></span>
           <h1 class="font-display text-2xl font-bold text-ink">Pet admin</h1>
-          <a href="/admin/collections" class="ml-auto btn-ghost !px-4 !py-2 text-sm"><Icon name="grid" class="h-4 w-4" /> Collections</a>
+          <a href="/admin/usage" class="ml-auto btn-ghost !px-4 !py-2 text-sm"><Icon name="bolt" class="h-4 w-4" /> Usage</a>
+          <a href="/admin/collections" class="btn-ghost !px-4 !py-2 text-sm"><Icon name="grid" class="h-4 w-4" /> Collections</a>
           <a href="/admin/submissions" class="btn-ghost !px-4 !py-2 text-sm"><Icon name="wand" class="h-4 w-4" /> Submissions</a>
           <a href="/requests" class="btn-ghost !px-4 !py-2 text-sm"><Icon name="sparkles" class="h-4 w-4" /> Requests</a>
           <span class="text-sm text-muted"><b class="text-ink">{user.login}</b></span>
