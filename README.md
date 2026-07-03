@@ -9,6 +9,7 @@
     <img src="https://img.shields.io/badge/Swift-SwiftUI-orange" alt="Swift" />
     <a href="https://github.com/ntd4996/agentpet/actions"><img src="https://github.com/ntd4996/agentpet/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
     <a href="https://github.com/ntd4996/agentpet"><img src="https://img.shields.io/github/stars/ntd4996/agentpet?style=social" alt="GitHub stars" /></a>
+    <a href="https://ko-fi.com/ntd4996"><img src="https://img.shields.io/badge/Ko--fi-FF5E5B?logo=ko-fi&logoColor=white" alt="Ko-fi" /></a>
     <a href="https://buymeacoffee.com/ntd4996"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black" alt="Buy me a coffee" /></a>
   </p>
   <p><b>A desktop pet that reacts while your AI coding agents work , and grows the more you code.</b></p>
@@ -38,6 +39,8 @@ It is also a **tamagotchi**. The pet is fed by real work , the tokens your agent
   <h3>Enjoying AgentPet? Help keep it free.</h3>
   <p>It is built and given away for free. A coffee (or a star) keeps the features coming.</p>
   <p>
+    <a href="https://ko-fi.com/ntd4996"><img src="https://img.shields.io/badge/Ko--fi-FF5E5B?style=for-the-badge&logo=ko-fi&logoColor=white" alt="Ko-fi" height="42" /></a>
+    &nbsp;
     <a href="https://buymeacoffee.com/ntd4996"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee" height="42" /></a>
     &nbsp;
     <a href="https://github.com/ntd4996/agentpet"><img src="https://img.shields.io/badge/Star%20on%20GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="Star on GitHub" height="42" /></a>
@@ -245,7 +248,7 @@ AgentPet bundles no pet art of its own. If you hold rights to a character and wa
 If AgentPet saves you some tab-hunting:
 
 - ⭐ **[Star the repo](https://github.com/ntd4996/agentpet)** so more people find it.
-- ☕ **[Buy me a coffee](https://buymeacoffee.com/ntd4996)** to fuel more features.
+- ☕ **[Buy me a coffee](https://buymeacoffee.com/ntd4996)** or **[support on Ko-fi](https://ko-fi.com/ntd4996)** to fuel more features.
 
 Built by **[Nguyễn Thành Đạt (@ntd4996)](https://github.com/ntd4996)** and the community.
 
