@@ -9,6 +9,7 @@
     <img src="https://img.shields.io/badge/Swift-SwiftUI-orange" alt="Swift" />
     <a href="https://github.com/ntd4996/agentpet/actions"><img src="https://github.com/ntd4996/agentpet/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
     <a href="https://github.com/ntd4996/agentpet"><img src="https://img.shields.io/github/stars/ntd4996/agentpet?style=social" alt="GitHub stars" /></a>
+    <a href="https://buymeacoffee.com/ntd4996"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black" alt="Buy me a coffee" /></a>
   </p>
   <p><b>A desktop pet that reacts while your AI coding agents work , and grows the more you code.</b></p>
   <p>
@@ -32,6 +33,16 @@
 Run several coding agents at once (Claude Code, Codex, Gemini, Cursor and more) and it gets hard to tell who is **working**, who is **done**, and who is **waiting for your input**. AgentPet answers that at a glance: a menu-bar monitor shows every agent's live state, and a little pixel pet floats on your desktop and reacts to it all.
 
 It is also a **tamagotchi**. The pet is fed by real work , the tokens your agents burn and the sessions they finish , so it earns XP, levels up, unlocks achievements, and evolves as you code. Free, open source, and fully offline unless you choose to connect.
+
+<div align="center">
+  <h3>Enjoying AgentPet? Help keep it free.</h3>
+  <p>It is built and given away for free. A coffee (or a star) keeps the features coming.</p>
+  <p>
+    <a href="https://buymeacoffee.com/ntd4996"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black" alt="Buy me a coffee" height="42" /></a>
+    &nbsp;
+    <a href="https://github.com/ntd4996/agentpet"><img src="https://img.shields.io/badge/Star%20on%20GitHub-181717?style=for-the-badge&logo=github&logoColor=white" alt="Star on GitHub" height="42" /></a>
+  </p>
+</div>
 
 ## Table of contents
 
