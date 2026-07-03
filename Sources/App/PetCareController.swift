@@ -108,7 +108,7 @@ final class PetCareController: ObservableObject {
         if levelAfter > levelBefore {
             let line = String(
                 format: NSLocalizedString("Level up! Lv %d ⭐", comment: "pet level-up celebrate line"),
-                levelAfter
+                PetCare.displayLevel(forXP: s.xp)
             )
             PetController.shared.flashLevelUp(line: line, petID: petID)
         }
