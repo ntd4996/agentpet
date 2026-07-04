@@ -23,6 +23,7 @@ enum Style {
     KiroFlat,          // agent file: {"name":..,"hooks":{event:[{"command":..}]}}
     AntigravityNested, // {"agentpet": {Event: [..]}} (matcher events vs bare handlers)
     OpencodePlugin,    // a JS plugin file
+    PiExtension,       // a TS extension file for Pi (~/.pi/agent/extensions)
 }
 
 struct Spec {
@@ -51,6 +52,10 @@ fn spec(kind: &str) -> Option<Spec> {
             events: &["agentSpawn", "userPromptSubmit", "postToolUse", "stop"] },
         "opencode" => Spec { style: Style::OpencodePlugin, rel_path: &[".config", "opencode", "plugin", "agentpet.js"],
             events: &[] },
+        "droid" => Spec { style: Style::ClaudeNested, rel_path: &[".factory", "hooks.json"],
+            events: &["SessionStart", "UserPromptSubmit", "PreToolUse", "Notification", "Stop", "SubagentStop", "SessionEnd"] },
+        "pi" => Spec { style: Style::PiExtension, rel_path: &[".pi", "agent", "extensions", "agentpet.ts"],
+            events: &[] },
         _ => return None,
     })
 }
@@ -66,6 +71,8 @@ pub fn catalog() -> Vec<AgentInfo> {
         ("antigravity", "Antigravity", Some("No \"needs input\" alerts (Antigravity has no notification hook)")),
         ("copilot", "GitHub Copilot", Some("Copilot CLI only (~/.copilot/hooks)")),
         ("kiro", "Kiro CLI", Some("Hooks the default Kiro CLI agent")),
+        ("droid", "Factory Droid", Some("Factory Droid CLI (~/.factory/hooks.json)")),
+        ("pi", "Pi", Some("Pi extension (~/.pi/agent/extensions). No \"needs input\" alerts")),
     ];
     entries.iter().map(|(kind, name, note)| AgentInfo {
         kind: kind.to_string(),
@@ -135,14 +142,14 @@ fn make_entry(style: Style, event: &str, cmd: &str) -> Value {
         } else {
             json!({ "type": "command", "command": cmd })
         },
-        Style::OpencodePlugin => Value::Null,
+        Style::OpencodePlugin | Style::PiExtension => Value::Null,
     }
 }
 
 // ----- public API ----------------------------------------------------------
 pub fn is_installed(kind: &str) -> bool {
     let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else { return false };
-    if s.style == Style::OpencodePlugin {
+    if s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
         return std::fs::read_to_string(&path).map(|c| is_ours(&c)).unwrap_or(false);
     }
     let v = read_json(&path);
@@ -174,6 +181,10 @@ fn install(kind: &str) -> std::io::Result<()> {
         if let Some(dir) = path.parent() { std::fs::create_dir_all(dir)?; }
         return std::fs::write(&path, opencode_plugin(&binary_from(&cmd)));
     }
+    if s.style == Style::PiExtension {
+        if let Some(dir) = path.parent() { std::fs::create_dir_all(dir)?; }
+        return std::fs::write(&path, pi_extension(&binary_from(&cmd)));
+    }
 
     let mut v = read_json(&path);
     let Some(obj) = v.as_object_mut() else {
@@ -204,7 +215,7 @@ fn install(kind: &str) -> std::io::Result<()> {
 fn uninstall(kind: &str) -> std::io::Result<()> {
     let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else { return Ok(()) };
     // Files we own outright: just delete.
-    if kind == "copilot" || s.style == Style::OpencodePlugin {
+    if kind == "copilot" || s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
         let _ = std::fs::remove_file(&path);
         return Ok(());
     }
@@ -242,6 +253,32 @@ fn opencode_plugin(binary: &str) -> String {
          \x20 const sid = \"opencode:\" + (directory || \"default\")\n\
          \x20 const send = (state) => {{ try {{ Bun.spawn([AGENTPET_BIN, \"hook\", \"--agent\", \"opencode\", \"--event\", state, \"--session\", sid, \"--project\", directory || \"\"]) }} catch (e) {{}} }}\n\
          \x20 return {{ \"session.created\": async () => {{ send(\"working\") }}, \"session.idle\": async () => {{ send(\"done\") }} }}\n\
+         }}\n"
+    )
+}
+
+/// The Pi extension: reports session lifecycle through the `agentpet hook` CLI.
+fn pi_extension(binary: &str) -> String {
+    let bin = serde_json::to_string(binary).unwrap_or_else(|_| format!("\"{}\"", binary));
+    format!(
+        "// AgentPet integration (auto-generated, safe to delete to uninstall).\n\
+         // Reports Pi session lifecycle to AgentPet's menu bar app.\n\
+         import {{ spawn }} from \"node:child_process\"\n\
+         const AGENTPET_BIN = {bin}\n\
+         export default function (pi) {{\n\
+         \x20 const send = (state, ctx) => {{\n\
+         \x20   try {{\n\
+         \x20     const cwd = (ctx && ctx.cwd) || process.cwd()\n\
+         \x20     const file = ctx && ctx.sessionManager && ctx.sessionManager.getSessionFile ? ctx.sessionManager.getSessionFile() : null\n\
+         \x20     const sid = \"pi:\" + (file || cwd)\n\
+         \x20     const p = spawn(AGENTPET_BIN, [\"hook\", \"--agent\", \"pi\", \"--event\", state, \"--session\", sid, \"--project\", cwd], {{ stdio: \"ignore\" }})\n\
+         \x20     if (p && p.unref) p.unref()\n\
+         \x20   }} catch (e) {{}}\n\
+         \x20 }}\n\
+         \x20 pi.on(\"session_start\", async (_e, ctx) => send(\"registered\", ctx))\n\
+         \x20 pi.on(\"agent_start\", async (_e, ctx) => send(\"working\", ctx))\n\
+         \x20 pi.on(\"agent_end\", async (_e, ctx) => send(\"done\", ctx))\n\
+         \x20 pi.on(\"session_shutdown\", async (_e, ctx) => send(\"done\", ctx))\n\
          }}\n"
     )
 }

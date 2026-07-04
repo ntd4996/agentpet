@@ -20,6 +20,7 @@ export interface CareState {
   streakDays: number;
   lastFedDayKey: string | null;
   days: Record<string, number>; // dayKey -> tokens (last 14)
+  unlockedAchievements: string[];
 }
 
 export function emptyState(): CareState {
@@ -27,7 +28,55 @@ export function emptyState(): CareState {
     xp: 0, tokenCarry: 0, tokensToday: 0, mealsToday: 0,
     totalTokens: 0, totalMeals: 0, lastFedAt: null,
     dayKey: dayKey(new Date()), streakDays: 0, lastFedDayKey: null, days: {},
+    unlockedAchievements: [],
   };
+}
+
+// ---- achievements (14 badges, must match PetCare.swift) ---------------------
+
+export const ACHIEVEMENTS = [
+  "firstMeal", "sessions100", "sessions500", "tokens1M", "tokens10M", "tokens50M",
+  "level5", "level10", "level20", "level35", "streak7", "streak14", "streak30", "nightOwl",
+];
+export const ACH_NAME: Record<string, string> = {
+  firstMeal: "First Meal", sessions100: "100 Sessions", sessions500: "500 Sessions",
+  tokens1M: "1M Tokens", tokens10M: "10M Tokens", tokens50M: "50M Tokens",
+  level5: "Level 5", level10: "Level 10", level20: "Level 20", level35: "Level 35",
+  streak7: "7-Day Streak", streak14: "14-Day Streak", streak30: "30-Day Streak", nightOwl: "Night Owl",
+};
+export const ACH_ICON: Record<string, string> = {
+  firstMeal: "🍽", sessions100: "🏆", sessions500: "🥇", tokens1M: "🔥", tokens10M: "⚡",
+  tokens50M: "💥", level5: "⭐", level10: "🌟", level20: "🛡️", level35: "👑",
+  streak7: "📅", streak14: "📆", streak30: "🗓️", nightOwl: "🌙",
+};
+
+function checkAchievements(s: CareState, hour: number): Set<string> {
+  const dl = displayLevel(s.xp);
+  const r = new Set<string>();
+  if (s.totalMeals >= 1) r.add("firstMeal");
+  if (s.totalMeals >= 100) r.add("sessions100");
+  if (s.totalMeals >= 500) r.add("sessions500");
+  if (s.totalTokens >= 1_000_000) r.add("tokens1M");
+  if (s.totalTokens >= 10_000_000) r.add("tokens10M");
+  if (s.totalTokens >= 50_000_000) r.add("tokens50M");
+  if (dl >= 5) r.add("level5");
+  if (dl >= 10) r.add("level10");
+  if (dl >= 20) r.add("level20");
+  if (dl >= 35) r.add("level35");
+  if (s.streakDays >= 7) r.add("streak7");
+  if (s.streakDays >= 14) r.add("streak14");
+  if (s.streakDays >= 30) r.add("streak30");
+  if (hour < 6 && s.totalMeals >= 1) r.add("nightOwl");
+  return r;
+}
+
+/** Reconciles unlocked badges against the current stats. Returns newly unlocked. */
+export function unlockNewAchievements(s: CareState, now = new Date()): string[] {
+  const qualified = checkAchievements(s, now.getHours());
+  const already = new Set(s.unlockedAchievements || []);
+  const newly = [...qualified].filter((a) => !already.has(a));
+  s.unlockedAchievements = [...already, ...newly];
+  return newly;
 }
 
 // ---- level / stage math (must match PetCare.swift) --------------------------
@@ -128,6 +177,7 @@ export function feedTokens(s: CareState, tokens: number, now = new Date()): numb
   s.tokenCarry = pool % TOKENS_PER_XP;
   s.xp += gained;
   markFed(s, now);
+  unlockNewAchievements(s, now);
   return gained;
 }
 
@@ -138,6 +188,7 @@ export function recordMeal(s: CareState, now = new Date()): number {
   s.mealsToday += 1;
   s.xp += MEAL_XP;
   markFed(s, now);
+  unlockNewAchievements(s, now);
   return MEAL_XP;
 }
 

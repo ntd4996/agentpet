@@ -74,6 +74,13 @@ function renderCare() {
   setTxt("care-xp", `${s.xp} XP`);
   const toNext = care.tokensToNextLevel(s);
   setTxt("care-tonext", toNext > 0 ? `≈ ${fmtNum(toNext)} ${t("tokens to next level")}` : "");
+  // achievements
+  const unlocked = new Set(s.unlockedAchievements || []);
+  setTxt("care-achcount", `${unlocked.size} / ${care.ACHIEVEMENTS.length}`);
+  const badges = document.getElementById("care-badges");
+  if (badges) badges.innerHTML = care.ACHIEVEMENTS
+    .map((a) => `<span class="care-badge${unlocked.has(a) ? " on" : ""}" title="${t(care.ACH_NAME[a])}">${care.ACH_ICON[a]}</span>`)
+    .join("");
   setTxt("care-today", fmtNum(s.tokensToday));
   setTxt("care-today-sub", `${s.mealsToday} ${t("sessions")}`);
   setTxt("care-streak", String(s.streakDays));

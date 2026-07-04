@@ -64,7 +64,7 @@ export async function push(): Promise<void> {
     streak: s.streakDays,
     lastFedAt: s.lastFedAt ? Math.floor(s.lastFedAt / 1000) : null,
     week: care.recentDays(s, 7).map((d) => d.tokens),
-    achievements: [] as string[],
+    achievements: s.unlockedAchievements || [],
   }));
   if (!pets.length) return;
   try {
@@ -116,6 +116,12 @@ export async function restore(): Promise<number> {
           s.streakDays = c.streak || 0;
         }
       }
+      // Achievements union, then reconcile against the merged (higher) stats.
+      if (Array.isArray(c.achievements) && c.achievements.length) {
+        const merged = new Set([...(s.unlockedAchievements || []), ...c.achievements.map(String)]);
+        s.unlockedAchievements = [...merged];
+      }
+      care.unlockNewAchievements(s);
     });
     changed++;
   }

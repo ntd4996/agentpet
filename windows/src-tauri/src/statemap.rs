@@ -32,6 +32,15 @@ pub fn state(kind: &str, event: &str) -> Option<&'static str> {
             "Stop" | "SubagentStop" => Some("done"),
             _ => None,
         },
+        // Factory Droid CLI: same Claude-nested payload; Notification is a
+        // permission/approval request or 60s idle, mapped to "waiting".
+        "droid" => match event {
+            "SessionStart" => Some("registered"),
+            "UserPromptSubmit" | "PreToolUse" | "PostToolUse" => Some("working"),
+            "Notification" => Some("waiting"),
+            "Stop" => Some("done"),
+            _ => None, // SubagentStop etc. -> no change
+        },
         "gemini" => match event {
             "SessionStart" => Some("registered"),
             "BeforeAgent" | "BeforeModel" | "BeforeTool" | "AfterTool" | "BeforeToolSelection"
@@ -88,6 +97,6 @@ pub fn state(kind: &str, event: &str) -> Option<&'static str> {
 pub fn is_session_end(kind: &str, event: &str) -> bool {
     matches!(
         (kind, event),
-        ("claude", "SessionEnd") | ("gemini", "SessionEnd") | ("cursor", "sessionEnd")
+        ("claude", "SessionEnd") | ("gemini", "SessionEnd") | ("cursor", "sessionEnd") | ("droid", "SessionEnd")
     )
 }

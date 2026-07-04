@@ -827,3 +827,7 @@ body.pop {
 .ghelp { font-size: 11px; opacity: .55; margin-top: 8px; padding: 0 2px; line-height: 1.4; }
 .code-input { font-family: ui-monospace, Menlo, monospace; text-transform: uppercase; letter-spacing: .2em; width: 120px; text-align: center; }
 #sync-out .row, #sync-in .row { margin-bottom: 8px; gap: 8px; }
+.care-achhead { display: flex; justify-content: space-between; font-size: 11px; opacity: .7; }
+.care-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+.care-badge { font-size: 15px; line-height: 1; opacity: .25; filter: grayscale(1); transition: opacity .2s; }
+.care-badge.on { opacity: 1; filter: none; }
