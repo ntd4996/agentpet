@@ -18,6 +18,10 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.2" cy="10.2" r="2.1"/><circle cx="9.3" cy="6.4" r="2.2"/><circle cx="14.7" cy="6.4" r="2.2"/><circle cx="18.8" cy="10.2" r="2.1"/><path d="M12 10.5c-2.6 0-5.4 2.5-5.4 5 0 1.6 1.2 2.6 2.7 2.6 1 0 1.8-.4 2.7-.4s1.7.4 2.7.4c1.5 0 2.7-1 2.7-2.6 0-2.5-2.8-5-5.4-5z"/></svg>
         <span id="tab-pet">Pet</span>
       </button>
+      <button class="tab" data-tab="care">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+        <span id="tab-care">Care</span>
+      </button>
       <button class="tab" data-tab="bubble">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1.5 6.75A3.25 3.25 0 0 1 4.75 3.5h7A3.25 3.25 0 0 1 15 6.75v3.5a3.25 3.25 0 0 1-3.25 3.25H8.6l-3.35 2.8a.5.5 0 0 1-.82-.38V13.5h.32A3.25 3.25 0 0 1 1.5 10.25v-3.5z"/><path d="M16.4 7.9h1.35a4.75 4.75 0 0 1 4.75 4.75v1.6a4.75 4.75 0 0 1-4.05 4.7v2.17a.5.5 0 0 1-.83.37l-2.86-2.49h-2.51a4.74 4.74 0 0 1-3.92-2.07h3.42a4.65 4.65 0 0 0 4.65-4.65V7.9z"/></svg>
         <span id="tab-bubble">Bubble</span>
@@ -154,6 +158,33 @@
             <div class="row"><span class="slider-wrap wide"><input type="range" id="pet-size" min="70" max="130" /><span class="val dim" id="pet-size-val"></span>
               <span class="size-presets"><button data-size="80">S</button><button data-size="100">M</button><button data-size="125">L</button></span></span></div>
           </div>
+        </div>
+      </div>
+
+      <!-- =============================== CARE ================================ -->
+      <div class="page" data-page="care">
+        <div class="group">
+          <div class="ghead" id="t-care-head">Your companion</div>
+          <div class="gcard care-hud">
+            <div class="care-top">
+              <div class="care-id">
+                <div class="care-name" id="care-name">—</div>
+                <div class="care-stage"><b id="care-level">Lv 0</b> · <span id="care-stagename">Hatchling</span></div>
+              </div>
+              <div class="care-hunger" id="care-hunger">—</div>
+            </div>
+            <div class="care-bar"><div class="care-bar-fill" id="care-xpfill"></div></div>
+            <div class="care-xprow"><span id="care-xp">0 XP</span><span id="care-tonext" class="dim"></span></div>
+            <div class="care-grid">
+              <div class="care-stat"><div class="cs-label" id="t-care-today">Today</div><div class="cs-val" id="care-today">0</div><div class="cs-sub" id="care-today-sub">0 sessions</div></div>
+              <div class="care-stat"><div class="cs-label" id="t-care-streak">Streak</div><div class="cs-val" id="care-streak">0</div><div class="cs-sub" id="t-care-streak-sub">days fed</div></div>
+              <div class="care-stat"><div class="cs-label" id="t-care-lifetime">Lifetime</div><div class="cs-val" id="care-lifetime">0</div><div class="cs-sub" id="t-care-lifetime-sub">tokens eaten</div></div>
+              <div class="care-stat"><div class="cs-label" id="t-care-sessions">Sessions</div><div class="cs-val" id="care-sessions">0</div><div class="cs-sub" id="t-care-sessions-sub">completed</div></div>
+            </div>
+            <div class="care-charthead"><span id="t-care-burn">Burn, last 7 days</span><span id="care-burntotal" class="dim"></span></div>
+            <div class="care-chart" id="care-chart"></div>
+          </div>
+          <div class="ghelp" id="t-care-help">Your pet eats the real tokens your agents burn and the sessions they finish. Feeding earns XP; it levels up through five stages.</div>
         </div>
       </div>
 

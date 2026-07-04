@@ -804,3 +804,24 @@ body.pop {
 ::-webkit-scrollbar-thumb:hover { background-color: rgba(255, 255, 255, 0.35); background-clip: padding-box; }
 ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 ::-webkit-scrollbar-corner { background: transparent; }
+
+/* ---- Care tab (tamagotchi HUD) ---- */
+.care-hud { display: flex; flex-direction: column; gap: 12px; }
+.care-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.care-name { font-weight: 700; font-size: 16px; }
+.care-stage { opacity: .7; font-size: 12px; margin-top: 2px; }
+.care-hunger { font-size: 12px; opacity: .8; white-space: nowrap; }
+.care-bar { height: 8px; border-radius: 999px; background: rgba(127,127,127,.22); overflow: hidden; }
+.care-bar-fill { height: 100%; width: 0; background: #f5a623; border-radius: 999px; transition: width .3s ease; }
+.care-xprow { display: flex; justify-content: space-between; font-size: 12px; }
+.care-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.care-stat { background: rgba(127,127,127,.10); border-radius: 10px; padding: 10px 12px; }
+.cs-label { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; opacity: .55; }
+.cs-val { font-size: 20px; font-weight: 700; margin-top: 2px; }
+.cs-sub { font-size: 11px; opacity: .55; }
+.care-charthead { display: flex; justify-content: space-between; font-size: 11px; opacity: .7; margin-top: 2px; }
+.care-chart { display: flex; align-items: flex-end; gap: 6px; height: 72px; }
+.cbar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.cbar { width: 100%; background: #f5a623; border-radius: 4px 4px 0 0; min-height: 3px; }
+.cbar-lbl { font-size: 9px; opacity: .5; margin-top: 3px; }
+.ghelp { font-size: 11px; opacity: .55; margin-top: 8px; padding: 0 2px; line-height: 1.4; }

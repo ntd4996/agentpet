@@ -9,6 +9,7 @@ import { agentIconUrl, uiIcon } from "./icons";
 import { LAYOUT_PRESETS, readBubbleConfig, type TokenItem, type BubbleToken } from "./bubble";
 import { initDemo } from "./demo";
 import { slice, type Rect } from "./pet";
+import * as care from "./care";
 
 // ------------------------------------------------------------- segmented ----
 // macOS-style segmented controls: <span class="seg" data-key data-default>.
@@ -38,9 +39,56 @@ function initTabs() {
       document.querySelectorAll<HTMLElement>(".page").forEach((p) => {
         p.classList.toggle("sel", p.dataset.page === b.dataset.tab);
       });
+      if (b.dataset.tab === "care") renderCare();
     };
   });
 }
+
+// ------------------------------------------------------------------ care ----
+function fmtNum(n: number): string {
+  n = Number(n) || 0;
+  if (n >= 1e9) return (n / 1e9).toFixed(1).replace(/\.0$/, "") + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(1).replace(/\.0$/, "") + "K";
+  return String(n);
+}
+function currentPetName(): string {
+  const slug = savedSlug();
+  if (!slug) return t("Your pet");
+  const hit = getLibrary().find((p) => p.slug === slug) || catalog.find((p) => p.slug === slug);
+  return hit?.name || slug;
+}
+function renderCare() {
+  const slug = savedSlug();
+  if (!slug) return;
+  const s = care.stateFor(slug);
+  const internal = care.levelForXP(s.xp);
+  const setTxt = (id: string, v: string) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt("care-name", currentPetName());
+  setTxt("care-level", `${t("Lv")} ${care.displayLevel(s.xp)}`);
+  setTxt("care-stagename", t(care.stageName(internal)));
+  setTxt("care-hunger", t(care.hunger(s)));
+  const fill = document.getElementById("care-xpfill");
+  if (fill) fill.style.width = `${Math.round(care.levelProgress(s.xp) * 100)}%`;
+  setTxt("care-xp", `${s.xp} XP`);
+  const toNext = care.tokensToNextLevel(s);
+  setTxt("care-tonext", toNext > 0 ? `≈ ${fmtNum(toNext)} ${t("tokens to next level")}` : "");
+  setTxt("care-today", fmtNum(s.tokensToday));
+  setTxt("care-today-sub", `${s.mealsToday} ${t("sessions")}`);
+  setTxt("care-streak", String(s.streakDays));
+  setTxt("care-lifetime", fmtNum(s.totalTokens));
+  setTxt("care-sessions", String(s.totalMeals));
+  const days = care.recentDays(s, 7);
+  const max = Math.max(1, ...days.map((d) => d.tokens));
+  setTxt("care-burntotal", fmtNum(days.reduce((a, d) => a + d.tokens, 0)));
+  const chart = document.getElementById("care-chart");
+  if (chart) chart.innerHTML = days
+    .map((d) => `<div class="cbar-wrap" title="${fmtNum(d.tokens)}"><div class="cbar" style="height:${Math.max(3, Math.round((d.tokens / max) * 100))}%"></div><div class="cbar-lbl">${d.label}</div></div>`)
+    .join("");
+}
+// Refresh when the pet window feeds the pet, and periodically for the hunger clock.
+listen("care-updated", () => { if (document.querySelector('.page[data-page="care"].sel')) renderCare(); });
+setInterval(() => { if (document.querySelector('.page[data-page="care"].sel')) renderCare(); }, 30_000);
 
 // ---------------------------------------------------------------- agents ----
 interface AgentInfo {

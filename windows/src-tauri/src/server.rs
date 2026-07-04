@@ -85,6 +85,9 @@ fn handle_event(app: &AppHandle, body: &str) {
         None
     };
     let is_stop_done = event == "Stop" && state == "done";
+    // Kept for the token event, since `emit_payload` moves session/project.
+    let tok_session = session.clone();
+    let tok_project = project.clone();
 
     let emit_payload = move |app: &AppHandle, state: &str, title: Option<String>| {
         let payload = serde_json::json!({
@@ -110,6 +113,15 @@ fn handle_event(app: &AppHandle, body: &str) {
                 state
             };
             emit_payload(&app, &final_state, title);
+            // Feed the pet: the tokens Claude burned since the last read (delta).
+            if let Some(tokens) = crate::transcript::new_usage_tokens(&path) {
+                if tokens > 0 {
+                    let _ = app.emit("agent-tokens", serde_json::json!({
+                        "agent": "claude", "session": tok_session,
+                        "project": tok_project, "tokens": tokens,
+                    }));
+                }
+            }
         });
         return;
     }

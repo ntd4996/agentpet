@@ -11,6 +11,52 @@ use std::sync::Mutex;
 // Summary-based titles are final; first-user-message titles are provisional
 // (a later summary supersedes them), so only summaries are cached.
 static SUMMARY_CACHE: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
+// Byte offset already consumed by `new_usage_tokens` per transcript path, so
+// repeated reads only sum the freshly-appended usage (a port of the macOS
+// TranscriptReader.usageOffsets).
+static USAGE_OFFSETS: Mutex<Option<HashMap<String, u64>>> = Mutex::new(None);
+
+/// Sums Claude model usage tokens (input + output) appended to the transcript
+/// since the previous call for the same path. First call consumes the whole
+/// file. `None` if unreadable, `0` if no new usage lines appeared. Feeds the pet.
+pub fn new_usage_tokens(path: &str) -> Option<i64> {
+    let mut f = std::fs::File::open(path).ok()?;
+    let size = f.seek(SeekFrom::End(0)).ok()?;
+    let mut start = USAGE_OFFSETS
+        .lock()
+        .ok()
+        .and_then(|g| g.as_ref().and_then(|m| m.get(path).copied()))
+        .unwrap_or(0);
+    if start > size {
+        start = 0; // file truncated/replaced: start over
+    }
+    if size <= start {
+        return Some(0);
+    }
+    f.seek(SeekFrom::Start(start)).ok()?;
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf).ok()?;
+    // Consume up to the last full line; a partial trailing line stays for later.
+    let nl = buf.iter().rposition(|&b| b == b'\n')?;
+    let consumable = &buf[..=nl];
+    let new_off = start + consumable.len() as u64;
+    if let Ok(mut g) = USAGE_OFFSETS.lock() {
+        g.get_or_insert_with(HashMap::new).insert(path.to_string(), new_off);
+    }
+    let text = String::from_utf8_lossy(consumable);
+    let mut total: i64 = 0;
+    for line in text.lines() {
+        if !line.contains("\"usage\"") {
+            continue; // fast reject: most lines carry no usage object
+        }
+        let Ok(json) = serde_json::from_str::<Value>(line.trim()) else { continue };
+        if let Some(usage) = json.get("message").and_then(|m| m.get("usage")) {
+            total += usage.get("input_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+            total += usage.get("output_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+        }
+    }
+    Some(total)
+}
 
 /// Expected transcript path for a Claude Code session when the hook payload
 /// didn't carry `transcript_path`: `~/.claude/projects/<sanitized-cwd>/<id>.jsonl`

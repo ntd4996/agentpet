@@ -7,6 +7,7 @@ import { BubbleRenderer } from "./bubble";
 import { loadCatalog, savedSlug, saveSlug } from "./catalog";
 import { t, setLang, type Lang } from "./i18n";
 import { bubbleLines, PET_CHAT } from "./activity";
+import * as care from "./care";
 import { sendNotification, isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -215,6 +216,11 @@ function maybeNotify(e: AgentEventPayload) {
   const prev = lastState.get(key);
   lastState.set(key, e.state);
   if (e.state === prev) return;
+  // A finished session is a "meal" for the pet (records XP + streak).
+  if (e.state === "done") {
+    const slug = savedSlug();
+    if (slug) { care.mutate(slug, (s) => care.recordMeal(s)); emit("care-updated"); }
+  }
   if (e.state !== "done" && e.state !== "waiting") return;
   chime(e.state === "done" ? "done" : "waiting");
   if (!notifyReady || localStorage.getItem("ap_notify") === "0") return;
@@ -237,6 +243,15 @@ listen<string>("agent-end", (e) => {
   for (const k of [...lastState.keys()]) if (k.endsWith(`:${e.payload}`)) lastState.delete(k);
   store.remove(e.payload);
   render();
+});
+// Tokens burned by an agent feed the currently-selected pet (Claude for now).
+listen<{ agent: string; session: string; project: string; tokens: number }>("agent-tokens", (e) => {
+  const n = e.payload?.tokens || 0;
+  if (n <= 0) return;
+  const slug = savedSlug();
+  if (!slug) return;
+  care.mutate(slug, (s) => care.feedTokens(s, n));
+  emit("care-updated");
 });
 // Settings window: dismiss one session / clear all (mac popover actions).
 listen<string>("session-dismiss", (e) => { store.removeKey(e.payload); render(); });
