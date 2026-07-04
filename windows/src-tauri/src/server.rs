@@ -166,7 +166,7 @@ fn handle_event(app: &AppHandle, body: &str) {
         let proj = tok_project.clone();
         std::thread::spawn(move || {
             let cwd = if proj.is_empty() { None } else { Some(proj.as_str()) };
-            if let Some(path) = crate::transcript::codex_rollout_path(&sess, cwd) {
+            if let Some(path) = crate::transcript::codex_rollout_path_cached(&sess, cwd) {
                 if let Some(tokens) = crate::transcript::new_codex_usage_tokens(&path) {
                     if tokens > 0 {
                         let _ = app2.emit("agent-tokens", serde_json::json!({

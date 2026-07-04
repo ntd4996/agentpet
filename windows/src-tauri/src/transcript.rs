@@ -15,6 +15,25 @@ static SUMMARY_CACHE: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
 // repeated reads only sum the freshly-appended usage (a port of the macOS
 // TranscriptReader.usageOffsets).
 static USAGE_OFFSETS: Mutex<Option<HashMap<String, u64>>> = Mutex::new(None);
+// Resolved Codex rollout path per session, so we don't re-walk ~/.codex/sessions
+// on every event (it fires on each tool use).
+static CODEX_PATHS: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
+
+/// Cached wrapper around `codex_rollout_path`, keyed by session id.
+pub fn codex_rollout_path_cached(session_id: &str, cwd: Option<&str>) -> Option<String> {
+    if let Some(hit) = CODEX_PATHS
+        .lock()
+        .ok()
+        .and_then(|g| g.as_ref().and_then(|m| m.get(session_id).cloned()))
+    {
+        return Some(hit);
+    }
+    let path = codex_rollout_path(session_id, cwd)?;
+    if let Ok(mut g) = CODEX_PATHS.lock() {
+        g.get_or_insert_with(HashMap::new).insert(session_id.to_string(), path.clone());
+    }
+    Some(path)
+}
 
 /// Sums Claude model usage tokens (input + output) appended to the transcript
 /// since the previous call for the same path. First call consumes the whole
