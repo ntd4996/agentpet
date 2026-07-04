@@ -26,6 +26,10 @@
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1.5 6.75A3.25 3.25 0 0 1 4.75 3.5h7A3.25 3.25 0 0 1 15 6.75v3.5a3.25 3.25 0 0 1-3.25 3.25H8.6l-3.35 2.8a.5.5 0 0 1-.82-.38V13.5h.32A3.25 3.25 0 0 1 1.5 10.25v-3.5z"/><path d="M16.4 7.9h1.35a4.75 4.75 0 0 1 4.75 4.75v1.6a4.75 4.75 0 0 1-4.05 4.7v2.17a.5.5 0 0 1-.83.37l-2.86-2.49h-2.51a4.74 4.74 0 0 1-3.92-2.07h3.42a4.65 4.65 0 0 0 4.65-4.65V7.9z"/></svg>
         <span id="tab-bubble">Bubble</span>
       </button>
+      <button class="tab" data-tab="history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+        <span id="tab-history">History</span>
+      </button>
       <button class="tab" data-tab="about">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
         <span id="tab-about">About</span>
@@ -348,6 +352,15 @@
             </div>
           </div>
           <div class="cap gfoot" id="t-msg-foot">Per-agent overrides win over "All agents". A custom line replaces the live/theme text and the real pet honours it.</div>
+        </div>
+      </div>
+
+      <!-- =============================== HISTORY ============================= -->
+      <div class="page" data-page="history">
+        <div class="group">
+          <div class="ghead"><span id="t-history">Session history</span><span id="history-count" class="dim"></span></div>
+          <div id="history-list" class="history-list"></div>
+          <div id="history-empty" class="ghelp" style="display:none">No finished sessions yet. Run an agent and they'll appear here.</div>
         </div>
       </div>
 

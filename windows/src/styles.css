@@ -831,3 +831,10 @@ body.pop {
 .care-badges { display: flex; flex-wrap: wrap; gap: 6px; }
 .care-badge { font-size: 15px; line-height: 1; opacity: .25; filter: grayscale(1); transition: opacity .2s; }
 .care-badge.on { opacity: 1; filter: none; }
+.history-list { display: flex; flex-direction: column; gap: 2px; max-height: 420px; overflow: auto; }
+.hist-day { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; opacity: .5; margin: 10px 0 4px; }
+.hist-row { display: flex; align-items: baseline; gap: 8px; padding: 5px 8px; border-radius: 8px; }
+.hist-row:hover { background: rgba(127,127,127,.10); }
+.hist-agent { font-size: 10px; text-transform: uppercase; opacity: .6; min-width: 54px; }
+.hist-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-meta { font-size: 11px; white-space: nowrap; }

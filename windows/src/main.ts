@@ -10,6 +10,7 @@ import { bubbleLines, PET_CHAT } from "./activity";
 import * as care from "./care";
 import * as sync from "./sync";
 import * as usage from "./usage";
+import * as history from "./history";
 import { sendNotification, isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -213,16 +214,25 @@ let notifyReady = false;
   try { notifyReady = (await isPermissionGranted()) || (await requestPermission()) === "granted"; } catch {}
 })();
 const lastState = new Map<string, string>();
+const sessionStarts = new Map<string, number>();
 function maybeNotify(e: AgentEventPayload) {
   const key = `${e.agent}:${e.session}`;
   const prev = lastState.get(key);
   lastState.set(key, e.state);
+  if (!sessionStarts.has(key) && (e.state === "working" || e.state === "registered")) {
+    sessionStarts.set(key, Date.now());
+  }
   if (e.state === prev) return;
   // A finished session is a "meal" for the pet (records XP + streak).
   if (e.state === "done") {
     const slug = savedSlug();
     if (slug) { care.mutate(slug, (s) => care.recordMeal(s)); emit("care-updated"); sync.schedulePush(); }
     if (e.project) usage.recordSession(e.project, e.agent);
+    const now = Date.now();
+    history.log({
+      id: e.session, agent: e.agent, project: e.project ? basename(e.project) : "",
+      title: e.title || "", startedAt: sessionStarts.get(key) ?? now, endedAt: now,
+    });
   }
   if (e.state !== "done" && e.state !== "waiting") return;
   chime(e.state === "done" ? "done" : "waiting");

@@ -11,6 +11,7 @@ import { initDemo } from "./demo";
 import { slice, type Rect } from "./pet";
 import * as care from "./care";
 import * as sync from "./sync";
+import * as history from "./history";
 
 // ------------------------------------------------------------- segmented ----
 // macOS-style segmented controls: <span class="seg" data-key data-default>.
@@ -41,8 +42,41 @@ function initTabs() {
         p.classList.toggle("sel", p.dataset.page === b.dataset.tab);
       });
       if (b.dataset.tab === "care") { renderCare(); renderSync(); }
+      if (b.dataset.tab === "history") renderHistory();
     };
   });
+}
+
+// ------------------------------------------------------------------ history ----
+function renderHistory() {
+  const listEl = document.getElementById("history-list");
+  const emptyEl = document.getElementById("history-empty");
+  const countEl = document.getElementById("history-count");
+  if (!listEl) return;
+  const items = history.list();
+  if (countEl) countEl.textContent = items.length ? `${items.length}` : "";
+  if (emptyEl) emptyEl.style.display = items.length ? "none" : "";
+  const escH = (s: string) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+  const fmtDur = (ms: number) => {
+    const s = Math.max(0, Math.round(ms / 1000));
+    if (s < 60) return `${s}s`;
+    const m = Math.round(s / 60);
+    return m < 60 ? `${m}m` : `${Math.round(m / 60)}h`;
+  };
+  const dayLabel = (t: number) => new Date(t).toLocaleDateString();
+  const timeLabel = (t: number) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  let html = "", curDay = "";
+  for (const e of items) {
+    const d = dayLabel(e.endedAt);
+    if (d !== curDay) { curDay = d; html += `<div class="hist-day">${escH(d)}</div>`; }
+    const label = e.title || e.project || e.agent;
+    html += `<div class="hist-row">
+      <span class="hist-agent">${escH(e.agent)}</span>
+      <span class="hist-title">${escH(label)}</span>
+      <span class="hist-meta dim">${escH(e.project)} · ${fmtDur(e.endedAt - e.startedAt)} · ${timeLabel(e.endedAt)}</span>
+    </div>`;
+  }
+  listEl.innerHTML = html;
 }
 
 // ------------------------------------------------------------------ care ----
