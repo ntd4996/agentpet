@@ -93,6 +93,7 @@ pub fn run_hook(args: &[String]) {
             .unwrap_or_default()
             .to_string(),
         transcript: first_str(&v, &["transcript_path", "transcriptPath"]).unwrap_or_default(),
+        subagent: first_str(&v, &["agent_id", "subagent_id", "agentId"]).unwrap_or_default(),
     });
 }
 
@@ -173,6 +174,7 @@ struct Payload {
     file: String,
     desc: String,
     transcript: String,
+    subagent: String,
 }
 
 impl Payload {
@@ -181,7 +183,7 @@ impl Payload {
             "agent": self.agent, "event": self.event, "session": self.session,
             "project": self.project, "message": self.message, "tool": self.tool,
             "file": self.file, "desc": self.desc, "transcript": self.transcript,
-            "ts": now_millis(),
+            "subagent": self.subagent, "ts": now_millis(),
         })
         .to_string()
     }

@@ -9,6 +9,7 @@ import { t, setLang, type Lang } from "./i18n";
 import { bubbleLines, PET_CHAT } from "./activity";
 import * as care from "./care";
 import * as sync from "./sync";
+import * as usage from "./usage";
 import { sendNotification, isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -221,6 +222,7 @@ function maybeNotify(e: AgentEventPayload) {
   if (e.state === "done") {
     const slug = savedSlug();
     if (slug) { care.mutate(slug, (s) => care.recordMeal(s)); emit("care-updated"); sync.schedulePush(); }
+    if (e.project) usage.recordSession(e.project, e.agent);
   }
   if (e.state !== "done" && e.state !== "waiting") return;
   chime(e.state === "done" ? "done" : "waiting");
@@ -249,6 +251,8 @@ listen<string>("agent-end", (e) => {
 listen<{ agent: string; session: string; project: string; tokens: number }>("agent-tokens", (e) => {
   const n = e.payload?.tokens || 0;
   if (n <= 0) return;
+  const p = e.payload;
+  if (p.project) usage.recordTokens(p.project, p.agent, n);
   const slug = savedSlug();
   if (!slug) return;
   care.mutate(slug, (s) => care.feedTokens(s, n));
@@ -259,6 +263,7 @@ listen<{ agent: string; session: string; project: string; tokens: number }>("age
 // On launch: pull any cloud progress, then keep pushing in the background.
 if (sync.signedIn()) {
   sync.restore().then(() => { emit("care-updated"); sync.schedulePush(5000); }).catch(() => {});
+  usage.schedulePush(8000);
 }
 // Settings window: dismiss one session / clear all (mac popover actions).
 listen<string>("session-dismiss", (e) => { store.removeKey(e.payload); render(); });

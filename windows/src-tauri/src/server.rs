@@ -68,6 +68,36 @@ fn handle_event(app: &AppHandle, body: &str) {
         let _ = app.emit("agent-end", session);
         return;
     }
+
+    // SubagentStop (Claude/Droid) is not a state change, but the subagent burned
+    // tokens in its own transcript , feed those before the event is dropped.
+    if event == "SubagentStop" && (agent == "claude" || agent == "droid") {
+        let subagent = str_of(&v, "subagent").to_string();
+        let parent = if !transcript.is_empty() {
+            Some(transcript.clone())
+        } else if !project.is_empty() && !session.is_empty() {
+            crate::transcript::inferred_path(&session, &project)
+        } else {
+            None
+        };
+        if let (false, Some(parent)) = (subagent.is_empty(), parent) {
+            let app2 = app.clone();
+            let sess = session.clone();
+            let proj = project.clone();
+            let agent2 = agent.clone();
+            std::thread::spawn(move || {
+                let path = crate::transcript::subagent_transcript_path(&parent, &subagent);
+                if let Some(tokens) = crate::transcript::new_usage_tokens(&path) {
+                    if tokens > 0 {
+                        let _ = app2.emit("agent-tokens", serde_json::json!({
+                            "agent": agent2, "session": sess, "project": proj, "tokens": tokens,
+                        }));
+                    }
+                }
+            });
+        }
+    }
+
     let Some(state) = crate::statemap::state(&agent, &event) else { return };
 
     // Claude's Stop fires identically whether the agent is truly done or just
@@ -85,7 +115,8 @@ fn handle_event(app: &AppHandle, body: &str) {
         None
     };
     let is_stop_done = event == "Stop" && state == "done";
-    // Kept for the token event, since `emit_payload` moves session/project.
+    // Kept for the token events, since `emit_payload` moves session/project/agent.
+    let agent_kind = agent.clone();
     let tok_session = session.clone();
     let tok_project = project.clone();
 
@@ -124,6 +155,27 @@ fn handle_event(app: &AppHandle, body: &str) {
             }
         });
         return;
+    }
+
+    // Codex has no Claude-style transcript; read its rollout JSONL for the tokens
+    // it burned, so Codex pets grow like Claude (#29). Path is resolved per event
+    // (cached by the offset map inside the reader).
+    if agent_kind == "codex" {
+        let app2 = app.clone();
+        let sess = tok_session.clone();
+        let proj = tok_project.clone();
+        std::thread::spawn(move || {
+            let cwd = if proj.is_empty() { None } else { Some(proj.as_str()) };
+            if let Some(path) = crate::transcript::codex_rollout_path(&sess, cwd) {
+                if let Some(tokens) = crate::transcript::new_codex_usage_tokens(&path) {
+                    if tokens > 0 {
+                        let _ = app2.emit("agent-tokens", serde_json::json!({
+                            "agent": "codex", "session": sess, "project": proj, "tokens": tokens,
+                        }));
+                    }
+                }
+            }
+        });
     }
 
     emit_payload(app, state, None);

@@ -74,6 +74,124 @@ pub fn inferred_path(session_id: &str, cwd: &str) -> Option<String> {
     ))
 }
 
+/// Sums new Codex token usage (fresh input minus cached, plus output) appended
+/// to a rollout JSONL since the previous call, so Codex earns token XP like
+/// Claude. Offset-based + serialised, like `new_usage_tokens`.
+pub fn new_codex_usage_tokens(path: &str) -> Option<i64> {
+    let mut guard = USAGE_OFFSETS.lock().ok()?;
+    let offsets = guard.get_or_insert_with(HashMap::new);
+
+    let mut f = std::fs::File::open(path).ok()?;
+    let size = f.seek(SeekFrom::End(0)).ok()?;
+    let mut start = offsets.get(path).copied().unwrap_or(0);
+    if start > size {
+        start = 0;
+    }
+    if size <= start {
+        return Some(0);
+    }
+    f.seek(SeekFrom::Start(start)).ok()?;
+    let mut buf = Vec::new();
+    f.read_to_end(&mut buf).ok()?;
+    let nl = buf.iter().rposition(|&b| b == b'\n')?;
+    let consumable = &buf[..=nl];
+    offsets.insert(path.to_string(), start + consumable.len() as u64);
+    let text = String::from_utf8_lossy(consumable);
+    let mut total: i64 = 0;
+    for line in text.lines() {
+        if !line.contains("\"last_token_usage\"") {
+            continue;
+        }
+        let Ok(json) = serde_json::from_str::<Value>(line.trim()) else { continue };
+        if let Some(last) = json
+            .get("payload")
+            .and_then(|p| p.get("info"))
+            .and_then(|i| i.get("last_token_usage"))
+        {
+            let input = last.get("input_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+            let cached = last.get("cached_input_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+            let output = last.get("output_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+            total += (input - cached).max(0) + output;
+        }
+    }
+    Some(total)
+}
+
+/// Locates a Codex session's rollout file under ~/.codex/sessions. Primary: a
+/// filename containing the session id. Fallback: the newest rollout whose first
+/// line's `payload.cwd` matches `cwd`.
+pub fn codex_rollout_path(session_id: &str, cwd: Option<&str>) -> Option<String> {
+    fn norm(p: &str) -> String {
+        p.trim_end_matches(['/', '\\']).to_lowercase()
+    }
+    fn walk(
+        dir: &std::path::Path,
+        session_id: &str,
+        out: &mut Vec<(std::path::PathBuf, std::time::SystemTime)>,
+    ) -> Option<std::path::PathBuf> {
+        for entry in std::fs::read_dir(dir).ok()?.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                if let Some(hit) = walk(&p, session_id, out) {
+                    return Some(hit);
+                }
+            } else if let Some(name) = p.file_name().and_then(|n| n.to_str()) {
+                if name.ends_with(".jsonl") && name.contains("rollout-") {
+                    if name.contains(session_id) {
+                        return Some(p);
+                    }
+                    let m = entry
+                        .metadata()
+                        .ok()
+                        .and_then(|md| md.modified().ok())
+                        .unwrap_or(std::time::UNIX_EPOCH);
+                    out.push((p, m));
+                }
+            }
+        }
+        None
+    }
+    let root = dirs::home_dir()?.join(".codex").join("sessions");
+    let mut candidates: Vec<(std::path::PathBuf, std::time::SystemTime)> = Vec::new();
+    if let Some(hit) = walk(&root, session_id, &mut candidates) {
+        return Some(hit.to_string_lossy().into_owned());
+    }
+    let cwd = cwd?;
+    if cwd.trim().is_empty() {
+        return None;
+    }
+    let target = norm(cwd);
+    candidates.sort_by(|a, b| b.1.cmp(&a.1));
+    for (p, _) in candidates.iter().take(40) {
+        let Some(line) = first_line(p) else { continue };
+        let Ok(json) = serde_json::from_str::<Value>(line.trim()) else { continue };
+        if let Some(c) = json.get("payload").and_then(|pl| pl.get("cwd")).and_then(|v| v.as_str()) {
+            if norm(c) == target {
+                return Some(p.to_string_lossy().into_owned());
+            }
+        }
+    }
+    None
+}
+
+fn first_line(path: &std::path::Path) -> Option<String> {
+    let mut f = std::fs::File::open(path).ok()?;
+    let mut buf = vec![0u8; 4096];
+    let n = f.read(&mut buf).ok()?;
+    buf.truncate(n);
+    String::from_utf8_lossy(&buf).lines().next().map(|l| l.to_string())
+}
+
+/// Path to a subagent's transcript for a Claude/Droid `SubagentStop`. Claude
+/// stores them at `<parent-without-.jsonl>/subagents/<agent-id>.jsonl`.
+pub fn subagent_transcript_path(parent: &str, agent_id: &str) -> String {
+    let dir = std::path::Path::new(parent).with_extension("");
+    dir.join("subagents")
+        .join(format!("{}.jsonl", agent_id))
+        .to_string_lossy()
+        .into_owned()
+}
+
 /// Conversation title: a Claude "summary" event (cached), else the first human
 /// user message (≤60 chars, provisional).
 pub fn title(path: &str) -> Option<String> {
