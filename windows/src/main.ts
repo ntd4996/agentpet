@@ -8,6 +8,7 @@ import { loadCatalog, savedSlug, saveSlug } from "./catalog";
 import { t, setLang, type Lang } from "./i18n";
 import { bubbleLines, PET_CHAT } from "./activity";
 import * as care from "./care";
+import * as sync from "./sync";
 import { sendNotification, isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -219,7 +220,7 @@ function maybeNotify(e: AgentEventPayload) {
   // A finished session is a "meal" for the pet (records XP + streak).
   if (e.state === "done") {
     const slug = savedSlug();
-    if (slug) { care.mutate(slug, (s) => care.recordMeal(s)); emit("care-updated"); }
+    if (slug) { care.mutate(slug, (s) => care.recordMeal(s)); emit("care-updated"); sync.schedulePush(); }
   }
   if (e.state !== "done" && e.state !== "waiting") return;
   chime(e.state === "done" ? "done" : "waiting");
@@ -252,7 +253,13 @@ listen<{ agent: string; session: string; project: string; tokens: number }>("age
   if (!slug) return;
   care.mutate(slug, (s) => care.feedTokens(s, n));
   emit("care-updated");
+  sync.schedulePush();
 });
+
+// On launch: pull any cloud progress, then keep pushing in the background.
+if (sync.signedIn()) {
+  sync.restore().then(() => { emit("care-updated"); sync.schedulePush(5000); }).catch(() => {});
+}
 // Settings window: dismiss one session / clear all (mac popover actions).
 listen<string>("session-dismiss", (e) => { store.removeKey(e.payload); render(); });
 listen("sessions-clear", () => { store.clear(); render(); });

@@ -23,6 +23,7 @@ if (!user) {
 
 const db = getDB();
 let appUrl = "";
+let pairCode = "";
 if (db) {
   await ensureSchema(db);
   // Remember who this is so the care leaderboard can show their name/avatar
@@ -35,6 +36,18 @@ if (db) {
   await db.prepare("INSERT INTO care_devices (token, user_id, created_at) VALUES (?,?,?)")
     .bind(token, user.id, Date.now()).run();
   appUrl = `agentpet://link?token=${token}&login=${encodeURIComponent(user.login)}`;
+
+  // A short pairing code for platforms without the agentpet:// deep link
+  // (Windows): the app exchanges it at /api/care/pair for its own token.
+  const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const cbytes = new Uint8Array(6);
+  crypto.getRandomValues(cbytes);
+  pairCode = Array.from(cbytes, (b) => ALPHABET[b % ALPHABET.length]).join("");
+  const now = Date.now();
+  await db.batch([
+    db.prepare("DELETE FROM care_pair_codes WHERE user_id=? OR expires_at<?").bind(user.id, now),
+    db.prepare("INSERT INTO care_pair_codes (code, user_id, expires_at) VALUES (?,?,?)").bind(pairCode, user.id, now + 10 * 60_000),
+  ]);
 }
 ---
 <Base title="Link the app · AgentPet" description="Connect the AgentPet desktop app to your profile." active="">
@@ -47,6 +60,13 @@ if (db) {
         <>
           <a href={appUrl} class="btn-primary mt-6 !px-6 !py-3">Open AgentPet</a>
           <p class="mt-3 text-xs text-faint">Nothing happening? Click the button above, then allow the browser to open AgentPet.</p>
+          {pairCode && (
+            <div class="mt-6 rounded-2xl border border-line bg-brand-50/50 p-4">
+              <p class="text-sm text-muted">On <b class="text-ink">Windows</b>? Enter this code in the app's <b class="text-ink">Care</b> tab:</p>
+              <div class="mt-2 select-all font-mono text-3xl font-bold tracking-[0.3em] text-ink">{pairCode}</div>
+              <p class="mt-2 text-xs text-faint">The code expires in 10 minutes.</p>
+            </div>
+          )}
           <p class="mt-4 text-sm text-muted">All set? Check <a href="/profile" class="font-semibold text-brand-600 hover:text-brand-700">your profile</a>, your companions appear after the first sync.</p>
         </>
       ) : (

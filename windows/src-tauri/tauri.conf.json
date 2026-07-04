@@ -31,7 +31,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' https://pets.thenightwatcher.online data: ; connect-src 'self' https://pets.thenightwatcher.online ipc: http://ipc.localhost ; style-src 'self' 'unsafe-inline'; script-src 'self'"
+      "csp": "default-src 'self'; img-src 'self' https://pets.thenightwatcher.online data: ; connect-src 'self' https://pets.thenightwatcher.online https://agentpet.thenightwatcher.online ipc: http://ipc.localhost ; style-src 'self' 'unsafe-inline'; script-src 'self'"
     }
   },
   "bundle": {

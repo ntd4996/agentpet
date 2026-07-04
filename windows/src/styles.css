@@ -825,3 +825,5 @@ body.pop {
 .cbar { width: 100%; background: #f5a623; border-radius: 4px 4px 0 0; min-height: 3px; }
 .cbar-lbl { font-size: 9px; opacity: .5; margin-top: 3px; }
 .ghelp { font-size: 11px; opacity: .55; margin-top: 8px; padding: 0 2px; line-height: 1.4; }
+.code-input { font-family: ui-monospace, Menlo, monospace; text-transform: uppercase; letter-spacing: .2em; width: 120px; text-align: center; }
+#sync-out .row, #sync-in .row { margin-bottom: 8px; gap: 8px; }

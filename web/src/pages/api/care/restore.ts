@@ -1,7 +1,9 @@
 import type { APIRoute } from "astro";
 import { getDB, ensureSchema } from "../../../lib/db";
+import { corsJson, OPTIONS } from "../../../lib/cors";
 
 export const prerender = false;
+export { OPTIONS };
 
 // The desktop app pulls the user's per-pet care stats with its device token, so a
 // fresh install (or a second machine) can restore each pet's level/progress
@@ -9,16 +11,14 @@ export const prerender = false;
 export const GET: APIRoute = async ({ request }) => {
   const auth = request.headers.get("authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-  if (!/^[0-9a-f]{64}$/.test(token)) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
-  }
+  if (!/^[0-9a-f]{64}$/.test(token)) return corsJson({ error: "unauthorized" }, 401);
 
   const db = getDB();
-  if (!db) return new Response(JSON.stringify({ error: "no db" }), { status: 500 });
+  if (!db) return corsJson({ error: "no db" }, 500);
   await ensureSchema(db);
 
   const device: any = await db.prepare("SELECT user_id FROM care_devices WHERE token=?").bind(token).first();
-  if (!device) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
+  if (!device) return corsJson({ error: "unauthorized" }, 401);
 
   const rows: any = await db
     .prepare("SELECT pet_id, name, xp, tokens, meals, streak, last_fed_at, week, achievements FROM care_pets WHERE user_id=?")
@@ -38,9 +38,7 @@ export const GET: APIRoute = async ({ request }) => {
     achievements: safeJson(r.achievements, []),
   }));
 
-  return new Response(JSON.stringify({ pets }), {
-    headers: { "content-type": "application/json", "cache-control": "no-store" },
-  });
+  return corsJson({ pets });
 };
 
 function safeJson(s: any, fallback: any) {

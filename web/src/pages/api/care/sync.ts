@@ -1,7 +1,9 @@
 import type { APIRoute } from "astro";
 import { getDB, ensureSchema } from "../../../lib/db";
+import { corsJson, OPTIONS } from "../../../lib/cors";
 
 export const prerender = false;
+export { OPTIONS };
 
 // The desktop app pushes per-pet care stats with its device token. Upserts:
 // stats only ever move forward (MAX) so an out-of-date device can't shrink a
@@ -9,30 +11,24 @@ export const prerender = false;
 export const POST: APIRoute = async ({ request }) => {
   const auth = request.headers.get("authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-  if (!/^[0-9a-f]{64}$/.test(token)) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
-  }
+  if (!/^[0-9a-f]{64}$/.test(token)) return corsJson({ error: "unauthorized" }, 401);
 
   const db = getDB();
-  if (!db) return new Response(JSON.stringify({ error: "no db" }), { status: 500 });
+  if (!db) return corsJson({ error: "no db" }, 500);
   await ensureSchema(db);
 
   const device: any = await db
     .prepare("SELECT user_id FROM care_devices WHERE token=?")
     .bind(token)
     .first();
-  if (!device) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
+  if (!device) return corsJson({ error: "unauthorized" }, 401);
 
   let pets: any[] = [];
   try {
     const body: any = await request.json();
     pets = Array.isArray(body?.pets) ? body.pets.slice(0, 50) : [];
   } catch {}
-  if (!pets.length) {
-    return new Response(JSON.stringify({ ok: true, synced: 0 }), {
-      headers: { "content-type": "application/json" },
-    });
-  }
+  if (!pets.length) return corsJson({ ok: true, synced: 0 });
 
   const now = Date.now();
   const int = (x: any) => Math.max(0, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(Number(x) || 0)));
@@ -89,7 +85,5 @@ export const POST: APIRoute = async ({ request }) => {
     );
   if (statements.length) await db.batch(statements);
 
-  return new Response(JSON.stringify({ ok: true, synced: statements.length }), {
-    headers: { "content-type": "application/json", "cache-control": "no-store" },
-  });
+  return corsJson({ ok: true, synced: statements.length });
 };

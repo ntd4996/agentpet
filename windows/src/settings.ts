@@ -10,6 +10,7 @@ import { LAYOUT_PRESETS, readBubbleConfig, type TokenItem, type BubbleToken } fr
 import { initDemo } from "./demo";
 import { slice, type Rect } from "./pet";
 import * as care from "./care";
+import * as sync from "./sync";
 
 // ------------------------------------------------------------- segmented ----
 // macOS-style segmented controls: <span class="seg" data-key data-default>.
@@ -39,7 +40,7 @@ function initTabs() {
       document.querySelectorAll<HTMLElement>(".page").forEach((p) => {
         p.classList.toggle("sel", p.dataset.page === b.dataset.tab);
       });
-      if (b.dataset.tab === "care") renderCare();
+      if (b.dataset.tab === "care") { renderCare(); renderSync(); }
     };
   });
 }
@@ -89,6 +90,48 @@ function renderCare() {
 // Refresh when the pet window feeds the pet, and periodically for the hunger clock.
 listen("care-updated", () => { if (document.querySelector('.page[data-page="care"].sel')) renderCare(); });
 setInterval(() => { if (document.querySelector('.page[data-page="care"].sel')) renderCare(); }, 30_000);
+
+// ---- web profile / leaderboard sign-in ----
+function renderSync() {
+  const out = document.getElementById("sync-out");
+  const inn = document.getElementById("sync-in");
+  const status = document.getElementById("sync-status");
+  if (!out || !inn) return;
+  const on = sync.signedIn();
+  out.style.display = on ? "none" : "";
+  inn.style.display = on ? "" : "none";
+  if (on && status) {
+    const who = sync.login();
+    status.textContent = who ? `${t("Connected as")} ${who}` : t("Connected to your profile");
+  }
+}
+function initSync() {
+  const codeEl = document.getElementById("sync-code") as HTMLInputElement | null;
+  const msg = document.getElementById("sync-msg");
+  document.getElementById("sync-connect")?.addEventListener("click", async () => {
+    const c = (codeEl?.value || "").trim().toUpperCase();
+    if (msg) msg.textContent = t("Connecting…");
+    const r = await sync.pair(c);
+    if (r.ok) {
+      if (msg) msg.textContent = "";
+      if (codeEl) codeEl.value = "";
+      renderSync(); renderCare();
+    } else if (msg) {
+      msg.textContent = r.error === "expired" ? t("Code expired, get a new one.") : t("Could not connect.");
+    }
+  });
+  document.getElementById("sync-restore")?.addEventListener("click", async () => {
+    const msg2 = document.getElementById("sync-msg2");
+    if (msg2) msg2.textContent = t("Restoring…");
+    const n = await sync.restore();
+    await sync.push();
+    if (msg2) msg2.textContent = n > 0 ? `${t("Restored")} ${n}` : t("Already up to date.");
+    renderCare();
+  });
+  document.getElementById("sync-disconnect")?.addEventListener("click", () => { sync.disconnect(); renderSync(); });
+  renderSync();
+}
+initSync();
 
 // ---------------------------------------------------------------- agents ----
 interface AgentInfo {

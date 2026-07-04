@@ -186,6 +186,26 @@
           </div>
           <div class="ghelp" id="t-care-help">Your pet eats the real tokens your agents burn and the sessions they finish. Feeding earns XP; it levels up through five stages.</div>
         </div>
+        <div class="group">
+          <div class="ghead" id="t-webprofile">Web profile</div>
+          <div class="gcard">
+            <div id="sync-out">
+              <div class="row"><span id="t-sync-desc">Show your companions on your web profile and the leaderboard.</span></div>
+              <div class="row"><button class="small-btn" id="sync-signin" data-url="https://agentpet.thenightwatcher.online/link-app"><span id="t-sync-signin">Sign in with GitHub</span></button></div>
+              <div class="row"><input id="sync-code" maxlength="6" placeholder="ABC123" class="code-input" /><button class="small-btn" id="sync-connect"><span id="t-sync-connect">Connect</span></button></div>
+              <div class="row dim" id="sync-msg"></div>
+            </div>
+            <div id="sync-in" style="display:none">
+              <div class="row"><span id="sync-status">Connected</span></div>
+              <div class="row">
+                <button class="small-btn" id="sync-restore"><span id="t-sync-restore">Restore</span></button>
+                <button class="small-btn" id="sync-disconnect"><span id="t-sync-disc">Disconnect</span></button>
+              </div>
+              <div class="row dim" id="sync-msg2"></div>
+            </div>
+          </div>
+          <div class="ghelp" id="t-sync-help">Fully optional. Everything works offline; connecting only adds the profile and leaderboard.</div>
+        </div>
       </div>
 
       <!-- =============================== BUBBLE ============================== -->
