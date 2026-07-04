@@ -20,13 +20,15 @@ static USAGE_OFFSETS: Mutex<Option<HashMap<String, u64>>> = Mutex::new(None);
 /// since the previous call for the same path. First call consumes the whole
 /// file. `None` if unreadable, `0` if no new usage lines appeared. Feeds the pet.
 pub fn new_usage_tokens(path: &str) -> Option<i64> {
+    // Hold the offsets lock across the whole read + advance, so two events for
+    // the same session firing at once can't both consume the same bytes (which
+    // would double-feed the pet). Reads are small deltas, so serialising is fine.
+    let mut guard = USAGE_OFFSETS.lock().ok()?;
+    let offsets = guard.get_or_insert_with(HashMap::new);
+
     let mut f = std::fs::File::open(path).ok()?;
     let size = f.seek(SeekFrom::End(0)).ok()?;
-    let mut start = USAGE_OFFSETS
-        .lock()
-        .ok()
-        .and_then(|g| g.as_ref().and_then(|m| m.get(path).copied()))
-        .unwrap_or(0);
+    let mut start = offsets.get(path).copied().unwrap_or(0);
     if start > size {
         start = 0; // file truncated/replaced: start over
     }
@@ -39,10 +41,7 @@ pub fn new_usage_tokens(path: &str) -> Option<i64> {
     // Consume up to the last full line; a partial trailing line stays for later.
     let nl = buf.iter().rposition(|&b| b == b'\n')?;
     let consumable = &buf[..=nl];
-    let new_off = start + consumable.len() as u64;
-    if let Ok(mut g) = USAGE_OFFSETS.lock() {
-        g.get_or_insert_with(HashMap::new).insert(path.to_string(), new_off);
-    }
+    offsets.insert(path.to_string(), start + consumable.len() as u64);
     let text = String::from_utf8_lossy(consumable);
     let mut total: i64 = 0;
     for line in text.lines() {
