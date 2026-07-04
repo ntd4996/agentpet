@@ -254,6 +254,7 @@ listen<AgentEventPayload>("agent-event", (e) => {
 });
 listen<string>("agent-end", (e) => {
   for (const k of [...lastState.keys()]) if (k.endsWith(`:${e.payload}`)) lastState.delete(k);
+  for (const k of [...sessionStarts.keys()]) if (k.endsWith(`:${e.payload}`)) sessionStarts.delete(k);
   store.remove(e.payload);
   render();
 });
