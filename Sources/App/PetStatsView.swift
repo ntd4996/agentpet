@@ -12,6 +12,7 @@ struct PetStatsView: View {
     @ObservedObject private var pet = PetController.shared
     @ObservedObject private var imagePets = ImagePetStore.shared
     @ObservedObject private var usage = OpenUsageClient.shared
+    @ObservedObject private var usageStore = ProjectUsageStore.shared
     @ObservedObject private var updater = UpdaterController.shared
     @State private var updateLabel: String?
     @State private var hoveredAchievement: Achievement?
@@ -43,6 +44,7 @@ struct PetStatsView: View {
             achievementBlock
             statGrid(state)
             trendBlock(state)
+            costBlock
             usageBlock
             if let last = state.lastFedAt {
                 HStack {
@@ -287,6 +289,23 @@ struct PetStatsView: View {
             }
             .frame(height: 48, alignment: .bottom)
         }
+    }
+
+    // MARK: - Cost
+
+    private var costBlock: some View {
+        HStack {
+            Text("Est. cost (Claude)")
+                .font(.system(size: 9, weight: .semibold)).tracking(0.8)
+                .foregroundStyle(.white.opacity(0.35))
+            Spacer()
+            Text(verbatim: "Today \(Self.costString(usageStore.todayCostUSD)) · Month \(Self.costString(usageStore.monthlyCostUSD))")
+                .font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.55))
+        }
+    }
+
+    private static func costString(_ usd: Double) -> String {
+        String(format: "$%.2f", usd)
     }
 
     // MARK: - Usage / limits
