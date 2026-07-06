@@ -199,4 +199,67 @@ final class SessionStoreTests: XCTestCase {
         let order = store.sorted.map(\.id)
         XCTAssertEqual(order, ["working", "waiting", "done"])
     }
+
+    // MARK: - pendingApproval gating
+
+    private func approvalEvent(
+        requestId: String? = "req-1", toolName: String? = "Bash", toolSummary: String? = "npm test",
+        session: String = "s1", at date: Date
+    ) -> AgentEvent {
+        AgentEvent(
+            sessionId: session, agentKind: .claude, eventName: "PreToolUse", project: "/proj",
+            approvalRequestId: requestId, toolName: toolName, toolSummary: toolSummary, timestamp: date
+        )
+    }
+
+    func testApplyWithApprovalRequestIdSetsWaitingStateAndPendingApproval() {
+        let store = SessionStore()
+        let s = store.apply(approvalEvent(at: t0), now: t0)
+        XCTAssertEqual(s?.state, .waiting, "a gated tool request must override the PreToolUse .working mapping")
+        XCTAssertEqual(s?.pendingApproval?.requestId, "req-1")
+        XCTAssertEqual(s?.pendingApproval?.toolName, "Bash")
+        XCTAssertEqual(s?.pendingApproval?.summary, "npm test")
+    }
+
+    func testSubsequentEventWithoutApprovalIdClearsPendingApproval() {
+        let store = SessionStore()
+        store.apply(approvalEvent(at: t0), now: t0)
+        let updated = store.apply(event("PostToolUse"), now: t0.addingTimeInterval(1))
+        XCTAssertNil(updated?.pendingApproval, "a later event with no approval request must clear a stale one")
+    }
+
+    func testSecondApprovalRequestOverwritesPendingApprovalNewestWins() {
+        let store = SessionStore()
+        store.apply(approvalEvent(requestId: "req-1", at: t0), now: t0)
+        let second = store.apply(
+            approvalEvent(requestId: "req-2", toolName: "Bash", toolSummary: "rm -rf tmp", at: t0.addingTimeInterval(1)),
+            now: t0.addingTimeInterval(1)
+        )
+        XCTAssertEqual(second?.pendingApproval?.requestId, "req-2", "newest pending approval wins, it does not queue")
+        XCTAssertEqual(second?.pendingApproval?.summary, "rm -rf tmp")
+    }
+
+    func testResolveApprovalClearsPendingApprovalAndSetsWorkingWhenIdMatches() {
+        let store = SessionStore()
+        store.apply(approvalEvent(requestId: "req-1", at: t0), now: t0)
+        let resolved = store.resolveApproval(id: "s1", requestId: "req-1")
+        XCTAssertTrue(resolved)
+        XCTAssertNil(store.session(id: "s1")?.pendingApproval)
+        XCTAssertEqual(store.session(id: "s1")?.state, .working)
+    }
+
+    func testResolveApprovalNoOpsWhenRequestIdMismatches() {
+        let store = SessionStore()
+        store.apply(approvalEvent(requestId: "req-1", at: t0), now: t0)
+        let resolved = store.resolveApproval(id: "s1", requestId: "wrong-id")
+        XCTAssertFalse(resolved)
+        XCTAssertEqual(store.session(id: "s1")?.pendingApproval?.requestId, "req-1",
+                       "mismatched requestId must not clear an unrelated/newer pending approval")
+        XCTAssertEqual(store.session(id: "s1")?.state, .waiting)
+    }
+
+    func testResolveApprovalNoOpsWhenSessionMissing() {
+        let store = SessionStore()
+        XCTAssertFalse(store.resolveApproval(id: "missing", requestId: "req-1"))
+    }
 }

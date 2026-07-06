@@ -21,15 +21,61 @@ public enum EventSender {
     }
 
     static func writeToSocket(_ data: Data, path: String) -> Bool {
-        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
-        guard fd >= 0 else { return false }
+        guard let fd = connectedSocket(path: path) else { return false }
         defer { close(fd) }
+        return writeAll(data, fd: fd)
+    }
+
+    static func writeToQueue(_ data: Data, dir: String) {
+        let fm = FileManager.default
+        try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        let name = "\(Int(Date().timeIntervalSince1970))-\(UUID().uuidString).json"
+        let full = (dir as NSString).appendingPathComponent(name)
+        try? data.write(to: URL(fileURLWithPath: full))
+    }
+
+    /// Sends an approval-gated event and blocks for the daemon's decision,
+    /// falling back to `.ask` on connect/write/timeout/decode failure.
+    public static func sendAndAwaitReply(
+        _ event: AgentEvent, socketPath: String, timeout: TimeInterval = 25
+    ) -> ApprovalDecision {
+        guard let line = try? encodeLine(event), let fd = connectedSocket(path: socketPath) else {
+            return .ask
+        }
+        defer { close(fd) }
+        guard writeAll(line, fd: fd) else { return .ask }
+
+        var tv = timeval(
+            tv_sec: Int(timeout), tv_usec: Int32(timeout.truncatingRemainder(dividingBy: 1) * 1_000_000)
+        )
+        guard setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size)) == 0 else {
+            return .ask
+        }
+
+        let deadline = Date().addingTimeInterval(timeout)
+        var buffer = Data()
+        var chunk = [UInt8](repeating: 0, count: 256)
+        while !buffer.contains(0x0A) {
+            guard Date() < deadline else { return .ask }
+            let n = read(fd, &chunk, chunk.count)
+            if n <= 0 { return .ask }
+            buffer.append(contentsOf: chunk[0..<n])
+        }
+        guard let newlineIndex = buffer.firstIndex(of: 0x0A),
+              let reply = try? EventCoding.decoder.decode(ApprovalReply.self, from: Data(buffer[..<newlineIndex]))
+        else { return .ask }
+        return reply.decision
+    }
+
+    private static func connectedSocket(path: String) -> Int32? {
+        let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+        guard fd >= 0 else { return nil }
 
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
         let bytes = Array(path.utf8)
         let capacity = MemoryLayout.size(ofValue: addr.sun_path)
-        guard bytes.count < capacity else { return false }
+        guard bytes.count < capacity else { close(fd); return nil }
         withUnsafeMutablePointer(to: &addr.sun_path) { tuplePtr in
             tuplePtr.withMemoryRebound(to: CChar.self, capacity: capacity) { dst in
                 for (i, b) in bytes.enumerated() { dst[i] = CChar(bitPattern: b) }
@@ -40,9 +86,12 @@ public enum EventSender {
         let connected = withUnsafePointer(to: &addr) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, size) }
         }
-        guard connected == 0 else { return false }
+        guard connected == 0 else { close(fd); return nil }
+        return fd
+    }
 
-        return data.withUnsafeBytes { raw -> Bool in
+    static func writeAll(_ data: Data, fd: Int32) -> Bool {
+        data.withUnsafeBytes { raw -> Bool in
             var offset = 0
             while offset < raw.count {
                 let n = write(fd, raw.baseAddress!.advanced(by: offset), raw.count - offset)
@@ -52,12 +101,8 @@ public enum EventSender {
             return true
         }
     }
+}
 
-    static func writeToQueue(_ data: Data, dir: String) {
-        let fm = FileManager.default
-        try? fm.createDirectory(atPath: dir, withIntermediateDirectories: true)
-        let name = "\(Int(Date().timeIntervalSince1970))-\(UUID().uuidString).json"
-        let full = (dir as NSString).appendingPathComponent(name)
-        try? data.write(to: URL(fileURLWithPath: full))
-    }
+private struct ApprovalReply: Decodable {
+    let decision: ApprovalDecision
 }

@@ -19,6 +19,13 @@ enum HookCLI {
             ))
             exit(2)
         }
+        // Approval-gated events must reply with the hook's permission decision on
+        // stdout so Claude Code can allow/deny the tool call synchronously.
+        if event.approvalRequestId != nil {
+            let decision = EventSender.sendAndAwaitReply(event, socketPath: AgentPetPaths.socketPath)
+            print(ApprovalHookResponse.json(for: decision))
+            exit(0)
+        }
         EventSender.send(event, socketPath: AgentPetPaths.socketPath, queueDir: AgentPetPaths.queueDir)
         exit(0)
     }

@@ -716,10 +716,19 @@ private struct AgentRow: View {
     /// text too, so "waiting for input" reads as urgent at a glance.
     private static let waitingColor = Color(red: 0xF5 / 255.0, green: 0x9E / 255.0, blue: 0x0B / 255.0)
 
+    @ViewBuilder
     var body: some View {
+        if let pending = session.pendingApproval {
+            PendingApprovalRow(session: session, pending: pending, chatStyle: chatStyle)
+        } else {
+            rowBody
+        }
+    }
+
+    private var rowBody: some View {
         let visible = settings.effectiveLayout.tokens.filter { $0.isVisible && tokenHasValue($0.token) }
 
-        HStack(alignment: .center, spacing: 4) {
+        return HStack(alignment: .center, spacing: 4) {
             if visible.contains(where: { $0.token == .dot }) {
                 tokenView(for: .dot)
             }
@@ -895,6 +904,63 @@ private struct AgentRow: View {
         let m = s / 60
         if m < 60  { return "\(m)m" }
         return "\(m / 60)h \(m % 60)m"
+    }
+}
+
+// MARK: - Pending approval row
+
+/// Row shown instead of the normal status line when a session has a gated
+/// tool call awaiting the user's allow/deny decision.
+private struct PendingApprovalRow: View {
+    let session: AgentSession
+    let pending: PendingApproval
+    var chatStyle: Bool = false
+    @ObservedObject private var settings = BubbleSettings.shared
+
+    private static let waitingColor = Color(red: 0xF5 / 255.0, green: 0x9E / 255.0, blue: 0x0B / 255.0)
+    private static let allowColor = Color(red: 0.13, green: 0.77, blue: 0.37)
+    private static let denyColor = Color(red: 0.86, green: 0.23, blue: 0.23)
+
+    private var rowMaxWidth: CGFloat {
+        chatStyle ? AgentBubble.petContentMaxWidth : AgentBubble.contentMaxWidth
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 6) {
+            Circle().fill(Self.waitingColor).frame(width: 8, height: 8)
+            Text("\(pending.toolName): \(pending.summary)")
+                .font(.system(size: settings.fontSize.primaryPt, weight: .medium))
+                .foregroundStyle(textColor(0.82))
+                .lineLimit(1)
+                .truncationMode(.tail)
+            decisionButton(title: NSLocalizedString("Allow", comment: "Approve a pending tool call"),
+                            tint: Self.allowColor, decision: .allow)
+            decisionButton(title: NSLocalizedString("Deny", comment: "Reject a pending tool call"),
+                            tint: Self.denyColor, decision: .deny)
+        }
+        .frame(maxWidth: rowMaxWidth, alignment: .leading)
+    }
+
+    private func decisionButton(title: String, tint: Color, decision: ApprovalDecision) -> some View {
+        Button {
+            AppDaemon.shared.resolveApproval(sessionId: session.id, requestId: pending.requestId, decision: decision)
+        } label: {
+            Text(title)
+                .font(.system(size: settings.fontSize.secondaryPt, weight: .semibold))
+                .foregroundStyle(tint)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Capsule().fill(tint.opacity(0.12)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func textColor(_ opacity: Double) -> Color {
+        switch settings.theme {
+        case .light:  return .black.opacity(opacity)
+        case .dark:   return .white.opacity(opacity)
+        case .system: return Color.primary.opacity(opacity)
+        }
     }
 }
 

@@ -56,6 +56,15 @@ final class AppDaemon: ObservableObject {
         refresh()
     }
 
+    /// Resolves a pending approval from the bubble UI: writes the decision to
+    /// the hook and optimistically clears the pending state in the store.
+    func resolveApproval(sessionId: String, requestId: String, decision: ApprovalDecision) {
+        _ = PendingApprovalRegistry.shared.resolve(requestId: requestId, decision: decision)
+        if store.resolveApproval(id: sessionId, requestId: requestId) {
+            refresh()
+        }
+    }
+
     private func ingest(_ event: AgentEvent) {
         let before = store.session(id: event.sessionId)?.state
         guard let updated = store.apply(event, now: Date()) else {

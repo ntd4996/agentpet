@@ -116,16 +116,34 @@ public final class EventSocketServer: @unchecked Sendable {
         }
     }
 
+    // Assumes one event per connection: if the first line decodes to an
+    // approval request, its fd is handed off to the registry (not closed here).
     private func handleClient(_ fd: Int32, onEvent: (AgentEvent) -> Void) {
-        defer { close(fd) }
         var buffer = Data()
         var chunk = [UInt8](repeating: 0, count: 4096)
-        while true {
-            let n = read(fd, &chunk, chunk.count)
-            if n <= 0 { break }
-            buffer.append(contentsOf: chunk[0..<n])
+        while buffer.firstIndex(of: 0x0A) == nil {
+            guard Self.readMore(fd: fd, into: &buffer, chunk: &chunk) else { break }
         }
+        if let newlineIndex = buffer.firstIndex(of: 0x0A) {
+            let line = buffer[..<newlineIndex]
+            if let event = try? EventCoding.decoder.decode(AgentEvent.self, from: Data(line)),
+               let requestId = event.approvalRequestId {
+                PendingApprovalRegistry.shared.register(requestId: requestId, fd: fd)
+                onEvent(event)
+                return
+            }
+        }
+        while Self.readMore(fd: fd, into: &buffer, chunk: &chunk) {}
+        close(fd)
         Self.decodeLines(buffer, onEvent: onEvent)
+    }
+
+    /// Reads one chunk from `fd` into `buffer`. Returns `false` at EOF/error.
+    private static func readMore(fd: Int32, into buffer: inout Data, chunk: inout [UInt8]) -> Bool {
+        let n = read(fd, &chunk, chunk.count)
+        guard n > 0 else { return false }
+        buffer.append(contentsOf: chunk[0..<n])
+        return true
     }
 
     /// Drains a directory of queued event files written while the daemon was

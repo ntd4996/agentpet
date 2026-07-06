@@ -86,4 +86,57 @@ final class ClaudeHookPayloadTests: XCTestCase {
         XCTAssertEqual(event?.agentKind, .gemini)
         XCTAssertTrue(ActivityTheme.chef.running.contains(event?.message ?? ""), "got \(event?.message ?? "nil")")
     }
+
+    // MARK: - approval gating (PreToolUse + Bash)
+
+    func testPreToolUseBashPopulatesApprovalFields() {
+        let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"npm test"}}"#
+        let event = payload(json)?.makeEvent(now: now)
+        XCTAssertNotNil(event?.approvalRequestId, "must generate a request id for a gated tool")
+        XCTAssertEqual(event?.toolName, "Bash")
+        XCTAssertEqual(event?.toolSummary, "npm test")
+    }
+
+    func testPreToolUseBashTruncatesSummaryTo80Characters() {
+        let longCommand = String(repeating: "a", count: 200)
+        let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"\#(longCommand)"}}"#
+        let event = payload(json)?.makeEvent(now: now)
+        XCTAssertEqual(event?.toolSummary?.count, 80, "summary must be truncated to 80 chars")
+    }
+
+    func testPreToolUseBashWithNoCommandFallsBackToToolName() {
+        let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"PreToolUse","tool_name":"Bash"}"#
+        let event = payload(json)?.makeEvent(now: now)
+        XCTAssertEqual(event?.toolSummary, "Bash", "no command in tool_input -> summary falls back to tool name")
+    }
+
+    func testPreToolUseNonGatedToolLeavesApprovalFieldsNil() {
+        let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/x"}}"#
+        let event = payload(json)?.makeEvent(now: now)
+        XCTAssertNil(event?.approvalRequestId, "Read is not in the gated tool whitelist")
+        XCTAssertNil(event?.toolName)
+        XCTAssertNil(event?.toolSummary)
+    }
+
+    func testNonPreToolUseEventLeavesApprovalFieldsNilEvenForBash() {
+        let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"Stop","tool_name":"Bash","tool_input":{"command":"npm test"}}"#
+        let event = payload(json)?.makeEvent(now: now)
+        XCTAssertNil(event?.approvalRequestId, "only PreToolUse should ever trigger gating")
+        XCTAssertNil(event?.toolName)
+        XCTAssertNil(event?.toolSummary)
+    }
+
+    func testPreToolUseBashForNonClaudeKindLeavesApprovalFieldsNil() {
+        let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"npm test"}}"#
+
+        let codexEvent = payload(json)?.makeEvent(now: now, kind: .codex)
+        XCTAssertNil(codexEvent?.approvalRequestId, "approval gating is a Claude-only contract")
+        XCTAssertNil(codexEvent?.toolName)
+        XCTAssertNil(codexEvent?.toolSummary)
+
+        let droidEvent = payload(json)?.makeEvent(now: now, kind: .droid)
+        XCTAssertNil(droidEvent?.approvalRequestId, "approval gating is a Claude-only contract")
+        XCTAssertNil(droidEvent?.toolName)
+        XCTAssertNil(droidEvent?.toolSummary)
+    }
 }

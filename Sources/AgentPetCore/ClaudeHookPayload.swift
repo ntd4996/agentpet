@@ -27,6 +27,9 @@ public struct ClaudeHookPayload: Decodable, Equatable {
         case agentId = "agent_id"
     }
 
+    /// Tools whose `PreToolUse` event gates the session on a user decision.
+    private static let gatedTools: Set<String> = ["Bash"]
+
     public static func decode(from data: Data) -> ClaudeHookPayload? {
         try? JSONDecoder().decode(ClaudeHookPayload.self, from: data)
     }
@@ -42,10 +45,22 @@ public struct ClaudeHookPayload: Decodable, Equatable {
             toolInput: toolInput,
             explicitMessage: message
         ) ?? toolName.map { "Using \($0)" }
+
+        var approvalRequestId: String?
+        var approvalToolName: String?
+        var approvalToolSummary: String?
+        if kind == .claude, hookEventName == "PreToolUse", let toolName, Self.gatedTools.contains(toolName) {
+            approvalRequestId = UUID().uuidString
+            approvalToolName = toolName
+            approvalToolSummary = String((toolInput?.command ?? toolName).prefix(80))
+        }
+
         return AgentEvent(
             sessionId: sessionId, agentKind: kind, eventName: hookEventName,
             project: cwd, message: context, model: model?.displayName,
-            transcriptPath: transcriptPath, subagentId: agentId, timestamp: now
+            transcriptPath: transcriptPath, subagentId: agentId,
+            approvalRequestId: approvalRequestId, toolName: approvalToolName,
+            toolSummary: approvalToolSummary, timestamp: now
         )
     }
 }

@@ -17,6 +17,15 @@ public struct AgentEvent: Codable, Sendable, Equatable {
     public var transcriptPath: String?
     /// Subagent identifier from a `SubagentStop` event (e.g. `"agent-abc123"`).
     public var subagentId: String?
+    /// Non-nil marks this event as a gated `PreToolUse` request: the daemon
+    /// is holding the hook's connection open until the user approves/denies.
+    public var approvalRequestId: String?
+    /// Name of the tool awaiting approval (e.g. `"Bash"`). Set alongside
+    /// `approvalRequestId`.
+    public var toolName: String?
+    /// Human-readable summary of the pending tool call (e.g. the shell
+    /// command), truncated for display. Set alongside `approvalRequestId`.
+    public var toolSummary: String?
     public var timestamp: Date
 
     public init(
@@ -28,6 +37,9 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         model: String? = nil,
         transcriptPath: String? = nil,
         subagentId: String? = nil,
+        approvalRequestId: String? = nil,
+        toolName: String? = nil,
+        toolSummary: String? = nil,
         timestamp: Date
     ) {
         self.sessionId = sessionId
@@ -38,6 +50,9 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         self.model = model
         self.transcriptPath = transcriptPath
         self.subagentId = subagentId
+        self.approvalRequestId = approvalRequestId
+        self.toolName = toolName
+        self.toolSummary = toolSummary
         self.timestamp = timestamp
     }
 }
