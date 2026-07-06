@@ -28,9 +28,12 @@ public final class PendingApprovalRegistry: @unchecked Sendable {
 
     public init() {}
 
-    /// Registers `fd` for `requestId`, auto-resolving to `.ask` after
-    /// `timeout` seconds if no manual `resolve` call arrives first.
-    public func register(requestId: String, fd: Int32, timeout: TimeInterval = 25) {
+    /// Auto-resolves to `.ask` after `timeout` — kept shorter than the CLI's
+    /// read timeout so the reply lands while the peer is still reading.
+    public func register(requestId: String, fd: Int32, timeout: TimeInterval = 10) {
+        // SO_NOSIGPIPE: a write after the CLI died must not SIGPIPE the daemon.
+        var on: Int32 = 1
+        _ = setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
         queue.async { self.fds[requestId] = fd }
         queue.asyncAfter(deadline: .now() + timeout) { [self] in
             _resolveLocked(requestId: requestId, decision: .ask)

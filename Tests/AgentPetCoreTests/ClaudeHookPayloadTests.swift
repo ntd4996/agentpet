@@ -91,7 +91,7 @@ final class ClaudeHookPayloadTests: XCTestCase {
 
     func testPreToolUseBashPopulatesApprovalFields() {
         let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"npm test"}}"#
-        let event = payload(json)?.makeEvent(now: now)
+        let event = payload(json)?.makeEvent(now: now, gatedTools: ["Bash"])
         XCTAssertNotNil(event?.approvalRequestId, "must generate a request id for a gated tool")
         XCTAssertEqual(event?.toolName, "Bash")
         XCTAssertEqual(event?.toolSummary, "npm test")
@@ -100,27 +100,35 @@ final class ClaudeHookPayloadTests: XCTestCase {
     func testPreToolUseBashTruncatesSummaryTo80Characters() {
         let longCommand = String(repeating: "a", count: 200)
         let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"\#(longCommand)"}}"#
-        let event = payload(json)?.makeEvent(now: now)
+        let event = payload(json)?.makeEvent(now: now, gatedTools: ["Bash"])
         XCTAssertEqual(event?.toolSummary?.count, 80, "summary must be truncated to 80 chars")
     }
 
     func testPreToolUseBashWithNoCommandFallsBackToToolName() {
         let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"PreToolUse","tool_name":"Bash"}"#
-        let event = payload(json)?.makeEvent(now: now)
+        let event = payload(json)?.makeEvent(now: now, gatedTools: ["Bash"])
         XCTAssertEqual(event?.toolSummary, "Bash", "no command in tool_input -> summary falls back to tool name")
     }
 
     func testPreToolUseNonGatedToolLeavesApprovalFieldsNil() {
         let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"/x"}}"#
-        let event = payload(json)?.makeEvent(now: now)
+        let event = payload(json)?.makeEvent(now: now, gatedTools: ["Bash"])
         XCTAssertNil(event?.approvalRequestId, "Read is not in the gated tool whitelist")
+        XCTAssertNil(event?.toolName)
+        XCTAssertNil(event?.toolSummary)
+    }
+
+    func testEmptyGatedToolsDisablesApprovalEvenForBash() {
+        let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"npm test"}}"#
+        let event = payload(json)?.makeEvent(now: now, gatedTools: [])
+        XCTAssertNil(event?.approvalRequestId, "empty whitelist means the gate is off")
         XCTAssertNil(event?.toolName)
         XCTAssertNil(event?.toolSummary)
     }
 
     func testNonPreToolUseEventLeavesApprovalFieldsNilEvenForBash() {
         let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"Stop","tool_name":"Bash","tool_input":{"command":"npm test"}}"#
-        let event = payload(json)?.makeEvent(now: now)
+        let event = payload(json)?.makeEvent(now: now, gatedTools: ["Bash"])
         XCTAssertNil(event?.approvalRequestId, "only PreToolUse should ever trigger gating")
         XCTAssertNil(event?.toolName)
         XCTAssertNil(event?.toolSummary)
@@ -129,14 +137,37 @@ final class ClaudeHookPayloadTests: XCTestCase {
     func testPreToolUseBashForNonClaudeKindLeavesApprovalFieldsNil() {
         let json = #"{"session_id":"s","cwd":"/proj","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"npm test"}}"#
 
-        let codexEvent = payload(json)?.makeEvent(now: now, kind: .codex)
+        let codexEvent = payload(json)?.makeEvent(now: now, kind: .codex, gatedTools: ["Bash"])
         XCTAssertNil(codexEvent?.approvalRequestId, "approval gating is a Claude-only contract")
         XCTAssertNil(codexEvent?.toolName)
         XCTAssertNil(codexEvent?.toolSummary)
 
-        let droidEvent = payload(json)?.makeEvent(now: now, kind: .droid)
+        let droidEvent = payload(json)?.makeEvent(now: now, kind: .droid, gatedTools: ["Bash"])
         XCTAssertNil(droidEvent?.approvalRequestId, "approval gating is a Claude-only contract")
         XCTAssertNil(droidEvent?.toolName)
         XCTAssertNil(droidEvent?.toolSummary)
+    }
+}
+
+// MARK: - ApprovalGateConfig (opt-in whitelist file)
+
+final class ApprovalGateConfigTests: XCTestCase {
+    func testMissingConfigMeansGateOff() {
+        let missing = NSTemporaryDirectory() + "agentpet-missing-\(UUID().uuidString).json"
+        XCTAssertEqual(ApprovalGateConfig.gatedTools(path: missing), [])
+    }
+
+    func testValidConfigEnablesListedTools() throws {
+        let path = NSTemporaryDirectory() + "agentpet-gate-\(UUID().uuidString).json"
+        try #"{"tools":["Bash","Write"]}"#.write(toFile: path, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        XCTAssertEqual(ApprovalGateConfig.gatedTools(path: path), ["Bash", "Write"])
+    }
+
+    func testMalformedConfigMeansGateOff() throws {
+        let path = NSTemporaryDirectory() + "agentpet-gate-\(UUID().uuidString).json"
+        try "not json".write(toFile: path, atomically: true, encoding: .utf8)
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        XCTAssertEqual(ApprovalGateConfig.gatedTools(path: path), [])
     }
 }

@@ -26,3 +26,4 @@ landing/node_modules/
 
 # Claude Code local tooling
 .claude/
+.aurora-cli/

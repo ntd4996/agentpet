@@ -27,16 +27,16 @@ public struct ClaudeHookPayload: Decodable, Equatable {
         case agentId = "agent_id"
     }
 
-    /// Tools whose `PreToolUse` event gates the session on a user decision.
-    private static let gatedTools: Set<String> = ["Bash"]
-
     public static func decode(from data: Data) -> ClaudeHookPayload? {
         try? JSONDecoder().decode(ClaudeHookPayload.self, from: data)
     }
 
-    /// Builds an `AgentEvent` from the payload, or `nil` if the essential
-    /// fields (session id and event name) are missing.
-    public func makeEvent(now: Date, kind: AgentKind = .claude) -> AgentEvent? {
+    /// Builds an `AgentEvent`, or `nil` if session id / event name are missing.
+    /// `gatedTools` defaults to the opt-in config — empty means the gate is off.
+    public func makeEvent(
+        now: Date, kind: AgentKind = .claude,
+        gatedTools: Set<String> = ApprovalGateConfig.gatedTools()
+    ) -> AgentEvent? {
         guard let sessionId, let hookEventName else { return nil }
         let context = ActivityFormatter.activityMessage(
             eventName: hookEventName,
@@ -49,7 +49,7 @@ public struct ClaudeHookPayload: Decodable, Equatable {
         var approvalRequestId: String?
         var approvalToolName: String?
         var approvalToolSummary: String?
-        if kind == .claude, hookEventName == "PreToolUse", let toolName, Self.gatedTools.contains(toolName) {
+        if kind == .claude, hookEventName == "PreToolUse", let toolName, gatedTools.contains(toolName) {
             approvalRequestId = UUID().uuidString
             approvalToolName = toolName
             approvalToolSummary = String((toolInput?.command ?? toolName).prefix(80))

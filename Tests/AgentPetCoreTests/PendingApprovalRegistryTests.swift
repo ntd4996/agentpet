@@ -80,4 +80,18 @@ final class PendingApprovalRegistryTests: XCTestCase {
         let output = readAll(readFD)
         XCTAssertEqual(output, "{\"decision\":\"allow\"}\n")
     }
+
+    func testResolveAfterPeerClosedDoesNotCrash() {
+        let registry = PendingApprovalRegistry()
+        var fds: [Int32] = [0, 0]
+        fds.withUnsafeMutableBufferPointer { _ = socketpair(AF_UNIX, SOCK_STREAM, 0, $0.baseAddress) }
+
+        registry.register(requestId: "req-gone", fd: fds[1])
+        close(fds[0])   // peer (the CLI side) goes away before the decision
+
+        // Without SO_NOSIGPIPE this write raises SIGPIPE and kills the process.
+        XCTAssertTrue(registry.resolve(requestId: "req-gone", decision: .ask),
+                      "resolve still consumes the registration even when the write fails")
+        XCTAssertFalse(registry.resolve(requestId: "req-gone", decision: .ask))
+    }
 }

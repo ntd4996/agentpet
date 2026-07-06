@@ -37,7 +37,7 @@ public enum EventSender {
     /// Sends an approval-gated event and blocks for the daemon's decision,
     /// falling back to `.ask` on connect/write/timeout/decode failure.
     public static func sendAndAwaitReply(
-        _ event: AgentEvent, socketPath: String, timeout: TimeInterval = 25
+        _ event: AgentEvent, socketPath: String, timeout: TimeInterval = 12
     ) -> ApprovalDecision {
         guard let line = try? encodeLine(event), let fd = connectedSocket(path: socketPath) else {
             return .ask
@@ -87,6 +87,9 @@ public enum EventSender {
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, size) }
         }
         guard connected == 0 else { close(fd); return nil }
+        // SO_NOSIGPIPE: a write after the daemon died must not SIGPIPE the CLI.
+        var on: Int32 = 1
+        _ = setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
         return fd
     }
 

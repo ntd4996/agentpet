@@ -21,6 +21,9 @@ final class AppDaemon: ObservableObject {
     private var pruneTimer: Timer?
 
     func start() {
+        // The approval reply can race the CLI closing its socket — a stray
+        // write must return EPIPE, not SIGPIPE-kill the whole app.
+        signal(SIGPIPE, SIG_IGN)
         try? FileManager.default.createDirectory(
             atPath: AgentPetPaths.baseDir, withIntermediateDirectories: true
         )
