@@ -6,8 +6,8 @@ final class ProjectUsageStoreCostTests: XCTestCase {
     private let storageKey = "agentpet.projectUsage"
     private let dirtyKey = "agentpet.projectUsage.dirty"
 
-    private var savedStorage: Any?
-    private var savedDirty: Any?
+    nonisolated(unsafe) private var savedStorage: Any?
+    nonisolated(unsafe) private var savedDirty: Any?
 
     override func setUp() {
         super.setUp()
