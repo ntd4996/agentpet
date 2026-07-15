@@ -7,6 +7,7 @@ interface Props { title?: string; description?: string; active?: string; }
 const { title = "AgentPet", description = "Adopt, build, and share pixel companions for your AI coding agents.", active = "" } = Astro.props;
 const nav = [
   { href: "/gallery", label: "Gallery", key: "gallery" },
+  { href: "/arena", label: "Arena", key: "arena" },
   { href: "/collections", label: "Collections", key: "collections" },
   { href: "/leaderboard", label: "Leaderboard", key: "leaderboard" },
   { href: "/requests", label: "Requests", key: "requests" },
@@ -16,7 +17,7 @@ const nav = [
   { href: "/docs", label: "Docs", key: "docs" },
 ];
 // Keep the inline bar short (fits long Vietnamese labels); the rest go under "More".
-const PRIMARY = ["gallery", "collections", "leaderboard", "make", "docs"];
+const PRIMARY = ["gallery", "arena", "leaderboard", "make", "docs"];
 const primaryNav = nav.filter((n) => PRIMARY.includes(n.key));
 const moreNav = nav
   .filter((n) => !PRIMARY.includes(n.key))

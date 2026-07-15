@@ -53,6 +53,14 @@ export async function ensureSchema(db: any): Promise<void> {
     db.prepare("CREATE TABLE IF NOT EXISTS usage_daily (user_id INTEGER NOT NULL, project_id TEXT NOT NULL, project_name TEXT NOT NULL, agent TEXT NOT NULL, day TEXT NOT NULL, tokens INTEGER NOT NULL DEFAULT 0, sessions INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (user_id, project_id, agent, day))"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_usage_user_day ON usage_daily (user_id, day)"),
     db.prepare("CREATE INDEX IF NOT EXISTS idx_usage_day ON usage_daily (day)"),
+    // Arena: the skill-based auto-battler. Runs are server-authoritative; team
+    // snapshots become async ghost opponents; stats power the arena leaderboard.
+    db.prepare("CREATE TABLE IF NOT EXISTS arena_runs (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'active', turn INTEGER NOT NULL, tokens INTEGER NOT NULL, pins INTEGER NOT NULL, wins INTEGER NOT NULL, team TEXT NOT NULL, shop TEXT NOT NULL, rerolls INTEGER NOT NULL DEFAULT 0, seed TEXT NOT NULL, day TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_arena_runs_user ON arena_runs (user_id, status)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_arena_runs_day ON arena_runs (user_id, day)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS arena_snapshots (id TEXT PRIMARY KEY, user_id INTEGER NOT NULL, login TEXT, turn INTEGER NOT NULL, wins INTEGER NOT NULL, team TEXT NOT NULL, created_at INTEGER NOT NULL)"),
+    db.prepare("CREATE INDEX IF NOT EXISTS idx_arena_snapshots ON arena_snapshots (turn, wins)"),
+    db.prepare("CREATE TABLE IF NOT EXISTS arena_stats (user_id INTEGER PRIMARY KEY, login TEXT, crowns INTEGER NOT NULL DEFAULT 0, runs INTEGER NOT NULL DEFAULT 0, best_wins INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL DEFAULT 0)"),
   ]);
   // care_pets predates the thumb/week columns in prod; additive + idempotent.
   try { await db.prepare("ALTER TABLE care_pets ADD COLUMN thumb TEXT").run(); } catch {}

@@ -1,0 +1,386 @@
+---
+import Base from "../layouts/Base.astro";
+import Icon from "../components/Icon.astro";
+import { currentUser } from "../lib/admin";
+import { UNITS, KIND_META, RULES, abilityText } from "../lib/arena/units";
+
+export const prerender = false;
+const user = await currentUser(Astro.cookies);
+const roster = UNITS.filter((u) => !u.token);
+---
+<Base title="Arena · AgentPet" description="A fair, brainy auto-battler: recruit a squad, train it with tokens, and outsmart other trainers' ghost teams." active="arena">
+  <section class="px-4 pt-8 pb-16">
+    <div class="mx-auto max-w-5xl">
+
+      <!-- ============================== LOBBY ============================== -->
+      <div id="v-lobby">
+        <div class="flex items-center gap-3">
+          <div class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Icon name="bolt" class="h-6 w-6" /></div>
+          <div>
+            <h1 class="font-display text-3xl font-bold text-ink">Arena</h1>
+            <p class="text-muted">Everyone starts equal. Recruit, train with tokens, position smartly, and out-think rival trainers' ghost squads.</p>
+          </div>
+        </div>
+
+        {!user ? (
+          <div class="card mt-8 p-8 text-center">
+            <p class="text-muted">Sign in with GitHub to enter the Arena. Runs are free.</p>
+            <a href="/api/auth/login?returnTo=/arena" class="btn-primary mt-5 !px-6 !py-3"><Icon name="users" class="h-5 w-5" /> Sign in with GitHub</a>
+          </div>
+        ) : (
+          <div class="mt-6 grid gap-5 lg:grid-cols-[1.2fr_1fr]">
+            <div class="card p-6">
+              <div class="flex flex-wrap items-center gap-3">
+                <div class="min-w-0">
+                  <div class="font-display text-lg font-bold text-ink">Ready, <span id="lb-login">trainer</span>?</div>
+                  <div class="text-sm text-muted"><span id="lb-title" class="font-semibold text-brand-600">Rookie</span> · <span id="lb-runs">0/5</span> runs today · <span id="lb-crowns">0</span> 👑</div>
+                </div>
+                <button id="btn-start" class="btn-primary ml-auto !px-6 !py-3">Start a run</button>
+              </div>
+              <div class="mt-4 rounded-2xl bg-brand-50/60 p-4 text-sm text-muted">
+                <b class="text-ink">How a run works:</b> each round you get <b class="text-ink">{RULES.income} tokens</b> (up to {RULES.carryCap} carry over). Recruit pets ({RULES.buyCost}), train them up (L2 = {RULES.trainCost[1]}, L3 = {RULES.trainCost[2]}), reroll the shop ({RULES.rerollCost}), order your line, then battle a ghost of another trainer's squad at the same round. Lose a 🔋 per defeat, out at 0. Win <b class="text-ink">{RULES.crownsToWin} battles</b> to take the crown 👑. Two of a kind wakes a <b class="text-ink">kind synergy</b>.
+              </div>
+              <div id="lb-msg" class="mt-3 text-sm text-rose-600"></div>
+            </div>
+            <div class="card p-6">
+              <h2 class="font-display text-lg font-bold text-ink">Crown holders</h2>
+              <div id="lb-board" class="mt-3 space-y-2 text-sm"><div class="text-faint">Loading…</div></div>
+            </div>
+          </div>
+        )}
+
+        <h2 class="mt-10 font-display text-xl font-bold text-ink">The roster</h2>
+        <p class="mt-1 text-sm text-muted">18 pets, 6 kinds, 3 tiers. Field two of a kind to wake their synergy.</p>
+        <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {roster.map((u) => (
+            <div class="card p-3 text-center">
+              <img src={`/arena/${u.id}.png`} alt={u.name} class="pixel-art mx-auto h-16 w-16" loading="lazy" />
+              <div class="mt-1 font-display font-bold text-ink">{u.name}</div>
+              <div class="text-[11px] font-semibold" style={`color:${KIND_META[u.kind].color}`}>{KIND_META[u.kind].name} · Tier {u.tier}</div>
+              <div class="mt-1 text-xs text-muted">⚔ {u.atk} · ❤ {u.hp}</div>
+              <div class="mt-1 text-[11px] leading-tight text-faint">{abilityText(u, 1)}</div>
+            </div>
+          ))}
+        </div>
+        <div class="mt-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {Object.entries(KIND_META).map(([k, m]) => (
+            <div class="rounded-2xl border border-line bg-white px-4 py-3 text-sm">
+              <b style={`color:${m.color}`}>{m.name}</b> <span class="text-muted">— {m.synergy}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- ============================== SHOP =============================== -->
+      <div id="v-shop" class="hidden">
+        <div class="card flex flex-wrap items-center gap-4 p-4">
+          <span class="font-display text-lg font-bold text-ink">Round <span id="s-turn">1</span></span>
+          <span class="text-sm font-semibold text-amber-600">🪙 <span id="s-tokens">10</span></span>
+          <span class="text-sm font-semibold text-emerald-600">🔋 <span id="s-pins">5</span></span>
+          <span class="text-sm font-semibold text-violet-600">👑 <span id="s-wins">0</span>/{RULES.crownsToWin}</span>
+          <span id="s-syn" class="text-xs text-muted"></span>
+          <button id="btn-fight" class="btn-primary ml-auto !px-6 !py-2.5">⚔ Battle</button>
+        </div>
+
+        <h3 class="mt-5 text-xs font-bold uppercase tracking-wide text-faint">Your squad <span class="font-normal">(front is left; click a pet to train, move or sell)</span></h3>
+        <div id="s-team" class="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-6"></div>
+        <div id="s-panel" class="mt-2 hidden rounded-2xl border border-brand-200 bg-brand-50/60 p-3 text-sm"></div>
+
+        <h3 class="mt-6 text-xs font-bold uppercase tracking-wide text-faint">Recruit <span class="font-normal">(🪙 {RULES.buyCost} each)</span></h3>
+        <div id="s-shop" class="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5"></div>
+        <div class="mt-3 flex items-center gap-3">
+          <button id="btn-reroll" class="btn-ghost !px-4 !py-2 text-sm">↻ Reroll (🪙 {RULES.rerollCost})</button>
+          <span id="s-msg" class="text-sm text-rose-600"></span>
+        </div>
+      </div>
+
+      <!-- ============================= BATTLE ============================== -->
+      <div id="v-battle" class="hidden">
+        <div class="card p-4 text-center">
+          <div id="b-title" class="font-display text-lg font-bold text-ink">Battle!</div>
+          <div id="b-banner" class="mt-1 min-h-5 text-sm font-semibold text-brand-600"></div>
+        </div>
+        <div class="mt-4 grid grid-cols-2 gap-6">
+          <div><div class="text-center text-xs font-bold uppercase tracking-wide text-faint">You</div><div id="b-mine" class="mt-2 flex flex-row-reverse flex-wrap justify-start gap-2"></div></div>
+          <div><div class="text-center text-xs font-bold uppercase tracking-wide text-faint" id="b-oppname">Rival</div><div id="b-theirs" class="mt-2 flex flex-wrap justify-start gap-2"></div></div>
+        </div>
+        <div class="mt-6 text-center">
+          <button id="btn-next" class="btn-primary hidden !px-8 !py-3">Continue</button>
+          <button id="btn-skip" class="btn-ghost !px-4 !py-2 text-sm">Skip replay ≫</button>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <script>
+    import { UNIT_BY_ID, KIND_META, RULES, abilityText, statAt } from "../lib/arena/units";
+
+    type Run = { turn: number; tokens: number; pins: number; wins: number; team: any[]; shop: (string | null)[]; rerolls: number; status: string };
+    const $ = (id: string) => document.getElementById(id)!;
+    const api = async (path: string, body?: any) => {
+      const res = await fetch(path, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : undefined);
+      return res.json();
+    };
+    const esc = (s: string) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+
+    let run: Run | null = null;
+    let selected = -1;
+
+    function show(view: "lobby" | "shop" | "battle") {
+      for (const v of ["lobby", "shop", "battle"]) $(`v-${v}`).classList.toggle("hidden", v !== view);
+      window.scrollTo({ top: 0 });
+    }
+
+    // ------------------------------- lobby ---------------------------------
+    async function loadLobby() {
+      if (!document.getElementById("btn-start")) return; // signed out
+      const d = await api("/api/arena/state.json");
+      if (d.error) return;
+      $("lb-login").textContent = d.user.login;
+      $("lb-title").textContent = d.title;
+      $("lb-runs").textContent = `${d.runsToday}/${d.runsPerDay}`;
+      $("lb-crowns").textContent = String(d.crowns);
+      $("btn-start").textContent = d.run ? "Continue your run" : "Start a run";
+      if (d.run) { run = d.run; }
+      const lb = await api("/api/arena/leaderboard.json");
+      $("lb-board").innerHTML = (lb.players || []).length
+        ? lb.players.slice(0, 10).map((p: any, i: number) => `
+            <div class="flex items-center gap-2">
+              <span class="w-5 text-center font-bold ${i < 3 ? "text-amber-500" : "text-faint"}">${i + 1}</span>
+              ${p.avatar ? `<img src="${esc(p.avatar)}" class="h-6 w-6 rounded-full" alt="" />` : `<span class="grid h-6 w-6 place-items-center rounded-full bg-brand-50 text-[10px] font-bold text-brand-600">${esc((p.login || "?")[0].toUpperCase())}</span>`}
+              <span class="min-w-0 flex-1 truncate font-semibold text-ink">${esc(p.login || "trainer")}</span>
+              <span class="text-muted">${p.crowns} 👑 · best ${p.best_wins}</span>
+            </div>`).join("")
+        : `<div class="text-faint">No crowns yet. Be the first!</div>`;
+    }
+
+    document.getElementById("btn-start")?.addEventListener("click", async () => {
+      const d = await api("/api/arena/run", {});
+      if (d.error) { $("lb-msg").textContent = d.error; return; }
+      run = d.run;
+      renderShop();
+      show("shop");
+    });
+
+    // ------------------------------- shop ----------------------------------
+    const stars = (n: number) => "★".repeat(n) + "☆".repeat(3 - n);
+
+    function unitCard(u: any, i: number): string {
+      const def = UNIT_BY_ID[u.id];
+      const atk = statAt(def.atk, u.level) + (u.ba || 0);
+      const hp = statAt(def.hp, u.level) + (u.bh || 0);
+      return `
+        <button data-slot="${i}" class="team-card card p-2 text-center transition ${selected === i ? "!border-brand-400 ring-2 ring-brand-200" : ""}">
+          <img src="/arena/${def.id}.png" alt="" class="pixel-art mx-auto h-12 w-12" />
+          <div class="truncate font-display text-sm font-bold text-ink">${def.name}</div>
+          <div class="text-[10px] text-amber-500">${stars(u.level)}</div>
+          <div class="text-[11px] text-muted">⚔ ${atk} · ❤ ${hp}</div>
+        </button>`;
+    }
+
+    function synergyLine(team: any[]): string {
+      const counts: Record<string, number> = {};
+      for (const u of team) counts[UNIT_BY_ID[u.id].kind] = (counts[UNIT_BY_ID[u.id].kind] || 0) + 1;
+      const active = Object.entries(counts).filter(([, n]) => n >= 2).map(([k]) => (KIND_META as any)[k].name);
+      return active.length ? `Synergies: ${active.join(" · ")}` : "No synergy yet (field 2 of a kind)";
+    }
+
+    function renderShop() {
+      if (!run) return;
+      $("s-turn").textContent = String(run.turn);
+      $("s-tokens").textContent = String(run.tokens);
+      $("s-pins").textContent = String(run.pins);
+      $("s-wins").textContent = String(run.wins);
+      $("s-syn").textContent = synergyLine(run.team);
+      $("s-msg").textContent = "";
+
+      const teamHtml = [];
+      for (let i = 0; i < RULES.teamSlots; i++) {
+        const u = run.team[i];
+        teamHtml.push(u ? unitCard(u, i) : `<div class="grid min-h-[104px] place-items-center rounded-2xl border border-dashed border-line text-2xl text-faint">·</div>`);
+      }
+      $("s-team").innerHTML = teamHtml.join("");
+      $("s-team").querySelectorAll<HTMLElement>("[data-slot]").forEach((el) =>
+        el.addEventListener("click", () => { selected = selected === Number(el.dataset.slot) ? -1 : Number(el.dataset.slot); renderShop(); }));
+
+      // selected panel
+      const panel = $("s-panel");
+      if (selected >= 0 && run.team[selected]) {
+        const u = run.team[selected];
+        const def = UNIT_BY_ID[u.id];
+        const trainCost = u.level >= 3 ? null : RULES.trainCost[u.level];
+        panel.classList.remove("hidden");
+        panel.innerHTML = `
+          <div class="flex flex-wrap items-center gap-2">
+            <b class="text-ink">${def.name}</b>
+            <span class="text-[11px] font-semibold" style="color:${(KIND_META as any)[def.kind].color}">${(KIND_META as any)[def.kind].name}</span>
+            <span class="text-muted">${abilityText(def, u.level)}</span>
+            <span class="ml-auto flex gap-2">
+              ${trainCost !== null ? `<button data-act="train" class="btn-primary !px-3 !py-1.5 text-xs">Train (🪙 ${trainCost})</button>` : `<span class="text-xs text-faint">Max level</span>`}
+              <button data-act="left" class="btn-ghost !px-3 !py-1.5 text-xs">← Front</button>
+              <button data-act="right" class="btn-ghost !px-3 !py-1.5 text-xs">Back →</button>
+              <button data-act="sell" class="btn-ghost !border-rose-200 !px-3 !py-1.5 text-xs !text-rose-600">Sell (+🪙 ${def.id === "bloop" ? 3 : RULES.sellRefund}${def.id === "pup" ? ", gifts stats" : ""})</button>
+            </span>
+          </div>`;
+        panel.querySelectorAll<HTMLElement>("[data-act]").forEach((b) => b.addEventListener("click", () => act(b.dataset.act!)));
+      } else { panel.classList.add("hidden"); selected = -1; }
+
+      $("s-shop").innerHTML = (run.shop || []).map((id, i) => {
+        if (!id) return `<div class="grid min-h-[120px] place-items-center rounded-2xl border border-dashed border-line text-faint text-xs">sold</div>`;
+        const def = UNIT_BY_ID[id];
+        return `
+          <button data-buy="${i}" class="card p-2 text-center transition hover:-translate-y-0.5 hover:!border-brand-300">
+            <img src="/arena/${def.id}.png" alt="" class="pixel-art mx-auto h-12 w-12" />
+            <div class="truncate font-display text-sm font-bold text-ink">${def.name}</div>
+            <div class="text-[10px] font-semibold" style="color:${(KIND_META as any)[def.kind].color}">${(KIND_META as any)[def.kind].name} · T${def.tier}</div>
+            <div class="text-[11px] text-muted">⚔ ${def.atk} · ❤ ${def.hp}</div>
+            <div class="mt-0.5 text-[10px] leading-tight text-faint">${abilityText(def, 1)}</div>
+          </button>`;
+      }).join("");
+      $("s-shop").querySelectorAll<HTMLElement>("[data-buy]").forEach((el) =>
+        el.addEventListener("click", () => buy(Number(el.dataset.buy))));
+    }
+
+    async function post(body: any): Promise<boolean> {
+      const d = await api("/api/arena/action", body);
+      if (d.error) { $("s-msg").textContent = d.error; return false; }
+      run = d.run;
+      if (d.battle) { playBattle(d.battle); return true; }
+      renderShop();
+      return true;
+    }
+
+    async function buy(shopIdx: number) {
+      if (!run) return;
+      let slot = -1;
+      for (let i = 0; i < RULES.teamSlots; i++) if (!run.team[i]) { slot = i; break; }
+      if (slot < 0) { $("s-msg").textContent = "team is full"; return; }
+      await post({ a: "buy", shopIdx, slot: Math.min(slot, run.team.length) });
+    }
+
+    async function act(kind: string) {
+      if (!run || selected < 0) return;
+      if (kind === "train") await post({ a: "train", slot: selected });
+      else if (kind === "sell") { await post({ a: "sell", slot: selected }); selected = -1; renderShop(); }
+      else if (kind === "left" && selected > 0) { await post({ a: "move", from: selected, to: selected - 1 }); selected -= 1; renderShop(); }
+      else if (kind === "right" && selected < run.team.length - 1) { await post({ a: "move", from: selected, to: selected + 1 }); selected += 1; renderShop(); }
+    }
+
+    $("btn-reroll")?.addEventListener("click", () => post({ a: "reroll" }));
+    $("btn-fight")?.addEventListener("click", () => post({ a: "end" }));
+
+    // ------------------------------ battle ---------------------------------
+    let skip = false;
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, skip ? 0 : ms));
+
+    function bUnitEl(u: any): HTMLElement {
+      const el = document.createElement("div");
+      el.className = "b-unit relative w-16 text-center transition-all duration-200";
+      el.dataset.uid = String(u.uid);
+      el.innerHTML = `
+        <img src="/arena/${u.id}.png" alt="" class="pixel-art mx-auto h-12 w-12" />
+        <div class="truncate text-[10px] font-bold text-ink">${u.name}</div>
+        <div class="text-[10px] text-muted">⚔<span class="u-atk">${u.atk}</span> ❤<span class="u-hp">${u.hp}</span></div>`;
+      return el;
+    }
+    const findU = (uid: number) => document.querySelector<HTMLElement>(`.b-unit[data-uid="${uid}"]`);
+
+    function float(el: HTMLElement, text: string, cls: string) {
+      const f = document.createElement("div");
+      f.textContent = text;
+      f.className = `pointer-events-none absolute -top-3 left-1/2 z-10 -translate-x-1/2 text-xs font-bold ${cls} float-up`;
+      el.appendChild(f);
+      setTimeout(() => f.remove(), 700);
+    }
+
+    async function playBattle(b: { log: any[]; won: boolean; draw: boolean; opponent: string }) {
+      skip = false;
+      show("battle");
+      $("b-mine").innerHTML = ""; $("b-theirs").innerHTML = "";
+      $("b-banner").textContent = "";
+      $("b-oppname").textContent = b.opponent;
+      $("btn-next").classList.add("hidden");
+      $("btn-skip").classList.remove("hidden");
+
+      for (const ev of b.log) {
+        if (ev.t === "start") {
+          for (const u of ev.teams[0]) $("b-mine").appendChild(bUnitEl(u));
+          for (const u of ev.teams[1]) $("b-theirs").appendChild(bUnitEl(u));
+          await sleep(500);
+        } else if (ev.t === "synergy") {
+          $("b-banner").textContent = `${(KIND_META as any)[ev.kind].name} synergy${ev.side === 0 ? " (you)" : ` (${b.opponent})`}!`;
+          await sleep(450);
+        } else if (ev.t === "cast") {
+          const el = findU(ev.uid); if (el) float(el, ev.name, "text-brand-600");
+          await sleep(350);
+        } else if (ev.t === "clash") {
+          const a = findU(ev.a), c = findU(ev.b);
+          a?.classList.add("lunge-r"); c?.classList.add("lunge-l");
+          await sleep(240);
+          a?.classList.remove("lunge-r"); c?.classList.remove("lunge-l");
+        } else if (ev.t === "hit") {
+          const el = findU(ev.uid);
+          if (el) {
+            el.querySelector(".u-hp")!.textContent = String(ev.hp);
+            if (ev.amount > 0) { float(el, `-${ev.amount}`, "text-rose-600"); el.classList.add("shake"); setTimeout(() => el.classList.remove("shake"), 250); }
+            else if (ev.amount < 0) float(el, `+${-ev.amount}`, "text-emerald-600");
+          }
+          await sleep(220);
+        } else if (ev.t === "dodge") {
+          const el = findU(ev.uid); if (el) float(el, "phase!", "text-violet-500");
+          await sleep(200);
+        } else if (ev.t === "buff") {
+          const el = findU(ev.uid);
+          if (el) {
+            const atkEl = el.querySelector(".u-atk")!, hpEl = el.querySelector(".u-hp")!;
+            atkEl.textContent = String(Number(atkEl.textContent) + ev.atk);
+            hpEl.textContent = String(Number(hpEl.textContent) + ev.hp);
+            float(el, `+${ev.atk}/+${ev.hp}`, "text-emerald-600");
+          }
+          await sleep(220);
+        } else if (ev.t === "faint") {
+          const el = findU(ev.uid);
+          if (el) { el.classList.add("opacity-0", "scale-75"); await sleep(260); el.remove(); }
+        } else if (ev.t === "spawn") {
+          const box = ev.side === 0 ? $("b-mine") : $("b-theirs");
+          const el = bUnitEl(ev.unit);
+          if (ev.front) box.prepend(el); else box.appendChild(el);
+          float(el, "spawn!", "text-brand-600");
+          await sleep(260);
+        } else if (ev.t === "revive") {
+          const el = findU(ev.uid);
+          if (el) { el.querySelector(".u-hp")!.textContent = String(ev.hp); float(el, "reignite!", "text-amber-500"); }
+          await sleep(300);
+        } else if (ev.t === "end") {
+          await sleep(300);
+        }
+      }
+
+      $("btn-skip").classList.add("hidden");
+      const over = run && run.status !== "active";
+      $("b-banner").textContent = b.draw ? "It's a draw." : b.won ? "Victory! 👑" : "Defeat… -1 🔋";
+      $("b-title").textContent = over ? (run!.status === "won" ? `Crown taken! ${RULES.crownsToWin} wins 🏆` : "Run over") : `Round ${run!.turn - 1} vs ${b.opponent}`;
+      const nextBtn = $("btn-next");
+      nextBtn.textContent = over ? "Back to lobby" : "Next round →";
+      nextBtn.classList.remove("hidden");
+      nextBtn.onclick = () => {
+        if (over) { run = null; loadLobby(); show("lobby"); }
+        else { selected = -1; renderShop(); show("shop"); }
+      };
+    }
+    $("btn-skip")?.addEventListener("click", () => { skip = true; });
+
+    loadLobby();
+  </script>
+
+  <style>
+    .pixel-art { image-rendering: pixelated; }
+    .lunge-r { transform: translateX(10px); }
+    .lunge-l { transform: translateX(-10px); }
+    .shake { animation: ap-shake 0.25s; }
+    @keyframes ap-shake { 25% { transform: translateX(-3px);} 75% { transform: translateX(3px);} }
+    .float-up { animation: ap-float 0.7s ease-out forwards; }
+    @keyframes ap-float { from { opacity: 1; transform: translate(-50%, 0);} to { opacity: 0; transform: translate(-50%, -14px);} }
+  </style>
+</Base>
