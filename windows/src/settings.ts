@@ -691,6 +691,10 @@ function initBubble() {
   const idle = document.getElementById("idle") as HTMLInputElement;
   idle.checked = localStorage.getItem("ap_idle") !== "0";
   idle.onchange = () => { localStorage.setItem("ap_idle", idle.checked ? "1" : "0"); changed(); };
+
+  const reactive = document.getElementById("reactive") as HTMLInputElement;
+  reactive.checked = localStorage.getItem("ap_reactive") !== "0";
+  reactive.onchange = () => { localStorage.setItem("ap_reactive", reactive.checked ? "1" : "0"); changed(); };
 }
 
 // -------------------------------------------------- bubble display + layout ----
@@ -1186,6 +1190,8 @@ function applyStatic() {
   set("o-theme-system", "System");
   set("t-idle", "Show idle message");
   set("t-idle-sub", "The pet's chatter while no agent is running.");
+  set("t-reactive", "Reactive comments");
+  set("t-reactive-sub", "The pet reacts to token usage, streaks, hunger, and busy sessions.");
   set("t-display", "Display");
   set("t-rows", "Rows");
   set("o-bm-list", "All rows");

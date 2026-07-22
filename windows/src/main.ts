@@ -11,6 +11,7 @@ import * as care from "./care";
 import * as sync from "./sync";
 import * as usage from "./usage";
 import * as history from "./history";
+import * as reactive from "./reactive";
 import { sendNotification, isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
@@ -124,6 +125,26 @@ let celebrateUntil = 0;
 let wasCelebrating = false;
 let prevSimpleMood = "";
 let moodLine = ""; // the single-bubble line for idle/done/celebrate
+let reactiveLine = "";
+let reactiveUntil = 0;
+
+/// Show a reactive comment for a few seconds (mac PetController.flashReactiveLine).
+function flashReactive(line: string | null) {
+  if (!line) return;
+  reactiveLine = line;
+  reactiveUntil = Date.now() + 5000;
+}
+
+/// Evaluate the care-driven reactive metrics after a feed / meal / hunger tick.
+function evaluateCareMetrics() {
+  const slug = savedSlug();
+  if (!slug) return;
+  const s = care.stateFor(slug);
+  flashReactive(reactive.evaluate("dailyTokens", s.tokensToday));
+  flashReactive(reactive.evaluate("streak", s.streakDays));
+  flashReactive(reactive.evaluate("dailyMeals", s.mealsToday));
+  flashReactive(reactive.evaluate("hunger", care.hunger(s)));
+}
 
 function pickMoodLine(mood: string) {
   // Custom/system pools; working/waiting fall back to the PetChat lines so the
@@ -157,22 +178,28 @@ function render() {
   const mood = celebrating ? "celebrate" : resolved;
   pet.setState(mood);
 
+  // A reactive comment briefly overrides the quiet single-line moods (not the
+  // multi-agent working bubble, not the celebrate burst).
+  const reactiveActive = Date.now() < reactiveUntil && !!reactiveLine;
+
   const multi = localStorage.getItem("ap_multi") !== "0";
   if ((mood === "working" || mood === "waiting") && !multi) {
     // Simple-bubble mode (mac: multi-agent off) , one plain chat line.
     if (resolved !== prevSimpleMood) { pickMoodLine(mood); prevSimpleMood = resolved; }
     if (!moodLine) pickMoodLine(mood);
-    bubble.renderLine(moodLine);
+    bubble.renderLine(reactiveActive ? reactiveLine : moodLine);
   } else if (mood === "working" || mood === "waiting") {
     bubble.render(sessions.filter((s) => s.state !== "idle" && s.state !== "registered"));
   } else if (mood === "celebrate") {
     bubble.renderLine(moodLine || t("Done"));
   } else if (mood === "done") {
     if (!moodLine) pickMoodLine("done");
-    bubble.renderLine(moodLine);
+    bubble.renderLine(reactiveActive ? reactiveLine : moodLine);
   } else {
     // idle: a persistent quiet line (mac shows it continuously, no blinking)
-    if (localStorage.getItem("ap_idle") !== "0") {
+    if (reactiveActive) {
+      bubble.renderLine(reactiveLine);
+    } else if (localStorage.getItem("ap_idle") !== "0") {
       if (!moodLine) pickMoodLine("idle");
       bubble.renderLine(moodLine);
     } else {
@@ -226,7 +253,7 @@ function maybeNotify(e: AgentEventPayload) {
   // A finished session is a "meal" for the pet (records XP + streak).
   if (e.state === "done") {
     const slug = savedSlug();
-    if (slug) { care.mutate(slug, (s) => care.recordMeal(s)); emit("care-updated"); sync.schedulePush(); }
+    if (slug) { care.mutate(slug, (s) => care.recordMeal(s)); emit("care-updated"); sync.schedulePush(); evaluateCareMetrics(); }
     if (e.project) usage.recordSession(e.project, e.agent);
     const now = Date.now();
     history.log({
@@ -250,6 +277,7 @@ function maybeNotify(e: AgentEventPayload) {
 listen<AgentEventPayload>("agent-event", (e) => {
   maybeNotify(e.payload);
   store.update(e.payload);
+  flashReactive(reactive.evaluate("sessionCount", store.active().length));
   render();
 });
 listen<string>("agent-end", (e) => {
@@ -269,6 +297,7 @@ listen<{ agent: string; session: string; project: string; tokens: number; cost?:
   care.mutate(slug, (s) => care.feedTokens(s, n));
   emit("care-updated");
   sync.schedulePush();
+  evaluateCareMetrics();
 });
 
 // On launch: pull any cloud progress, then keep pushing in the background.
