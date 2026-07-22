@@ -64,6 +64,8 @@ const firstRunLinux = [
   { t: "Enable notifications", b: "Allow notifications so the pet can ping you when an agent needs input." },
 ];
 
+const LINUX_ONELINE = `curl -fsSL https://agentpet.thenightwatcher.online/install.sh | sh`;
+
 const LINUX_RUN = `# AppImage , works on any distro
 chmod +x AgentPet_0.1.4_amd64.AppImage
 ./AgentPet_0.1.4_amd64.AppImage
@@ -247,7 +249,15 @@ open build/AgentPet.app`;
       <!-- Linux panel -->
       <div data-panel="linux" class="tab-panel mt-8 hidden">
         <div class="text-center">
-          <h3 class="font-display text-2xl font-bold text-ink">Three formats, pick one</h3>
+          <h3 class="font-display text-2xl font-bold text-ink">One line, done</h3>
+          <p class="mx-auto mt-2 max-w-lg text-muted">Downloads the latest AppImage and launches it. No root, works on any distro.</p>
+        </div>
+        <div class="mx-auto mt-5 max-w-2xl">
+          <CodeBlock code={LINUX_ONELINE} lang="bash" />
+        </div>
+
+        <div class="mt-10 text-center">
+          <h3 class="font-display text-2xl font-bold text-ink">Or pick a format</h3>
           <p class="mx-auto mt-2 max-w-md text-muted">A universal AppImage, or a native package for Debian/Ubuntu and Fedora. You only need one.</p>
         </div>
 
@@ -256,19 +266,19 @@ open build/AgentPet.app`;
             <span class="absolute right-5 top-6 rounded-full bg-mint-400/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-600">Any distro</span>
             <span class="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Icon name="download" class="h-6 w-6" /></span>
             <h3 class="mt-4 font-display text-xl font-semibold text-ink">AppImage</h3>
-            <p class="mt-2 flex-1 text-muted"><code class="rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs text-brand-700">chmod +x</code> it and run , no install, works everywhere.</p>
+            <p class="mt-2 flex-1 text-muted">Just chmod +x and run , no install, works on any distro.</p>
             <a href={LINUX_APPIMAGE} class="btn-primary mt-4 w-full"><Icon name="linux" class="h-5 w-5" /> Download .AppImage</a>
           </div>
           <div class="card flex flex-col p-7">
             <span class="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Icon name="package" class="h-6 w-6" /></span>
             <h3 class="mt-4 font-display text-xl font-semibold text-ink">Debian / Ubuntu</h3>
-            <p class="mt-2 flex-1 text-muted">A native <code class="rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs text-brand-700">.deb</code> , installs with apt/dpkg and pulls its dependencies.</p>
+            <p class="mt-2 flex-1 text-muted">A native .deb , installs with apt or dpkg and pulls its dependencies.</p>
             <a href={LINUX_DEB} class="btn-primary mt-4 w-full"><Icon name="linux" class="h-5 w-5" /> Download .deb</a>
           </div>
           <div class="card flex flex-col p-7">
             <span class="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Icon name="package" class="h-6 w-6" /></span>
             <h3 class="mt-4 font-display text-xl font-semibold text-ink">Fedora / openSUSE</h3>
-            <p class="mt-2 flex-1 text-muted">A native <code class="rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs text-brand-700">.rpm</code> for rpm-based distros.</p>
+            <p class="mt-2 flex-1 text-muted">A native .rpm for rpm-based distros.</p>
             <a href={LINUX_RPM} class="btn-primary mt-4 w-full"><Icon name="linux" class="h-5 w-5" /> Download .rpm</a>
           </div>
         </div>
