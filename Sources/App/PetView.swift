@@ -983,9 +983,6 @@ private struct FocusTerminalTap: ViewModifier {
                 .onTapGesture {
                     AppDaemon.shared.focusTerminal(sessionId: sessionId)
                 }
-                .onHover { inside in
-                    if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-                }
                 .help(NSLocalizedString("Click to open this terminal", comment: "bubble row focus-terminal hint"))
         } else {
             content
