@@ -712,6 +712,11 @@ private struct AgentRow: View {
 
     private var isWaiting: Bool { session.state == .waiting }
 
+    /// A live session we can jump back to: it knows its terminal and isn't done.
+    private var canFocusTerminal: Bool {
+        session.terminalProgram != nil && session.state != .done && session.state != .idle
+    }
+
     /// Same orange used for the waiting state dot — applied to the message
     /// text too, so "waiting for input" reads as urgent at a glance.
     private static let waitingColor = Color(red: 0xF5 / 255.0, green: 0x9E / 255.0, blue: 0x0B / 255.0)
@@ -750,6 +755,8 @@ private struct AgentRow: View {
             }
         }
         .frame(maxWidth: rowMaxWidth, alignment: .leading)
+        .contentShape(Rectangle())
+        .modifier(FocusTerminalTap(sessionId: session.id, enabled: canFocusTerminal))
     }
 
     @ViewBuilder
@@ -960,6 +967,28 @@ private struct PendingApprovalRow: View {
         case .light:  return .black.opacity(opacity)
         case .dark:   return .white.opacity(opacity)
         case .system: return Color.primary.opacity(opacity)
+        }
+    }
+}
+
+/// Makes a live session row clickable to bring its terminal to the front, with
+/// a pointer cursor on hover so the affordance is discoverable.
+private struct FocusTerminalTap: ViewModifier {
+    let sessionId: String
+    let enabled: Bool
+
+    func body(content: Content) -> some View {
+        if enabled {
+            content
+                .onTapGesture {
+                    AppDaemon.shared.focusTerminal(sessionId: sessionId)
+                }
+                .onHover { inside in
+                    if inside { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                }
+                .help(NSLocalizedString("Click to open this terminal", comment: "bubble row focus-terminal hint"))
+        } else {
+            content
         }
     }
 }

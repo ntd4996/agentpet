@@ -47,6 +47,8 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>AgentPet brings the terminal running an agent to the front when you click its bubble row.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>MIT License</string>
 	<key>NSPrincipalClass</key>

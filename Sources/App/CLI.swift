@@ -10,8 +10,14 @@ enum HookCLI {
         let now = Date()
         let parsed = HookArguments.parse(arguments)
         let kind = parsed.agent.flatMap(AgentKind.init(rawValue:)) ?? .claude
-        let event = parsed.makeEvent(now: now)
+        var event = parsed.makeEvent(now: now)
             ?? HookPayload.event(forAgent: kind, stdin: FileHandle.standardInput.readDataToEndOfFile(), now: now)
+
+        // Tag the event with the terminal we're running in, so a click on the
+        // session's bubble row can focus that exact window/tab later.
+        let terminal = TerminalInfo.capture()
+        event?.terminalProgram = terminal.program
+        event?.terminalTTY = terminal.tty
 
         guard let event else {
             FileHandle.standardError.write(Data(

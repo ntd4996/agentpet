@@ -68,6 +68,13 @@ final class AppDaemon: ObservableObject {
         }
     }
 
+    /// Brings the terminal running `sessionId` to the front (Terminal.app and
+    /// iTerm2 focus the exact tab via tty; Warp/others just activate the app).
+    func focusTerminal(sessionId: String) {
+        guard let session = store.session(id: sessionId) else { return }
+        TerminalFocus.focus(program: session.terminalProgram, tty: session.terminalTTY)
+    }
+
     private func ingest(_ event: AgentEvent) {
         let before = store.session(id: event.sessionId)?.state
         guard let updated = store.apply(event, now: Date()) else {

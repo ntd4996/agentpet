@@ -35,6 +35,12 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
     public var createdAt: Date
     /// Gated tool call currently awaiting the user's decision, if any.
     public var pendingApproval: PendingApproval?
+    /// `TERM_PROGRAM` of the terminal running this session. Sticky. Enables the
+    /// click-to-focus affordance on the bubble row.
+    public var terminalProgram: String?
+    /// Controlling TTY of the terminal running this session (e.g.
+    /// `"/dev/ttys003"`). Sticky. Used to target the exact window/tab.
+    public var terminalTTY: String?
 
     public init(
         id: String,
@@ -48,7 +54,9 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
         updatedAt: Date,
         stateSince: Date? = nil,
         createdAt: Date? = nil,
-        pendingApproval: PendingApproval? = nil
+        pendingApproval: PendingApproval? = nil,
+        terminalProgram: String? = nil,
+        terminalTTY: String? = nil
     ) {
         self.id = id
         self.agentKind = agentKind
@@ -62,5 +70,7 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
         self.stateSince = stateSince ?? updatedAt
         self.createdAt = createdAt ?? updatedAt
         self.pendingApproval = pendingApproval
+        self.terminalProgram = terminalProgram
+        self.terminalTTY = terminalTTY
     }
 }

@@ -107,6 +107,35 @@ final class SessionStoreTests: XCTestCase {
         XCTAssertEqual(s?.model, "Sonnet 4.6")
     }
 
+    func testApplySetsTerminalOnNewSession() {
+        let store = SessionStore()
+        let e = AgentEvent(
+            sessionId: "s1", agentKind: .claude, eventName: "SessionStart",
+            project: "/proj", terminalProgram: "iTerm.app", terminalTTY: "/dev/ttys003", timestamp: t0
+        )
+        let s = store.apply(e, now: t0)
+        XCTAssertEqual(s?.terminalProgram, "iTerm.app")
+        XCTAssertEqual(s?.terminalTTY, "/dev/ttys003")
+    }
+
+    func testApplyKeepsTerminalWhenLaterEventOmitsIt() {
+        let store = SessionStore()
+        let withTerminal = AgentEvent(
+            sessionId: "s1", agentKind: .claude, eventName: "SessionStart",
+            terminalProgram: "Apple_Terminal", terminalTTY: "/dev/ttys007", timestamp: t0
+        )
+        store.apply(withTerminal, now: t0)
+
+        let withoutTerminal = AgentEvent(
+            sessionId: "s1", agentKind: .claude, eventName: "Stop",
+            timestamp: t0.addingTimeInterval(5)
+        )
+        let updated = store.apply(withoutTerminal, now: t0.addingTimeInterval(5))
+
+        XCTAssertEqual(updated?.terminalProgram, "Apple_Terminal", "terminal should persist across later events")
+        XCTAssertEqual(updated?.terminalTTY, "/dev/ttys007")
+    }
+
     func testApplyIgnoresUnmappedEvent() {
         let store = SessionStore()
         XCTAssertNil(store.apply(event("Bogus"), now: t0))

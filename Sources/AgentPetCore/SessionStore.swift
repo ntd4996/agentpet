@@ -106,6 +106,8 @@ public final class SessionStore {
             existing.updatedAt = now
             if let project = event.project { existing.project = project }
             if let model = event.model { existing.model = model }
+            if let program = event.terminalProgram { existing.terminalProgram = program }
+            if let tty = event.terminalTTY { existing.terminalTTY = tty }
             existing.message = event.message
             existing.pendingApproval = pendingApproval
             byID[event.sessionId] = existing
@@ -120,7 +122,9 @@ public final class SessionStore {
             model: event.model,
             source: .hook,
             updatedAt: now,
-            pendingApproval: pendingApproval
+            pendingApproval: pendingApproval,
+            terminalProgram: event.terminalProgram,
+            terminalTTY: event.terminalTTY
         )
         byID[event.sessionId] = session
         return session

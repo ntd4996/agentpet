@@ -509,3 +509,4 @@
 "Today %@ · Month %@" = "今天 %@ · 本月 %@";
 "Allow" = "允许";
 "Deny" = "拒绝";
+"Click to open this terminal" = "点击打开此终端";
