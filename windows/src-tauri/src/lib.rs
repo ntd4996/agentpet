@@ -179,6 +179,36 @@ fn open_url(url: String) {
     }
 }
 
+/// Bring the terminal running a session to the front when its bubble row is
+/// clicked. Warp exports a `warp://session/<uuid>` deep link that focuses the
+/// exact pane , the one reliable cross-platform "focus exact tab". Other
+/// terminals have no dependable tab-focus API on Windows/Linux, so we only
+/// best-effort activate the app on macOS (where the Tauri build is dev-only).
+#[tauri::command]
+fn focus_terminal(program: String, focus_url: String) {
+    if focus_url.starts_with("warp://") {
+        #[cfg(windows)]
+        { let _ = std::process::Command::new("cmd").args(["/c", "start", "", &focus_url]).spawn(); }
+        #[cfg(target_os = "macos")]
+        { let _ = std::process::Command::new("open").arg(&focus_url).spawn(); }
+        #[cfg(all(unix, not(target_os = "macos")))]
+        { let _ = std::process::Command::new("xdg-open").arg(&focus_url).spawn(); }
+        return;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        let app = match program.as_str() {
+            "Apple_Terminal" => Some("Terminal"),
+            "iTerm.app" => Some("iTerm"),
+            _ => None,
+        };
+        if let Some(a) = app {
+            let _ = std::process::Command::new("open").args(["-a", a]).spawn();
+        }
+    }
+    let _ = program;
+}
+
 /// Persist the chosen language (for the tray on next launch) and re-label the
 /// tray menu items now. Called by the Settings language switcher.
 #[tauri::command]
@@ -325,6 +355,7 @@ pub fn run() {
             toggle_install,
             open_settings,
             open_url,
+            focus_terminal,
             set_lang,
             set_tray_status,
             set_pet_visible,

@@ -17,6 +17,9 @@ export interface Session {
   tool: string;
   updatedAt: number;
   stateSince: number;
+  /// Terminal this session runs in (for click-to-focus). Sticky.
+  terminalProgram: string;
+  terminalFocusUrl: string;
 }
 
 export interface AgentEventPayload {
@@ -31,6 +34,8 @@ export interface AgentEventPayload {
   event?: string;
   title?: string | null;
   ts?: number;
+  terminalProgram?: string;
+  terminalFocusUrl?: string;
 }
 
 const PRIORITY: Record<string, number> = { working: 4, waiting: 3, done: 2, registered: 1, idle: 0 };
@@ -70,6 +75,8 @@ export class SessionStore {
       tool: e.tool ?? "",
       updatedAt: now,
       stateSince: prev && prev.state === e.state ? prev.stateSince : now,
+      terminalProgram: e.terminalProgram || prev?.terminalProgram || "",
+      terminalFocusUrl: e.terminalFocusUrl || prev?.terminalFocusUrl || "",
     });
   }
 

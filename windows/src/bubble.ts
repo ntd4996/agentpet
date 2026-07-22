@@ -4,6 +4,7 @@
 // laid out from the user's token order with the same animated message text
 // (erase → retype → ellipsis-cycle/shimmer), state dots, and brand icons.
 
+import { invoke } from "@tauri-apps/api/core";
 import { Session, basename, agentLabel } from "./state";
 import { agentIconUrl, uiIcon } from "./icons";
 import { stateMessage, bubbleLine } from "./activity";
@@ -543,6 +544,14 @@ export class BubbleRenderer {
     const el = row.el;
     el.dataset.state = s.state;
     el.classList.toggle("waiting", s.state === "waiting");
+
+    // Click a row to focus the terminal running it (Warp deep-link; see the
+    // focus_terminal Rust command). Highlight + pointer only when focusable.
+    const canFocus = !!(s.terminalProgram || s.terminalFocusUrl);
+    el.classList.toggle("focusable", canFocus);
+    el.onclick = canFocus
+      ? () => { void invoke("focus_terminal", { program: s.terminalProgram, focusUrl: s.terminalFocusUrl }); }
+      : null;
 
     const dot = el.querySelector<HTMLElement>(".sdot");
     if (dot) dot.classList.toggle("spin", s.state !== "idle");

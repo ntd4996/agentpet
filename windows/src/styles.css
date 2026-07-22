@@ -65,6 +65,8 @@ body.overlay, body.overlay * {
   border-top: 7px solid var(--bubble-bg, rgba(22, 24, 38, 0.92));
   border-bottom: 0;
 }
+.bubble .brow.focusable { cursor: pointer; border-radius: 6px; transition: background 0.12s; }
+.bubble .brow.focusable:hover { background: rgba(127, 127, 127, 0.16); }
 .bubble .brow {
   display: flex;
   align-items: center;

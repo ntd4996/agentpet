@@ -14,6 +14,7 @@ use std::net::TcpStream;
 
 pub fn run_hook(args: &[String]) {
     let agent = flag(args, "--agent").unwrap_or_else(|| "unknown".into());
+    let (terminal_program, terminal_focus_url) = terminal_env();
 
     // Explicit flags win (opencode plugin + the run wrapper). `--event` carries a
     // normalised state directly there.
@@ -24,6 +25,8 @@ pub fn run_hook(args: &[String]) {
             session: flag(args, "--session").unwrap_or_default(),
             project: flag(args, "--project").unwrap_or_default(),
             message: flag(args, "--message").unwrap_or_default(),
+            terminal_program,
+            terminal_focus_url,
             ..Payload::default()
         });
     }
@@ -94,7 +97,17 @@ pub fn run_hook(args: &[String]) {
             .to_string(),
         transcript: first_str(&v, &["transcript_path", "transcriptPath"]).unwrap_or_default(),
         subagent: first_str(&v, &["agent_id", "subagent_id", "agentId"]).unwrap_or_default(),
+        terminal_program,
+        terminal_focus_url,
     });
+}
+
+/// Which terminal the hook runs in, for click-to-focus. `TERM_PROGRAM` names it;
+/// Warp also exports `WARP_FOCUS_URL` (a `warp://session/<uuid>` deep link) that
+/// focuses the exact pane , the one cross-platform "focus exact tab" we get.
+fn terminal_env() -> (String, String) {
+    let nonempty = |k: &str| std::env::var(k).ok().filter(|s| !s.is_empty()).unwrap_or_default();
+    (nonempty("TERM_PROGRAM"), nonempty("WARP_FOCUS_URL"))
 }
 
 /// `agentpet run [--session id] [--project path] [--agent kind] -- <command...>`
@@ -175,6 +188,8 @@ struct Payload {
     desc: String,
     transcript: String,
     subagent: String,
+    terminal_program: String,
+    terminal_focus_url: String,
 }
 
 impl Payload {
@@ -183,7 +198,9 @@ impl Payload {
             "agent": self.agent, "event": self.event, "session": self.session,
             "project": self.project, "message": self.message, "tool": self.tool,
             "file": self.file, "desc": self.desc, "transcript": self.transcript,
-            "subagent": self.subagent, "ts": now_millis(),
+            "subagent": self.subagent,
+            "terminalProgram": self.terminal_program, "terminalFocusUrl": self.terminal_focus_url,
+            "ts": now_millis(),
         })
         .to_string()
     }

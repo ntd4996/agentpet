@@ -62,6 +62,8 @@ fn handle_event(app: &AppHandle, body: &str) {
     let file = str_of(&v, "file").to_string();
     let desc = str_of(&v, "desc").to_string();
     let transcript = str_of(&v, "transcript").to_string();
+    let terminal_program = str_of(&v, "terminalProgram").to_string();
+    let terminal_focus_url = str_of(&v, "terminalFocusUrl").to_string();
     let ts = v.get("ts").and_then(|x| x.as_u64()).unwrap_or(0);
 
     if crate::statemap::is_session_end(&agent, &event) {
@@ -125,6 +127,7 @@ fn handle_event(app: &AppHandle, body: &str) {
             "agent": agent, "state": state, "session": session, "project": project,
             "message": message, "tool": tool, "file": file, "desc": desc,
             "event": event, "title": title, "ts": ts,
+            "terminalProgram": terminal_program, "terminalFocusUrl": terminal_focus_url,
         });
         let _ = app.emit("agent-event", payload);
     };

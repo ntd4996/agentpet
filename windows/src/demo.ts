@@ -114,6 +114,8 @@ export function initDemo() {
       tool: "",
       updatedAt: now,
       stateSince: now,
+      terminalProgram: "",
+      terminalFocusUrl: "",
     });
     after();
     paint();
