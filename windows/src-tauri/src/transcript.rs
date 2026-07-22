@@ -35,10 +35,29 @@ pub fn codex_rollout_path_cached(session_id: &str, cwd: Option<&str>) -> Option<
     Some(path)
 }
 
-/// Sums Claude model usage tokens (input + output) appended to the transcript
-/// since the previous call for the same path. First call consumes the whole
-/// file. `None` if unreadable, `0` if no new usage lines appeared. Feeds the pet.
-pub fn new_usage_tokens(path: &str) -> Option<i64> {
+/// Per-million-token USD rates by Claude tier (port of macOS ModelPricing):
+/// input, output. Cache-create is input×1.25, cache-read is input×0.1.
+fn claude_cost(model: Option<&str>, input: i64, output: i64, cache_create: i64, cache_read: i64) -> f64 {
+    let m = model.unwrap_or("").to_lowercase();
+    let (in_rate, out_rate) = if m.contains("haiku") {
+        (1.0, 5.0)
+    } else if m.contains("opus") {
+        (15.0, 75.0)
+    } else {
+        (3.0, 15.0)
+    };
+    (input as f64 * in_rate
+        + output as f64 * out_rate
+        + cache_create as f64 * in_rate * 1.25
+        + cache_read as f64 * in_rate * 0.1)
+        / 1_000_000.0
+}
+
+/// Sums Claude model usage tokens (input + output) AND estimates their USD cost
+/// (per-model tier + cache rates), for lines appended to the transcript since the
+/// previous call for the same path. First call consumes the whole file. `None` if
+/// unreadable, `(0, 0.0)` if no new usage lines appeared. Feeds the pet + cost.
+pub fn new_usage_delta(path: &str) -> Option<(i64, f64)> {
     // Hold the offsets lock across the whole read + advance, so two events for
     // the same session firing at once can't both consume the same bytes (which
     // would double-feed the pet). Reads are small deltas, so serialising is fine.
@@ -52,7 +71,7 @@ pub fn new_usage_tokens(path: &str) -> Option<i64> {
         start = 0; // file truncated/replaced: start over
     }
     if size <= start {
-        return Some(0);
+        return Some((0, 0.0));
     }
     f.seek(SeekFrom::Start(start)).ok()?;
     let mut buf = Vec::new();
@@ -63,17 +82,31 @@ pub fn new_usage_tokens(path: &str) -> Option<i64> {
     offsets.insert(path.to_string(), start + consumable.len() as u64);
     let text = String::from_utf8_lossy(consumable);
     let mut total: i64 = 0;
+    let mut cost = 0.0;
     for line in text.lines() {
         if !line.contains("\"usage\"") {
             continue; // fast reject: most lines carry no usage object
         }
         let Ok(json) = serde_json::from_str::<Value>(line.trim()) else { continue };
-        if let Some(usage) = json.get("message").and_then(|m| m.get("usage")) {
-            total += usage.get("input_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
-            total += usage.get("output_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+        if let Some(msg) = json.get("message") {
+            if let Some(usage) = msg.get("usage") {
+                let input = usage.get("input_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+                let output = usage.get("output_tokens").and_then(|v| v.as_i64()).unwrap_or(0);
+                let cache_create = usage
+                    .get("cache_creation_input_tokens")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0);
+                let cache_read = usage
+                    .get("cache_read_input_tokens")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0);
+                total += input + output;
+                let model = msg.get("model").and_then(|v| v.as_str());
+                cost += claude_cost(model, input, output, cache_create, cache_read);
+            }
         }
     }
-    Some(total)
+    Some((total, cost))
 }
 
 /// Expected transcript path for a Claude Code session when the hook payload

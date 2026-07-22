@@ -10,6 +10,7 @@ import { LAYOUT_PRESETS, readBubbleConfig, type TokenItem, type BubbleToken } fr
 import { initDemo } from "./demo";
 import { slice, type Rect } from "./pet";
 import * as care from "./care";
+import * as usage from "./usage";
 import * as sync from "./sync";
 import * as history from "./history";
 
@@ -117,6 +118,8 @@ function renderCare() {
     .join("");
   setTxt("care-today", fmtNum(s.tokensToday));
   setTxt("care-today-sub", `${s.mealsToday} ${t("sessions")}`);
+  const money = (v: number) => `$${v.toFixed(2)}`;
+  setTxt("care-cost", `${t("Today")} ${money(usage.todayCostUSD())} · ${t("Month")} ${money(usage.monthlyCostUSD())}`);
   setTxt("care-streak", String(s.streakDays));
   setTxt("care-lifetime", fmtNum(s.totalTokens));
   setTxt("care-sessions", String(s.totalMeals));

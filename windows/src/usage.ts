@@ -15,6 +15,7 @@ interface Row {
   day: string;
   tokens: number;
   sessions: number;
+  costUSD?: number;
 }
 
 function fnv1a(s: string): string {
@@ -47,15 +48,16 @@ function loadDirty(): Set<string> {
 }
 function saveDirty(d: Set<string>) { localStorage.setItem(DIRTY_KEY, JSON.stringify([...d])); }
 
-function record(project: string, agent: string, tokens: number, sessions: number) {
+function record(project: string, agent: string, tokens: number, sessions: number, cost = 0) {
   if (!project || !agent || (tokens <= 0 && sessions <= 0)) return;
   const { id, name } = projectIdentity(project);
   const day = today();
   const key = `${id}|${agent}|${day}`;
   const store = load();
-  const r = store[key] || { projectId: id, projectName: name, agent, day, tokens: 0, sessions: 0 };
+  const r = store[key] || { projectId: id, projectName: name, agent, day, tokens: 0, sessions: 0, costUSD: 0 };
   r.tokens += tokens;
   r.sessions += sessions;
+  r.costUSD = (r.costUSD || 0) + cost;
   r.projectName = name;
   store[key] = r;
   save(store);
@@ -65,8 +67,25 @@ function record(project: string, agent: string, tokens: number, sessions: number
   schedulePush();
 }
 
-export function recordTokens(project: string, agent: string, tokens: number) { record(project, agent, tokens, 0); }
+export function recordTokens(project: string, agent: string, tokens: number, cost = 0) { record(project, agent, tokens, 0, cost); }
 export function recordSession(project: string, agent: string) { record(project, agent, 0, 1); }
+
+function monthPrefix(): string {
+  const d = new Date();
+  return `${d.getFullYear().toString().padStart(4, "0")}-${(d.getMonth() + 1).toString().padStart(2, "0")}`;
+}
+
+/// Estimated Claude USD cost recorded for today (all projects/agents).
+export function todayCostUSD(): number {
+  const t = today();
+  return Object.values(load()).reduce((s, r) => (r.day === t ? s + (r.costUSD || 0) : s), 0);
+}
+
+/// Estimated Claude USD cost recorded this calendar month.
+export function monthlyCostUSD(): number {
+  const p = monthPrefix();
+  return Object.values(load()).reduce((s, r) => (r.day.startsWith(p) ? s + (r.costUSD || 0) : s), 0);
+}
 
 let pushTimer: number | undefined;
 export function schedulePush(afterMs = 30_000) {

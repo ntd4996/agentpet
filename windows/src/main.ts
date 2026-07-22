@@ -259,11 +259,11 @@ listen<string>("agent-end", (e) => {
   render();
 });
 // Tokens burned by an agent feed the currently-selected pet (Claude for now).
-listen<{ agent: string; session: string; project: string; tokens: number }>("agent-tokens", (e) => {
+listen<{ agent: string; session: string; project: string; tokens: number; cost?: number }>("agent-tokens", (e) => {
   const n = e.payload?.tokens || 0;
   if (n <= 0) return;
   const p = e.payload;
-  if (p.project) usage.recordTokens(p.project, p.agent, n);
+  if (p.project) usage.recordTokens(p.project, p.agent, n, p.cost || 0);
   const slug = savedSlug();
   if (!slug) return;
   care.mutate(slug, (s) => care.feedTokens(s, n));

@@ -87,10 +87,10 @@ fn handle_event(app: &AppHandle, body: &str) {
             let agent2 = agent.clone();
             std::thread::spawn(move || {
                 let path = crate::transcript::subagent_transcript_path(&parent, &subagent);
-                if let Some(tokens) = crate::transcript::new_usage_tokens(&path) {
+                if let Some((tokens, cost)) = crate::transcript::new_usage_delta(&path) {
                     if tokens > 0 {
                         let _ = app2.emit("agent-tokens", serde_json::json!({
-                            "agent": agent2, "session": sess, "project": proj, "tokens": tokens,
+                            "agent": agent2, "session": sess, "project": proj, "tokens": tokens, "cost": cost,
                         }));
                     }
                 }
@@ -144,12 +144,13 @@ fn handle_event(app: &AppHandle, body: &str) {
                 state
             };
             emit_payload(&app, &final_state, title);
-            // Feed the pet: the tokens Claude burned since the last read (delta).
-            if let Some(tokens) = crate::transcript::new_usage_tokens(&path) {
+            // Feed the pet: the tokens Claude burned since the last read (delta),
+            // plus their estimated USD cost.
+            if let Some((tokens, cost)) = crate::transcript::new_usage_delta(&path) {
                 if tokens > 0 {
                     let _ = app.emit("agent-tokens", serde_json::json!({
                         "agent": "claude", "session": tok_session,
-                        "project": tok_project, "tokens": tokens,
+                        "project": tok_project, "tokens": tokens, "cost": cost,
                     }));
                 }
             }
