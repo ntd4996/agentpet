@@ -86,8 +86,18 @@ public final class SessionStore {
             byID.removeValue(forKey: event.sessionId)
             return nil
         }
-        guard let state = StateMapper.state(for: event.agentKind, eventName: event.eventName) else {
+        guard var state = StateMapper.state(for: event.agentKind, eventName: event.eventName) else {
             return nil
+        }
+
+        let pendingApproval: PendingApproval?
+        if let requestId = event.approvalRequestId {
+            state = .waiting
+            pendingApproval = PendingApproval(
+                requestId: requestId, toolName: event.toolName ?? "", summary: event.toolSummary ?? ""
+            )
+        } else {
+            pendingApproval = nil
         }
 
         if var existing = byID[event.sessionId] {
@@ -97,6 +107,7 @@ public final class SessionStore {
             if let project = event.project { existing.project = project }
             if let model = event.model { existing.model = model }
             existing.message = event.message
+            existing.pendingApproval = pendingApproval
             byID[event.sessionId] = existing
             return existing
         }
@@ -108,10 +119,22 @@ public final class SessionStore {
             message: event.message,
             model: event.model,
             source: .hook,
-            updatedAt: now
+            updatedAt: now,
+            pendingApproval: pendingApproval
         )
         byID[event.sessionId] = session
         return session
+    }
+
+    /// Clears the pending approval for `id` and moves it to `.working`, but
+    /// only if `requestId` matches; otherwise a no-op returning `false`.
+    @discardableResult
+    public func resolveApproval(id: String, requestId: String) -> Bool {
+        guard var session = byID[id], session.pendingApproval?.requestId == requestId else { return false }
+        session.pendingApproval = nil
+        session.state = .working
+        byID[id] = session
+        return true
     }
 
     /// Demotes stale `done` sessions to `idle`, removes long-idle ones, and

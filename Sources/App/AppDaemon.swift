@@ -21,6 +21,9 @@ final class AppDaemon: ObservableObject {
     private var pruneTimer: Timer?
 
     func start() {
+        // The approval reply can race the CLI closing its socket — a stray
+        // write must return EPIPE, not SIGPIPE-kill the whole app.
+        signal(SIGPIPE, SIG_IGN)
         try? FileManager.default.createDirectory(
             atPath: AgentPetPaths.baseDir, withIntermediateDirectories: true
         )
@@ -54,6 +57,15 @@ final class AppDaemon: ObservableObject {
     func removeSession(_ id: String) {
         store.remove(id: id)
         refresh()
+    }
+
+    /// Resolves a pending approval from the bubble UI: writes the decision to
+    /// the hook and optimistically clears the pending state in the store.
+    func resolveApproval(sessionId: String, requestId: String, decision: ApprovalDecision) {
+        _ = PendingApprovalRegistry.shared.resolve(requestId: requestId, decision: decision)
+        if store.resolveApproval(id: sessionId, requestId: requestId) {
+            refresh()
+        }
     }
 
     private func ingest(_ event: AgentEvent) {

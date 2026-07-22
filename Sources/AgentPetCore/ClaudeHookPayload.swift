@@ -31,9 +31,12 @@ public struct ClaudeHookPayload: Decodable, Equatable {
         try? JSONDecoder().decode(ClaudeHookPayload.self, from: data)
     }
 
-    /// Builds an `AgentEvent` from the payload, or `nil` if the essential
-    /// fields (session id and event name) are missing.
-    public func makeEvent(now: Date, kind: AgentKind = .claude) -> AgentEvent? {
+    /// Builds an `AgentEvent`, or `nil` if session id / event name are missing.
+    /// `gatedTools` defaults to the opt-in config — empty means the gate is off.
+    public func makeEvent(
+        now: Date, kind: AgentKind = .claude,
+        gatedTools: Set<String> = ApprovalGateConfig.gatedTools()
+    ) -> AgentEvent? {
         guard let sessionId, let hookEventName else { return nil }
         let context = ActivityFormatter.activityMessage(
             eventName: hookEventName,
@@ -42,10 +45,22 @@ public struct ClaudeHookPayload: Decodable, Equatable {
             toolInput: toolInput,
             explicitMessage: message
         ) ?? toolName.map { "Using \($0)" }
+
+        var approvalRequestId: String?
+        var approvalToolName: String?
+        var approvalToolSummary: String?
+        if kind == .claude, hookEventName == "PreToolUse", let toolName, gatedTools.contains(toolName) {
+            approvalRequestId = UUID().uuidString
+            approvalToolName = toolName
+            approvalToolSummary = String((toolInput?.command ?? toolName).prefix(80))
+        }
+
         return AgentEvent(
             sessionId: sessionId, agentKind: kind, eventName: hookEventName,
             project: cwd, message: context, model: model?.displayName,
-            transcriptPath: transcriptPath, subagentId: agentId, timestamp: now
+            transcriptPath: transcriptPath, subagentId: agentId,
+            approvalRequestId: approvalRequestId, toolName: approvalToolName,
+            toolSummary: approvalToolSummary, timestamp: now
         )
     }
 }
