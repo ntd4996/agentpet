@@ -39,9 +39,23 @@ function projectIdentity(path: string): { id: string; name: string } {
 }
 
 function today(): string {
-  const d = new Date();
+  return dayString(new Date());
+}
+function dayString(d: Date): string {
   const y = d.getFullYear(), m = d.getMonth() + 1, day = d.getDate();
   return `${y.toString().padStart(4, "0")}-${m.toString().padStart(2, "0")}-${day.toString().padStart(2, "0")}`;
+}
+
+// Keep ~120 days of per-day rows (matches macOS ProjectUsageStore.pruneOld); the
+// zero-padded YYYY-MM-DD keys compare lexicographically, so a string cutoff works.
+const RETAIN_DAYS = 120;
+function prune(store: Record<string, Row>) {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - RETAIN_DAYS);
+  const cut = dayString(cutoff);
+  for (const [k, r] of Object.entries(store)) {
+    if (r.day < cut) delete store[k];
+  }
 }
 
 function load(): Record<string, Row> {
@@ -65,6 +79,7 @@ function record(project: string, agent: string, tokens: number, sessions: number
   r.costUSD = (r.costUSD || 0) + cost;
   r.projectName = name;
   store[key] = r;
+  prune(store);
   save(store);
   const dirty = loadDirty();
   dirty.add(key);

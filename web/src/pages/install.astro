@@ -9,14 +9,27 @@ const RELEASES = "https://github.com/ntd4996/agentpet/releases";
 const RELEASE_LATEST = "https://github.com/ntd4996/agentpet/releases/latest";
 const DISCORD = "https://discord.gg/kzFJKsZav";
 const BREW = "brew install --cask ntd4996/tap/agentpet";
-const WIN_TAG = "win-v0.1.2";
-const WIN_SETUP = `https://github.com/ntd4996/agentpet/releases/download/${WIN_TAG}/AgentPet_0.1.2_x64-setup.exe`;
+const WIN_TAG = "win-v0.1.4";
+const WIN_SETUP = `https://github.com/ntd4996/agentpet/releases/download/${WIN_TAG}/AgentPet_0.1.4_x64-setup.exe`;
 const WIN_PORTABLE = `https://github.com/ntd4996/agentpet/releases/download/${WIN_TAG}/AgentPet-portable-x64.zip`;
+
+const LINUX_TAG = "linux-v0.1.4";
+const LINUX_BASE = `https://github.com/ntd4996/agentpet/releases/download/${LINUX_TAG}`;
+const LINUX_APPIMAGE = `${LINUX_BASE}/AgentPet_0.1.4_amd64.AppImage`;
+const LINUX_DEB = `${LINUX_BASE}/AgentPet_0.1.4_amd64.deb`;
+const LINUX_RPM = `${LINUX_BASE}/AgentPet-0.1.4-1.x86_64.rpm`;
 
 const platforms = [
   { id: "macos", label: "macOS", icon: "apple", status: "Available" },
   { id: "windows", label: "Windows", icon: "windows", status: "Available" },
-  { id: "linux", label: "Linux", icon: "linux", status: "Soon" },
+  { id: "linux", label: "Linux", icon: "linux", status: "Available" },
+];
+
+const linuxRequirements = [
+  "A 64-bit desktop distro (Ubuntu/Debian, Fedora, or anything that runs an AppImage).",
+  "A compositor with transparency (standard on GNOME, KDE, and most desktops).",
+  "GTK 3 + WebKit2GTK 4.1 (the .deb/.rpm pull these in; the AppImage bundles what it can).",
+  "System-tray support (install a GNOME AppIndicator extension if your tray is missing).",
 ];
 
 const winRequirements = [
@@ -45,6 +58,22 @@ const firstRunWin = [
   { t: "Enable notifications", b: "Allow notifications so the pet can ping you when an agent needs input." },
 ];
 
+const firstRunLinux = [
+  { t: "Open AgentPet", b: "Your pet lands on the desktop and an icon appears in the system tray. Click the tray icon to open Settings." },
+  { t: "Connect an agent", b: "In Settings → General, click Install next to Claude Code (or your tool)." },
+  { t: "Enable notifications", b: "Allow notifications so the pet can ping you when an agent needs input." },
+];
+
+const LINUX_RUN = `# AppImage , works on any distro
+chmod +x AgentPet_0.1.4_amd64.AppImage
+./AgentPet_0.1.4_amd64.AppImage
+
+# Debian / Ubuntu
+sudo dpkg -i AgentPet_0.1.4_amd64.deb
+
+# Fedora / openSUSE
+sudo rpm -i AgentPet-0.1.4-1.x86_64.rpm`;
+
 const UNINSTALL = `brew uninstall --cask agentpet
 rm -rf ~/.agentpet
 rm -f  ~/Library/Preferences/com.agentpet.app.plist`;
@@ -54,16 +83,17 @@ cd agentpet
 ./scripts/build-app.sh release
 open build/AgentPet.app`;
 ---
-<Base title="Install AgentPet · download for macOS & Windows" description="Download and install AgentPet for macOS or Windows. Homebrew, a notarized DMG, or a Windows installer. Linux on the way." active="">
+<Base title="Install AgentPet · download for macOS, Windows & Linux" description="Download and install AgentPet for macOS, Windows, or Linux. Homebrew, a notarized DMG, a Windows installer, or an AppImage / .deb / .rpm." active="">
   <Hero
     eyebrow="Download"
     icon="download"
     title="Install"
     accent="AgentPet"
-    lead="Adopt a pixel companion for your AI coding agents. Free and open source, for macOS and Windows. Pick your platform below."
+    lead="Adopt a pixel companion for your AI coding agents. Free and open source, for macOS, Windows, and Linux. Pick your platform below."
   >
     <a href={RELEASE_LATEST} target="_blank" rel="noopener" data-os-cta="macos" class="btn-primary !px-6 !py-3.5 text-base"><Icon name="apple" class="h-5 w-5" /> Download for macOS</a>
     <a href={WIN_SETUP} data-os-cta="windows" class="btn-primary hidden !px-6 !py-3.5 text-base"><Icon name="windows" class="h-5 w-5" /> Download for Windows</a>
+    <a href={LINUX_APPIMAGE} data-os-cta="linux" class="btn-primary hidden !px-6 !py-3.5 text-base"><Icon name="linux" class="h-5 w-5" /> Download for Linux</a>
     <a href={GITHUB} target="_blank" rel="noopener" class="btn-ghost !px-6 !py-3.5 text-base"><Icon name="github" class="h-4 w-4" /> Star on GitHub</a>
   </Hero>
 
@@ -216,14 +246,64 @@ open build/AgentPet.app`;
 
       <!-- Linux panel -->
       <div data-panel="linux" class="tab-panel mt-8 hidden">
-        <div class="card mx-auto max-w-2xl p-10 text-center">
-          <span class="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Icon name="linux" class="h-8 w-8" /></span>
-          <h3 class="mt-5 font-display text-2xl font-bold text-ink">Linux & Ubuntu coming soon</h3>
-          <p class="mx-auto mt-3 max-w-md text-muted">We're building Linux support, starting with Ubuntu. Star the repo or join Discord to be first in line.</p>
-          <div class="mt-6 flex flex-wrap justify-center gap-3">
-            <a href={GITHUB} target="_blank" rel="noopener" class="btn-primary !px-5 !py-3"><Icon name="github" class="h-4 w-4" /> Watch on GitHub</a>
-            <a href={DISCORD} target="_blank" rel="noopener" class="btn-ghost !px-5 !py-3"><Icon name="discord" class="h-4 w-4" /> Get notified on Discord</a>
+        <div class="text-center">
+          <h3 class="font-display text-2xl font-bold text-ink">Three formats, pick one</h3>
+          <p class="mx-auto mt-2 max-w-md text-muted">A universal AppImage, or a native package for Debian/Ubuntu and Fedora. You only need one.</p>
+        </div>
+
+        <div class="mt-7 grid gap-5 md:grid-cols-3">
+          <div class="card relative flex flex-col p-7">
+            <span class="absolute right-5 top-6 rounded-full bg-mint-400/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-600">Any distro</span>
+            <span class="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Icon name="download" class="h-6 w-6" /></span>
+            <h3 class="mt-4 font-display text-xl font-semibold text-ink">AppImage</h3>
+            <p class="mt-2 flex-1 text-muted"><code class="rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs text-brand-700">chmod +x</code> it and run , no install, works everywhere.</p>
+            <a href={LINUX_APPIMAGE} class="btn-primary mt-4 w-full"><Icon name="linux" class="h-5 w-5" /> Download .AppImage</a>
           </div>
+          <div class="card flex flex-col p-7">
+            <span class="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Icon name="package" class="h-6 w-6" /></span>
+            <h3 class="mt-4 font-display text-xl font-semibold text-ink">Debian / Ubuntu</h3>
+            <p class="mt-2 flex-1 text-muted">A native <code class="rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs text-brand-700">.deb</code> , installs with apt/dpkg and pulls its dependencies.</p>
+            <a href={LINUX_DEB} class="btn-primary mt-4 w-full"><Icon name="linux" class="h-5 w-5" /> Download .deb</a>
+          </div>
+          <div class="card flex flex-col p-7">
+            <span class="grid h-12 w-12 place-items-center rounded-2xl bg-brand-50 text-brand-600"><Icon name="package" class="h-6 w-6" /></span>
+            <h3 class="mt-4 font-display text-xl font-semibold text-ink">Fedora / openSUSE</h3>
+            <p class="mt-2 flex-1 text-muted">A native <code class="rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs text-brand-700">.rpm</code> for rpm-based distros.</p>
+            <a href={LINUX_RPM} class="btn-primary mt-4 w-full"><Icon name="linux" class="h-5 w-5" /> Download .rpm</a>
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <CodeBlock code={LINUX_RUN} lang="bash" />
+        </div>
+
+        <!-- requirements -->
+        <div class="card mt-5 p-7">
+          <h3 class="font-display text-lg font-semibold text-ink">What you need</h3>
+          <ul class="mt-4 grid gap-3 sm:grid-cols-2">
+            {linuxRequirements.map((r) => (
+              <li class="flex items-start gap-3 text-sm text-muted">
+                <span class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-mint-400/15 text-emerald-600"><Icon name="check" class="h-3.5 w-3.5" /></span>
+                {r}
+              </li>
+            ))}
+          </ul>
+          <p class="mt-4 rounded-xl bg-sun-400/10 px-4 py-3 text-sm text-muted">This is an early Linux build , unsigned and without in-app auto-update yet, so grab new versions from <a href={RELEASES} target="_blank" rel="noopener" class="font-semibold text-brand-600 hover:text-brand-700">Releases</a>. It's open source, audit every line on <a href={GITHUB} target="_blank" rel="noopener" class="font-semibold text-brand-600 hover:text-brand-700">GitHub</a>.</p>
+        </div>
+
+        <!-- after install -->
+        <div class="mt-10">
+          <h3 class="text-center font-display text-2xl font-bold text-ink">After you install</h3>
+          <div class="mt-6 grid gap-5 md:grid-cols-3">
+            {firstRunLinux.map((s, i) => (
+              <div class="card p-6">
+                <div class="grid h-9 w-9 place-items-center rounded-full bg-brand-600 font-display text-sm font-bold text-white">{i + 1}</div>
+                <h4 class="mt-3 font-display text-lg font-semibold text-ink">{s.t}</h4>
+                <p class="mt-1.5 text-sm text-muted">{s.b}</p>
+              </div>
+            ))}
+          </div>
+          <p class="mt-5 text-center text-sm text-faint">Next: <a href="/integrations#setup" class="font-semibold text-brand-600 hover:text-brand-700">connect your agents</a> · <a href="/gallery" class="font-semibold text-brand-600 hover:text-brand-700">adopt a pet</a></p>
         </div>
       </div>
     </div>
@@ -303,12 +383,15 @@ open build/AgentPet.app`;
     }
     tabs.forEach((t) => t.addEventListener("click", () => select(t.dataset.tab!)));
 
-    // OS-aware default: Windows visitors get the Windows tab + hero button.
-    const isWindows = /Win(dows|32|64)/i.test(navigator.userAgent);
-    if (isWindows) {
-      select("windows");
+    // OS-aware default: show the visitor's platform tab + matching hero button.
+    const ua = navigator.userAgent;
+    const os = /Win(dows|32|64)/i.test(ua) ? "windows"
+      : (/Linux|X11|Ubuntu/i.test(ua) && !/Android/i.test(ua)) ? "linux"
+      : "macos";
+    if (os !== "macos") {
+      select(os);
       document.querySelectorAll<HTMLElement>("[data-os-cta]").forEach((el) => {
-        el.classList.toggle("hidden", el.dataset.osCta !== "windows");
+        el.classList.toggle("hidden", el.dataset.osCta !== os);
       });
     }
   </script>

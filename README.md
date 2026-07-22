@@ -4,7 +4,7 @@
     <a href="https://trendshift.io/repositories/46602?utm_source=trendshift-badge&amp;utm_medium=badge&amp;utm_campaign=badge-trendshift-46602" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/46602/daily?language=Swift" alt="ntd4996%2Fagentpet | Trendshift" width="250" height="55"/></a>
   </p>
   <p>
-    <img src="https://img.shields.io/badge/platform-macOS%2013%2B%20%C2%B7%20Windows%2010%2F11-black" alt="macOS 13+ · Windows 10/11" />
+    <img src="https://img.shields.io/badge/platform-macOS%2013%2B%20%C2%B7%20Windows%2010%2F11%20%C2%B7%20Linux-black" alt="macOS 13+ · Windows 10/11 · Linux" />
     <img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT" />
     <img src="https://img.shields.io/badge/Swift-SwiftUI-orange" alt="Swift" />
     <a href="https://github.com/ntd4996/agentpet/actions"><img src="https://github.com/ntd4996/agentpet/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
@@ -73,7 +73,7 @@ It is also a **tamagotchi**. The pet is fed by real work , the tokens your agent
 - 🔌 **11 coding agents** supported out of the box, plus a universal wrapper for anything else.
 - ☁️ **Optional web profile, leaderboard, and cross-device restore** , everything works offline if you skip it.
 - 🌍 **Localized** in English, Tiếng Việt, 简体中文 and 繁體中文.
-- 🍎 **macOS** (native Swift/SwiftUI, notarized) and 🪟 **Windows** (Tauri), both with auto-update.
+- 🍎 **macOS** (native Swift/SwiftUI, notarized), 🪟 **Windows** and 🐧 **Linux** (one Tauri app), with auto-update on macOS and Windows.
 
 ## Features
 
@@ -159,6 +159,23 @@ Grab the latest `AgentPet.dmg` from [Releases](https://github.com/ntd4996/agentp
 
 Download the installer or portable build from the [website](https://agentpet.thenightwatcher.online/install) or the [releases](https://github.com/ntd4996/agentpet/releases). The first launch may show a SmartScreen warning (the Windows build isn't code-signed yet); click **More info → Run anyway**. It installs per-user (no admin) and auto-updates.
 
+### Linux
+
+Download an AppImage, `.deb`, or `.rpm` from the [website](https://agentpet.thenightwatcher.online/install) or the [releases](https://github.com/ntd4996/agentpet/releases):
+
+```bash
+# AppImage , any distro
+chmod +x AgentPet_*_amd64.AppImage && ./AgentPet_*_amd64.AppImage
+
+# Debian / Ubuntu
+sudo dpkg -i AgentPet_*_amd64.deb
+
+# Fedora / openSUSE
+sudo rpm -i AgentPet-*.x86_64.rpm
+```
+
+Same Tauri app as Windows, so it has full feature parity with macOS. This is an early build: unsigned and without in-app auto-update yet, so grab new versions from Releases. If the tray icon is missing on GNOME, install an AppIndicator extension.
+
 ### Build from source (macOS)
 
 ```bash
@@ -212,14 +229,15 @@ A starter pet is installed on first launch. **AgentPet bundles no pet art** , ev
 
 - **macOS 13 Ventura or later** , native Swift / SwiftUI, notarized, Sparkle auto-update, Homebrew cask. Apple Silicon and Intel.
 - **Windows 10 / 11 (64-bit)** , Tauri (Rust), auto-update. Feature parity with macOS.
+- **Linux (64-bit)** , the same Tauri app, shipped as AppImage / `.deb` / `.rpm`. Feature parity with macOS. Early build: unsigned, no in-app auto-update yet.
 
 Under the hood: a Unix-socket daemon receives agent events from lightweight hooks, an on-device store drives the pet, and an optional Astro + Cloudflare Workers/D1 backend powers the web profile, leaderboard and usage dashboard. See [`docs/specs`](docs/specs) for the design.
 
 ## Community ports
 
-AgentPet is built for macOS and Windows, but the community has reimagined it elsewhere:
+Alongside the official macOS, Windows, and Linux builds, the community has reimagined AgentPet with its own stack:
 
-- **Linux (Rust + GTK4)** , [agentpet-linux](https://github.com/tranhuuhuy297/agentpet-linux) by [@tranhuuhuy297](https://github.com/tranhuuhuy297). An independent, from-scratch port for Ubuntu (Claude Code + Codex).
+- **Linux (Rust + GTK4)** , [agentpet-linux](https://github.com/tranhuuhuy297/agentpet-linux) by [@tranhuuhuy297](https://github.com/tranhuuhuy297). An independent, from-scratch GTK4 port for Ubuntu (Claude Code + Codex) , distinct from the official Tauri Linux build above.
 
 These are separate community projects, not maintained here. Building one? Open an issue and we'll link it.
 
