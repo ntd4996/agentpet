@@ -546,8 +546,9 @@ export class BubbleRenderer {
     el.classList.toggle("waiting", s.state === "waiting");
 
     // Click a row to focus the terminal running it (Warp deep-link; see the
-    // focus_terminal Rust command). Highlight + pointer only when focusable.
-    const canFocus = !!(s.terminalProgram || s.terminalFocusUrl);
+    // focus_terminal Rust command). Only Warp gives a reliable focus on
+    // Windows/Linux, so only warp-backed rows advertise as clickable.
+    const canFocus = !!s.terminalFocusUrl;
     el.classList.toggle("focusable", canFocus);
     el.onclick = canFocus
       ? () => { void invoke("focus_terminal", { program: s.terminalProgram, focusUrl: s.terminalFocusUrl }); }

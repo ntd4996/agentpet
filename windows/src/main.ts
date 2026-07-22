@@ -19,10 +19,16 @@ import * as projectpets from "./projectpets";
 const MY_PROJECT = new URLSearchParams(location.search).get("project");
 const IS_MAIN = MY_PROJECT === null;
 
+// A project window sets this the moment its project is un-split, so it stops
+// feeding during the brief async gap before Rust closes it (else the main window
+// , which now owns the project , and this dying window would both feed one event).
+let windowDead = false;
+
 /// Does this window own a session (feed its pet, count it, notify)? Split off:
 /// the main window owns everything. Split on: a project window owns only its
 /// project; the main window owns every unconfigured project.
 function ownsProject(path: string): boolean {
+  if (windowDead) return false;
   if (!projectpets.splitEnabled()) return IS_MAIN;
   const id = usage.projectId(path || "");
   if (MY_PROJECT) return id === MY_PROJECT;
@@ -249,6 +255,12 @@ function render() {
   if (IS_MAIN) reportTrayStatus(store.active());
 }
 setInterval(render, 500);
+// Hunger decays over time, so evaluate it on a timer (not only after feeding,
+// when the pet is always full) , matching macOS's state-republish trigger.
+setInterval(() => {
+  const slug = myPetSlug();
+  if (slug) flashReactive(reactive.evaluate("hunger", care.hunger(care.stateFor(slug))));
+}, 60_000);
 // Carousel advance / fold clicks request a prompt repaint.
 setInterval(() => { if (bubble.dirty) { bubble.dirty = false; render(); } }, 120);
 // Live elapsed clocks tick every second.
@@ -364,6 +376,15 @@ if (IS_MAIN && sync.signedIn()) {
 if (IS_MAIN) {
   syncProjectWindows();
   listen("split-changed", () => syncProjectWindows());
+} else {
+  // A project window: once split is off or its project is no longer configured,
+  // it's about to be closed , stop owning events immediately to avoid a
+  // double-feed with the main window during teardown.
+  listen("split-changed", () => {
+    if (!projectpets.splitEnabled() || (MY_PROJECT && !projectpets.configuredProjectIds().includes(MY_PROJECT))) {
+      windowDead = true;
+    }
+  });
 }
 // Settings window: dismiss one session / clear all (mac popover actions).
 listen<string>("session-dismiss", (e) => { store.removeKey(e.payload); render(); });

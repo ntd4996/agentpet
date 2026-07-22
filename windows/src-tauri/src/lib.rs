@@ -184,9 +184,19 @@ fn open_url(url: String) {
 /// exact pane , the one reliable cross-platform "focus exact tab". Other
 /// terminals have no dependable tab-focus API on Windows/Linux, so we only
 /// best-effort activate the app on macOS (where the Tauri build is dev-only).
+/// A safe `warp://session/<uuid>` deep link: scheme + only URL-safe characters,
+/// so it can never carry shell metacharacters into `cmd /c start`.
+fn is_safe_warp_url(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("warp://") else { return false };
+    !rest.is_empty()
+        && rest
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '/' | '-'))
+}
+
 #[tauri::command]
 fn focus_terminal(program: String, focus_url: String) {
-    if focus_url.starts_with("warp://") {
+    if is_safe_warp_url(&focus_url) {
         #[cfg(windows)]
         { let _ = std::process::Command::new("cmd").args(["/c", "start", "", &focus_url]).spawn(); }
         #[cfg(target_os = "macos")]
