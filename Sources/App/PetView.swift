@@ -712,9 +712,10 @@ private struct AgentRow: View {
 
     private var isWaiting: Bool { session.state == .waiting }
 
-    /// A live session we can jump back to: it knows its terminal and isn't done.
+    /// Any displayed session whose terminal we know can be jumped to, whatever
+    /// its state (working, waiting, done). Its tab may still be open.
     private var canFocusTerminal: Bool {
-        session.terminalProgram != nil && session.state != .done && session.state != .idle
+        session.terminalProgram != nil
     }
 
     /// Same orange used for the waiting state dot — applied to the message
@@ -723,11 +724,14 @@ private struct AgentRow: View {
 
     @ViewBuilder
     var body: some View {
-        if let pending = session.pendingApproval {
-            PendingApprovalRow(session: session, pending: pending, chatStyle: chatStyle)
-        } else {
-            rowBody
+        Group {
+            if let pending = session.pendingApproval {
+                PendingApprovalRow(session: session, pending: pending, chatStyle: chatStyle)
+            } else {
+                rowBody
+            }
         }
+        .modifier(RowInteraction(sessionId: session.id, canFocus: canFocusTerminal))
     }
 
     private var rowBody: some View {
@@ -755,8 +759,6 @@ private struct AgentRow: View {
             }
         }
         .frame(maxWidth: rowMaxWidth, alignment: .leading)
-        .contentShape(Rectangle())
-        .modifier(FocusTerminalTap(sessionId: session.id, enabled: canFocusTerminal))
     }
 
     @ViewBuilder
@@ -971,18 +973,42 @@ private struct PendingApprovalRow: View {
     }
 }
 
-/// Makes a live session row clickable to bring its terminal to the front, with
-/// a pointer cursor on hover so the affordance is discoverable.
-private struct FocusTerminalTap: ViewModifier {
+/// Row-level interaction for a live session: a subtle hover highlight so it's
+/// clear which row is under the pointer, plus a tap that focuses the session's
+/// terminal. The highlight is drawn with a negative inset so it doesn't shift
+/// the row's layout. Applied to normal and pending-approval rows alike; the
+/// Allow/Deny buttons inside a pending row keep their own taps.
+private struct RowInteraction: ViewModifier {
+    let sessionId: String
+    let canFocus: Bool
+    @State private var hovering = false
+
+    func body(content: Content) -> some View {
+        content
+            .background(highlight)
+            .contentShape(Rectangle())
+            .onHover { hovering = $0 }
+            .modifier(TapToFocus(sessionId: sessionId, enabled: canFocus))
+    }
+
+    @ViewBuilder
+    private var highlight: some View {
+        if canFocus && hovering {
+            RoundedRectangle(cornerRadius: 5)
+                .fill(Color.primary.opacity(0.10))
+                .padding(.horizontal, -5)
+                .padding(.vertical, -2)
+        }
+    }
+}
+
+private struct TapToFocus: ViewModifier {
     let sessionId: String
     let enabled: Bool
-
     func body(content: Content) -> some View {
         if enabled {
             content
-                .onTapGesture {
-                    AppDaemon.shared.focusTerminal(sessionId: sessionId)
-                }
+                .onTapGesture { AppDaemon.shared.focusTerminal(sessionId: sessionId) }
                 .help(NSLocalizedString("Click to open this terminal", comment: "bubble row focus-terminal hint"))
         } else {
             content

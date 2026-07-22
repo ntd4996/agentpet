@@ -33,6 +33,9 @@ public struct AgentEvent: Codable, Sendable, Equatable {
     /// Controlling TTY device of the terminal (e.g. `"/dev/ttys003"`), used to
     /// activate the exact window/tab in Terminal.app and iTerm2.
     public var terminalTTY: String?
+    /// Deep link that focuses the exact tab/pane (Warp's `WARP_FOCUS_URL`). Used
+    /// for terminals that expose a URL scheme instead of AppleScript.
+    public var terminalFocusURL: String?
     public var timestamp: Date
 
     public init(
@@ -49,6 +52,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         toolSummary: String? = nil,
         terminalProgram: String? = nil,
         terminalTTY: String? = nil,
+        terminalFocusURL: String? = nil,
         timestamp: Date
     ) {
         self.sessionId = sessionId
@@ -64,6 +68,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         self.toolSummary = toolSummary
         self.terminalProgram = terminalProgram
         self.terminalTTY = terminalTTY
+        self.terminalFocusURL = terminalFocusURL
         self.timestamp = timestamp
     }
 }

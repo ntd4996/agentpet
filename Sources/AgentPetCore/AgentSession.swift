@@ -41,6 +41,8 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
     /// Controlling TTY of the terminal running this session (e.g.
     /// `"/dev/ttys003"`). Sticky. Used to target the exact window/tab.
     public var terminalTTY: String?
+    /// Deep link that focuses the exact tab/pane (Warp). Sticky.
+    public var terminalFocusURL: String?
 
     public init(
         id: String,
@@ -56,7 +58,8 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
         createdAt: Date? = nil,
         pendingApproval: PendingApproval? = nil,
         terminalProgram: String? = nil,
-        terminalTTY: String? = nil
+        terminalTTY: String? = nil,
+        terminalFocusURL: String? = nil
     ) {
         self.id = id
         self.agentKind = agentKind
@@ -72,5 +75,6 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
         self.pendingApproval = pendingApproval
         self.terminalProgram = terminalProgram
         self.terminalTTY = terminalTTY
+        self.terminalFocusURL = terminalFocusURL
     }
 }

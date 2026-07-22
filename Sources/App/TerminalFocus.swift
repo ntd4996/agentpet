@@ -23,7 +23,7 @@ enum TerminalFocus {
         "alacritty": "org.alacritty",
     ]
 
-    static func focus(program: String?, tty: String?) {
+    static func focus(program: String?, tty: String?, focusURL: String? = nil) {
         guard let program else { return }
         queue.async {
             switch program {
@@ -32,9 +32,12 @@ enum TerminalFocus {
             case "iTerm.app" where tty != nil:
                 runScript(iTermScript(tty: tty!))
             default:
-                // Warp (no tab scripting) and any terminal we lack a tty for:
-                // just bring the app forward if we know its bundle id.
-                if let bid = bundleIDs[program] {
+                // Warp has no tab scripting but exposes a warp:// deep link that
+                // focuses the exact pane; open it. Otherwise just bring the app
+                // to the front if we recognise its bundle id.
+                if let focusURL, let url = URL(string: focusURL), url.scheme != nil {
+                    NSWorkspace.shared.open(url)
+                } else if let bid = bundleIDs[program] {
                     runScript("tell application id \"\(bid)\" to activate")
                 }
             }

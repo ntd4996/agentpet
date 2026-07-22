@@ -72,7 +72,7 @@ final class AppDaemon: ObservableObject {
     /// iTerm2 focus the exact tab via tty; Warp/others just activate the app).
     func focusTerminal(sessionId: String) {
         guard let session = store.session(id: sessionId) else { return }
-        TerminalFocus.focus(program: session.terminalProgram, tty: session.terminalTTY)
+        TerminalFocus.focus(program: session.terminalProgram, tty: session.terminalTTY, focusURL: session.terminalFocusURL)
     }
 
     private func ingest(_ event: AgentEvent) {

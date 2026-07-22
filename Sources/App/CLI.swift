@@ -18,6 +18,7 @@ enum HookCLI {
         let terminal = TerminalInfo.capture()
         event?.terminalProgram = terminal.program
         event?.terminalTTY = terminal.tty
+        event?.terminalFocusURL = terminal.focusURL
 
         guard let event else {
             FileHandle.standardError.write(Data(

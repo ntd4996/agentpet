@@ -3,14 +3,26 @@ import Foundation
 /// Captures which terminal the CLI helper runs inside, so the daemon can later
 /// bring that exact window/tab to the front when the user clicks a bubble row.
 public enum TerminalInfo {
-    /// `TERM_PROGRAM` + controlling TTY, read from the current process. Both are
-    /// `nil` when there's no terminal (e.g. an agent launched from CI), which
-    /// leaves the click-to-focus affordance disabled for that session.
+    public struct Captured: Sendable, Equatable {
+        public let program: String?
+        public let tty: String?
+        /// A deep link that focuses the exact tab/pane, when the terminal offers
+        /// one (Warp sets `WARP_FOCUS_URL`, e.g. `warp://session/<uuid>`).
+        public let focusURL: String?
+    }
+
+    /// Terminal identifiers read from the current process. All `nil` when there's
+    /// no terminal (e.g. an agent launched from CI), which leaves the
+    /// click-to-focus affordance disabled for that session.
     public static func capture(
         env: [String: String] = ProcessInfo.processInfo.environment
-    ) -> (program: String?, tty: String?) {
-        let program = env["TERM_PROGRAM"].flatMap { $0.isEmpty ? nil : $0 }
-        return (program, controllingTTY())
+    ) -> Captured {
+        func nonEmpty(_ key: String) -> String? { env[key].flatMap { $0.isEmpty ? nil : $0 } }
+        return Captured(
+            program: nonEmpty("TERM_PROGRAM"),
+            tty: controllingTTY(),
+            focusURL: nonEmpty("WARP_FOCUS_URL")
+        )
     }
 
     /// The device path of the controlling terminal (e.g. `/dev/ttys003`). Hooks
