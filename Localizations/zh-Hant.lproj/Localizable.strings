@@ -505,3 +505,7 @@
 "The home pet nudges you to rest after a work stretch." = "主寵物會在你工作一段時間後提醒休息。";
 "Turn off to freeze pet/bubble animation (lower CPU)." = "關閉以凍結寵物/氣泡動畫（降低 CPU）。";
 "missing" = "缺失";
+"Est. cost (Claude)" = "預估費用（Claude）";
+"Today %@ · Month %@" = "今天 %@ · 本月 %@";
+"Allow" = "允許";
+"Deny" = "拒絕";

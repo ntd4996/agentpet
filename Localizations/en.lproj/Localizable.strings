@@ -276,6 +276,7 @@
 "Sessions finished" = "Sessions finished";
 "Streak" = "Streak";
 "Est. cost (Claude)" = "Est. cost (Claude)";
+"Today %@ · Month %@" = "Today %@ · Month %@";
 "%d days" = "%d days";
 "Total tokens eaten" = "Total tokens eaten";
 "Total sessions" = "Total sessions";
@@ -448,3 +449,5 @@
 "Updates" = "Updates";
 "Quit" = "Quit";
 "Checking…" = "Checking…";
+"Allow" = "Allow";
+"Deny" = "Deny";

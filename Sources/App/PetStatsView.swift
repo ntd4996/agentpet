@@ -299,7 +299,8 @@ struct PetStatsView: View {
                 .font(.system(size: 9, weight: .semibold)).tracking(0.8)
                 .foregroundStyle(.white.opacity(0.35))
             Spacer()
-            Text(verbatim: "Today \(Self.costString(usageStore.todayCostUSD)) · Month \(Self.costString(usageStore.monthlyCostUSD))")
+            Text(verbatim: String(format: NSLocalizedString("Today %@ · Month %@", comment: "cost row: today / this month estimate"),
+                                   Self.costString(usageStore.todayCostUSD), Self.costString(usageStore.monthlyCostUSD)))
                 .font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.55))
         }
     }

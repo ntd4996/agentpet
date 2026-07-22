@@ -37,7 +37,7 @@ public enum EventSender {
     /// Sends an approval-gated event and blocks for the daemon's decision,
     /// falling back to `.ask` on connect/write/timeout/decode failure.
     public static func sendAndAwaitReply(
-        _ event: AgentEvent, socketPath: String, timeout: TimeInterval = 12
+        _ event: AgentEvent, socketPath: String, timeout: TimeInterval = ApprovalTimeouts.client
     ) -> ApprovalDecision {
         guard let line = try? encodeLine(event), let fd = connectedSocket(path: socketPath) else {
             return .ask

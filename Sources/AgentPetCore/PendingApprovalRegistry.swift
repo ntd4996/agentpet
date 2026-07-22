@@ -30,7 +30,7 @@ public final class PendingApprovalRegistry: @unchecked Sendable {
 
     /// Auto-resolves to `.ask` after `timeout` — kept shorter than the CLI's
     /// read timeout so the reply lands while the peer is still reading.
-    public func register(requestId: String, fd: Int32, timeout: TimeInterval = 10) {
+    public func register(requestId: String, fd: Int32, timeout: TimeInterval = ApprovalTimeouts.daemon) {
         // SO_NOSIGPIPE: a write after the CLI died must not SIGPIPE the daemon.
         var on: Int32 = 1
         _ = setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))

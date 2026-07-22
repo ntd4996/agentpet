@@ -164,6 +164,8 @@ public enum TranscriptReader {
     /// per turn; we sum fresh input (minus cached) + output to mirror Claude's
     /// `input_tokens + output_tokens`, so the leaderboard is comparable (#29).
     public static func newCodexUsageTokens(at path: String) -> Int? {
+        stateLock.lock()
+        defer { stateLock.unlock() }
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { try? handle.close() }
 

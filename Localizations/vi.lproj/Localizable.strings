@@ -506,3 +506,7 @@
 "The home pet nudges you to rest after a work stretch." = "Pet chính sẽ nhắc bạn nghỉ sau một quãng làm việc.";
 "Turn off to freeze pet/bubble animation (lower CPU)." = "Tắt để dừng hoạt ảnh pet/bong bóng (giảm CPU).";
 "missing" = "thiếu";
+"Est. cost (Claude)" = "Ước tính chi phí (Claude)";
+"Today %@ · Month %@" = "Hôm nay %@ · Tháng %@";
+"Allow" = "Cho phép";
+"Deny" = "Từ chối";
