@@ -9,15 +9,15 @@ const RELEASES = "https://github.com/ntd4996/agentpet/releases";
 const RELEASE_LATEST = "https://github.com/ntd4996/agentpet/releases/latest";
 const DISCORD = "https://discord.gg/kzFJKsZav";
 const BREW = "brew install --cask ntd4996/tap/agentpet";
-const WIN_TAG = "win-v0.1.4";
-const WIN_SETUP = `https://github.com/ntd4996/agentpet/releases/download/${WIN_TAG}/AgentPet_0.1.4_x64-setup.exe`;
+const WIN_TAG = "win-v0.1.5";
+const WIN_SETUP = `https://github.com/ntd4996/agentpet/releases/download/${WIN_TAG}/AgentPet_0.1.5_x64-setup.exe`;
 const WIN_PORTABLE = `https://github.com/ntd4996/agentpet/releases/download/${WIN_TAG}/AgentPet-portable-x64.zip`;
 
-const LINUX_TAG = "linux-v0.1.4";
+const LINUX_TAG = "linux-v0.1.5";
 const LINUX_BASE = `https://github.com/ntd4996/agentpet/releases/download/${LINUX_TAG}`;
-const LINUX_APPIMAGE = `${LINUX_BASE}/AgentPet_0.1.4_amd64.AppImage`;
-const LINUX_DEB = `${LINUX_BASE}/AgentPet_0.1.4_amd64.deb`;
-const LINUX_RPM = `${LINUX_BASE}/AgentPet-0.1.4-1.x86_64.rpm`;
+const LINUX_APPIMAGE = `${LINUX_BASE}/AgentPet_0.1.5_amd64.AppImage`;
+const LINUX_DEB = `${LINUX_BASE}/AgentPet_0.1.5_amd64.deb`;
+const LINUX_RPM = `${LINUX_BASE}/AgentPet-0.1.5-1.x86_64.rpm`;
 
 const platforms = [
   { id: "macos", label: "macOS", icon: "apple", status: "Available" },
@@ -67,14 +67,14 @@ const firstRunLinux = [
 const LINUX_ONELINE = `curl -fsSL https://agentpet.thenightwatcher.online/install.sh | sh`;
 
 const LINUX_RUN = `# AppImage , works on any distro
-chmod +x AgentPet_0.1.4_amd64.AppImage
-./AgentPet_0.1.4_amd64.AppImage
+chmod +x AgentPet_0.1.5_amd64.AppImage
+./AgentPet_0.1.5_amd64.AppImage
 
 # Debian / Ubuntu
-sudo dpkg -i AgentPet_0.1.4_amd64.deb
+sudo dpkg -i AgentPet_0.1.5_amd64.deb
 
 # Fedora / openSUSE
-sudo rpm -i AgentPet-0.1.4-1.x86_64.rpm`;
+sudo rpm -i AgentPet-0.1.5-1.x86_64.rpm`;
 
 const UNINSTALL = `brew uninstall --cask agentpet
 rm -rf ~/.agentpet
