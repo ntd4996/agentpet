@@ -1,0 +1,75 @@
+name: Linux build
+
+# Builds the Linux packages (.deb + AppImage + .rpm) for the Tauri app in
+# windows/ (the cross-platform desktop app; the folder name is historical).
+# Trigger manually from the Actions tab (workflow_dispatch) to test, or push a
+# tag like `linux-v0.1.2` to also attach the packages to a GitHub release.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "linux-v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: windows
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: windows/package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: windows/src-tauri
+
+      # Tauri v2 Linux build/runtime deps: webkit2gtk 4.1, GTK, the Ayatana
+      # appindicator for the tray, librsvg for icons, and patchelf for AppImage.
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            file \
+            libssl-dev \
+            build-essential \
+            curl wget
+
+      - name: Install frontend deps
+        run: npm ci
+
+      - name: Build Tauri app (deb + appimage + rpm)
+        run: npm run tauri build -- --bundles deb,appimage,rpm
+
+      - name: Upload packages as artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentpet-linux-packages
+          path: |
+            windows/src-tauri/target/release/bundle/deb/*.deb
+            windows/src-tauri/target/release/bundle/appimage/*.AppImage
+            windows/src-tauri/target/release/bundle/rpm/*.rpm
+          if-no-files-found: error
+
+      - name: Attach packages to release (on linux-v* tag)
+        if: startsWith(github.ref, 'refs/tags/linux-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            windows/src-tauri/target/release/bundle/deb/*.deb
+            windows/src-tauri/target/release/bundle/appimage/*.AppImage
+            windows/src-tauri/target/release/bundle/rpm/*.rpm

@@ -37,6 +37,8 @@
   "bundle": {
     "active": true,
     "targets": ["nsis", "msi"],
+    "category": "Utility",
+    "license": "MIT",
     "icon": ["icons/icon.ico", "icons/icon.png"],
     "publisher": "ntd4996",
     "homepage": "https://github.com/ntd4996/agentpet",
@@ -47,6 +49,15 @@
         "installMode": "currentUser",
         "displayLanguageSelector": true,
         "languages": ["English", "SimpChinese", "Vietnamese"]
+      }
+    },
+    "linux": {
+      "deb": {
+        "depends": [
+          "libwebkit2gtk-4.1-0",
+          "libgtk-3-0",
+          "libayatana-appindicator3-1"
+        ]
       }
     }
   },
