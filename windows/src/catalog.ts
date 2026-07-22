@@ -69,3 +69,32 @@ export function addToLibrary(p: LibPet) {
 export function removeFromLibrary(slug: string) {
   saveLibrary(getLibrary().filter((x) => x.slug !== slug));
 }
+
+// ---- Pet rename (macOS ImagePetStore.nameOverrides equivalent) --------------
+// A per-slug custom name; falls back to the library/catalog name, then the slug.
+
+const NAMES_KEY = "agentpet.petNames";
+
+function nameOverrides(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(NAMES_KEY) || "{}"); } catch { return {}; }
+}
+
+function defaultName(slug: string): string {
+  return getLibrary().find((p) => p.slug === slug)?.name || slug;
+}
+
+export function petDisplayName(slug: string): string {
+  const custom = nameOverrides()[slug];
+  if (custom && custom.trim()) return custom;
+  return defaultName(slug);
+}
+
+/// Sets or clears a pet's custom name. Clearing (empty or same as default)
+/// removes the override so the library name shows again. Capped at 40 chars.
+export function renamePet(slug: string, name: string) {
+  const overrides = nameOverrides();
+  const trimmed = name.trim().slice(0, 40);
+  if (!trimmed || trimmed === defaultName(slug)) delete overrides[slug];
+  else overrides[slug] = trimmed;
+  try { localStorage.setItem(NAMES_KEY, JSON.stringify(overrides)); } catch {}
+}

@@ -808,7 +808,8 @@ body.pop {
 /* ---- Care tab (tamagotchi HUD) ---- */
 .care-hud { display: flex; flex-direction: column; gap: 12px; }
 .care-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.care-name { font-weight: 700; font-size: 16px; }
+.care-name { font-weight: 700; font-size: 16px; cursor: text; }
+.care-rename { font-weight: 700; font-size: 16px; width: 100%; max-width: 200px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; color: inherit; padding: 2px 6px; outline: none; }
 .care-stage { opacity: .7; font-size: 12px; margin-top: 2px; }
 .care-hunger { font-size: 12px; opacity: .8; white-space: nowrap; }
 .care-bar { height: 8px; border-radius: 999px; background: rgba(127,127,127,.22); overflow: hidden; }

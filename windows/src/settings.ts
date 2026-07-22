@@ -3,7 +3,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { exit } from "@tauri-apps/plugin-process";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { loadCatalog, savedSlug, saveSlug, getLibrary, addToLibrary, removeFromLibrary, type Pet, type LibPet } from "./catalog";
+import { loadCatalog, savedSlug, saveSlug, getLibrary, addToLibrary, removeFromLibrary, petDisplayName, renamePet, type Pet, type LibPet } from "./catalog";
 import { t, getLang, setLang, type Lang } from "./i18n";
 import { agentIconUrl, uiIcon } from "./icons";
 import { LAYOUT_PRESETS, readBubbleConfig, type TokenItem, type BubbleToken } from "./bubble";
@@ -91,6 +91,8 @@ function fmtNum(n: number): string {
 function currentPetName(): string {
   const slug = savedSlug();
   if (!slug) return t("Your pet");
+  const custom = petDisplayName(slug);
+  if (custom !== slug) return custom;
   const hit = getLibrary().find((p) => p.slug === slug) || catalog.find((p) => p.slug === slug);
   return hit?.name || slug;
 }
@@ -131,6 +133,39 @@ function renderCare() {
     .map((d) => `<div class="cbar-wrap" title="${fmtNum(d.tokens)}"><div class="cbar" style="height:${Math.max(3, Math.round((d.tokens / max) * 100))}%"></div><div class="cbar-lbl">${d.label}</div></div>`)
     .join("");
 }
+// Click the pet's name to rename it; Enter or blur saves (empty resets to the
+// default). The custom name flows to the HUD, menubar, and web leaderboard.
+function setupRename() {
+  const nameEl = document.getElementById("care-name");
+  const input = document.getElementById("care-rename") as HTMLInputElement | null;
+  if (!nameEl || !input) return;
+  const startEdit = () => {
+    const slug = savedSlug();
+    if (!slug) return;
+    input.value = currentPetName();
+    nameEl.style.display = "none";
+    input.style.display = "";
+    input.focus();
+    input.select();
+  };
+  const commit = () => {
+    const slug = savedSlug();
+    if (slug) renamePet(slug, input.value);
+    input.style.display = "none";
+    nameEl.style.display = "";
+    renderCare();
+    emit("care-updated");
+    sync.schedulePush();
+  };
+  nameEl.addEventListener("click", startEdit);
+  input.addEventListener("blur", commit);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+    else if (e.key === "Escape") { input.value = currentPetName(); input.blur(); }
+  });
+}
+setupRename();
+
 // Refresh when the pet window feeds the pet, and periodically for the hunger clock.
 listen("care-updated", () => { if (document.querySelector('.page[data-page="care"].sel')) renderCare(); });
 setInterval(() => { if (document.querySelector('.page[data-page="care"].sel')) renderCare(); }, 30_000);

@@ -4,7 +4,7 @@
 // the pet works fully offline without ever signing in.
 
 import * as care from "./care";
-import { getLibrary } from "./catalog";
+import { petDisplayName } from "./catalog";
 
 const BASE = "https://agentpet.thenightwatcher.online";
 const TOKEN_KEY = "ap_care_token";
@@ -47,7 +47,7 @@ export async function pair(code: string): Promise<{ ok: boolean; error?: string 
 }
 
 function petName(id: string): string {
-  return getLibrary().find((p) => p.slug === id)?.name || id;
+  return petDisplayName(id);
 }
 
 /** Pushes every raised pet's stats to the profile. */
