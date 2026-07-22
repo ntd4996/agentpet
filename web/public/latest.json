@@ -1,0 +1,15 @@
+{
+  "version": "0.1.5",
+  "notes": "See the GitHub release notes for what's new.",
+  "pub_date": "2026-07-22T06:56:17.956Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZXpkWGd2RCszUHpSZE03ek5KWDF6K2ZmV1JucWo3L01jS1NpTDdtOVdZOXl2KzBjLzd4TWtVYVp1Z2JjaUZWQ0VucHVwcndySjV2aTBIcVRXSmVtVndTUWY4cXNvbXc0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NzAyODc2CWZpbGU6QWdlbnRQZXRfMC4xLjVfeDY0LXNldHVwLmV4ZQpWTFVuK3hJRnBVZ3dOMVp4S2F5UjhNUmwvbmxZNU5mUlVkcjF1WkdZNzQ1WHREQ1V3b3MxWGc1eEdnWFZZZVA3ZkFYeXc4YU85RTd2Q3IwTWNrVU5Ddz09Cg==",
+      "url": "https://github.com/ntd4996/agentpet/releases/download/win-v0.1.5/AgentPet_0.1.5_x64-setup.exe"
+    },
+    "linux-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZXpkWGd2RCszUHoyS3NicnVwNEY0aGJpWnFhL3dYTmxLLzNBcTRRb25MU2twVi8vczluWDlGVnI4OC9LdHRkNlk2UFhrVUVRdTJLMjF6V2tLcFFtZFRwelJqalZtTHdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0NzAzMzM4CWZpbGU6QWdlbnRQZXRfMC4xLjVfYW1kNjQuQXBwSW1hZ2UKZFQ2MEp3YTVXU0VjS2k5MDRtYlRVWkhuaU5oRjVldEFiZWxkNG9nNTFENmlTM1FsbXlXeVplWlFWbzVuQStteVpPL0p5N2VtNTNXRlgwRUVuMWVDQUE9PQo=",
+      "url": "https://github.com/ntd4996/agentpet/releases/download/linux-v0.1.5/AgentPet_0.1.5_amd64.AppImage"
+    }
+  }
+}
