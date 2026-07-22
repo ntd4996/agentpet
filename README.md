@@ -174,7 +174,13 @@ sudo dpkg -i AgentPet_*_amd64.deb
 sudo rpm -i AgentPet-*.x86_64.rpm
 ```
 
-Same Tauri app as Windows, so it has full feature parity with macOS. This is an early build: unsigned and without in-app auto-update yet, so grab new versions from Releases. If the tray icon is missing on GNOME, install an AppIndicator extension.
+Same Tauri app as Windows, so it has full feature parity with macOS. From 0.1.5 the AppImage auto-updates in-app; still unsigned. If the tray icon is missing on GNOME, install an AppIndicator extension.
+
+Or install with one line , grabs the latest AppImage, no root:
+
+```bash
+curl -fsSL https://agentpet.thenightwatcher.online/install.sh | sh
+```
 
 ### Build from source (macOS)
 
@@ -229,7 +235,7 @@ A starter pet is installed on first launch. **AgentPet bundles no pet art** , ev
 
 - **macOS 13 Ventura or later** , native Swift / SwiftUI, notarized, Sparkle auto-update, Homebrew cask. Apple Silicon and Intel.
 - **Windows 10 / 11 (64-bit)** , Tauri (Rust), auto-update. Feature parity with macOS.
-- **Linux (64-bit)** , the same Tauri app, shipped as AppImage / `.deb` / `.rpm`. Feature parity with macOS. Early build: unsigned, no in-app auto-update yet.
+- **Linux (64-bit)** , the same Tauri app, shipped as AppImage / `.deb` / `.rpm`. Feature parity with macOS. In-app auto-update from 0.1.5 (AppImage); still unsigned.
 
 Under the hood: a Unix-socket daemon receives agent events from lightweight hooks, an on-device store drives the pet, and an optional Astro + Cloudflare Workers/D1 backend powers the web profile, leaderboard and usage dashboard. See [`docs/specs`](docs/specs) for the design.
 
