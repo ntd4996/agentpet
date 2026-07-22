@@ -216,6 +216,41 @@ fn resolve_approval(id: String, decision: String) {
     crate::server::resolve_approval(&id, &decision);
 }
 
+/// Split-pet: ensure exactly one extra pet window `pet-<projectId>` exists per
+/// configured project, cloning the main pet's chrome. Each loads `index.html`
+/// with a `?project=<id>` query so its script shows only that project. Closing
+/// happens for any `pet-*` window no longer in the list (merge back). With split
+/// off, the frontend calls this with an empty list, so all extras close.
+#[tauri::command]
+fn sync_project_windows(app: tauri::AppHandle, projects: Vec<String>) {
+    use std::collections::HashSet;
+    let want: HashSet<String> = projects.iter().map(|id| format!("pet-{id}")).collect();
+    for (label, win) in app.webview_windows() {
+        if label.starts_with("pet-") && !want.contains(&label) {
+            let _ = win.close();
+        }
+    }
+    for (i, id) in projects.iter().enumerate() {
+        let label = format!("pet-{id}");
+        if app.get_webview_window(&label).is_some() {
+            continue;
+        }
+        let url = format!("index.html?project={id}");
+        let _ = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(url.into()))
+            .title("AgentPet")
+            .inner_size(260.0, 320.0)
+            .position(1200.0 - (i as f64 + 1.0) * 60.0, 600.0)
+            .transparent(true)
+            .decorations(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .resizable(false)
+            .shadow(false)
+            .focused(false)
+            .build();
+    }
+}
+
 /// Persist the chosen language (for the tray on next launch) and re-label the
 /// tray menu items now. Called by the Settings language switcher.
 #[tauri::command]
@@ -364,6 +399,7 @@ pub fn run() {
             open_url,
             focus_terminal,
             resolve_approval,
+            sync_project_windows,
             set_lang,
             set_tray_status,
             set_pet_visible,

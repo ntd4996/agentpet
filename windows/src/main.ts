@@ -12,12 +12,41 @@ import * as sync from "./sync";
 import * as usage from "./usage";
 import * as history from "./history";
 import * as reactive from "./reactive";
+import * as projectpets from "./projectpets";
+
+// Which project THIS pet window represents. `null` = the main window (the
+// default single pet). Split-pet spawns extra windows with `?project=<id>`.
+const MY_PROJECT = new URLSearchParams(location.search).get("project");
+const IS_MAIN = MY_PROJECT === null;
+
+/// Does this window own a session (feed its pet, count it, notify)? Split off:
+/// the main window owns everything. Split on: a project window owns only its
+/// project; the main window owns every unconfigured project.
+function ownsProject(path: string): boolean {
+  if (!projectpets.splitEnabled()) return IS_MAIN;
+  const id = usage.projectId(path || "");
+  if (MY_PROJECT) return id === MY_PROJECT;
+  return !projectpets.configuredProjectIds().includes(id);
+}
+
+/// The pet slug this window raises (a project window uses its mapped pet).
+function myPetSlug(): string | null {
+  if (MY_PROJECT && projectpets.splitEnabled()) return projectpets.petForProject(MY_PROJECT) || savedSlug();
+  return savedSlug();
+}
+
+/// Reconcile the per-project pet windows with the current config (main only).
+function syncProjectWindows() {
+  const ids = projectpets.splitEnabled() ? projectpets.configuredProjectIds() : [];
+  void invoke("sync_project_windows", { projects: ids });
+}
 import { sendNotification, isPermissionGranted, requestPermission } from "@tauri-apps/plugin-notification";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
 // Auto-update on launch (no-op offline / when no signed release is published).
-(async () => {
+// Main window only , the per-project windows share the same binary.
+if (IS_MAIN) (async () => {
   try {
     const update = await check();
     if (update) {
@@ -98,6 +127,12 @@ function chime(event: "done" | "waiting") {
 
 // --- pick + load a pet sprite -------------------------------------------------
 (async () => {
+  // A project window raises its mapped pet; the main window the selected one.
+  if (MY_PROJECT) {
+    const slug = projectpets.petForProject(MY_PROJECT);
+    const url = slug ? projectpets.libUrlForSlug(slug) : null;
+    if (url) { pet.load(url); return; }
+  }
   // Library selection (Browse/Create) wins; legacy ap_pet_custom still honoured.
   const url = localStorage.getItem("ap_pet_custom") || localStorage.getItem("ap_pet_url");
   if (url) { pet.load(url); return; }
@@ -137,7 +172,7 @@ function flashReactive(line: string | null) {
 
 /// Evaluate the care-driven reactive metrics after a feed / meal / hunger tick.
 function evaluateCareMetrics() {
-  const slug = savedSlug();
+  const slug = myPetSlug();
   if (!slug) return;
   const s = care.stateFor(slug);
   flashReactive(reactive.evaluate("dailyTokens", s.tokensToday));
@@ -155,7 +190,7 @@ function pickMoodLine(mood: string) {
 }
 
 function render() {
-  const sessions = store.active();
+  const sessions = store.active().filter((s) => ownsProject(s.project));
   const resolved = aggregateMood(sessions);
 
   if (resolved === "done" && lastResolved !== "done") {
@@ -209,7 +244,9 @@ function render() {
 
   snugBubble();
   reportHitRect();
-  reportTrayStatus(sessions);
+  // One global tray icon , the main window reports it, counting ALL sessions
+  // (not just this window's owned subset).
+  if (IS_MAIN) reportTrayStatus(store.active());
 }
 setInterval(render, 500);
 // Carousel advance / fold clicks request a prompt repaint.
@@ -250,9 +287,10 @@ function maybeNotify(e: AgentEventPayload) {
     sessionStarts.set(key, Date.now());
   }
   if (e.state === prev) return;
-  // A finished session is a "meal" for the pet (records XP + streak).
-  if (e.state === "done") {
-    const slug = savedSlug();
+  // A finished session is a "meal" for THIS window's pet , only the window that
+  // owns the project records it, so split pets never double-feed.
+  if (e.state === "done" && ownsProject(e.project)) {
+    const slug = myPetSlug();
     if (slug) { care.mutate(slug, (s) => care.recordMeal(s)); emit("care-updated"); sync.schedulePush(); evaluateCareMetrics(); }
     if (e.project) usage.recordSession(e.project, e.agent);
     const now = Date.now();
@@ -261,6 +299,8 @@ function maybeNotify(e: AgentEventPayload) {
       title: e.title || "", startedAt: sessionStarts.get(key) ?? now, endedAt: now,
     });
   }
+  // Chimes + notifications fire once , the main window only.
+  if (!IS_MAIN) return;
   if (e.state !== "done" && e.state !== "waiting") return;
   chime(e.state === "done" ? "done" : "waiting");
   if (!notifyReady || localStorage.getItem("ap_notify") === "0") return;
@@ -277,7 +317,8 @@ function maybeNotify(e: AgentEventPayload) {
 listen<AgentEventPayload>("agent-event", (e) => {
   maybeNotify(e.payload);
   store.update(e.payload);
-  flashReactive(reactive.evaluate("sessionCount", store.active().length));
+  const owned = store.active().filter((s) => ownsProject(s.project)).length;
+  flashReactive(reactive.evaluate("sessionCount", owned));
   render();
 });
 // Approval gate: the daemon parked a gated PreToolUse , show Allow/Deny.
@@ -296,13 +337,15 @@ listen<string>("agent-end", (e) => {
   store.remove(e.payload);
   render();
 });
-// Tokens burned by an agent feed the currently-selected pet (Claude for now).
+// Tokens burned by an agent feed THIS window's pet , only the owning window, so
+// split pets never double-feed the same tokens.
 listen<{ agent: string; session: string; project: string; tokens: number; cost?: number }>("agent-tokens", (e) => {
   const n = e.payload?.tokens || 0;
   if (n <= 0) return;
   const p = e.payload;
+  if (!ownsProject(p.project)) return;
   if (p.project) usage.recordTokens(p.project, p.agent, n, p.cost || 0);
-  const slug = savedSlug();
+  const slug = myPetSlug();
   if (!slug) return;
   care.mutate(slug, (s) => care.feedTokens(s, n));
   emit("care-updated");
@@ -310,10 +353,17 @@ listen<{ agent: string; session: string; project: string; tokens: number; cost?:
   evaluateCareMetrics();
 });
 
-// On launch: pull any cloud progress, then keep pushing in the background.
-if (sync.signedIn()) {
+// On launch: pull any cloud progress, then keep pushing in the background. The
+// main window owns cloud sync (care state is shared across windows).
+if (IS_MAIN && sync.signedIn()) {
   sync.restore().then(() => { emit("care-updated"); sync.schedulePush(5000); }).catch(() => {});
   usage.schedulePush(8000);
+}
+// Split-pet: the main window spawns/closes the per-project pet windows, and
+// re-syncs whenever Settings changes the config.
+if (IS_MAIN) {
+  syncProjectWindows();
+  listen("split-changed", () => syncProjectWindows());
 }
 // Settings window: dismiss one session / clear all (mac popover actions).
 listen<string>("session-dismiss", (e) => { store.removeKey(e.payload); render(); });

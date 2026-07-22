@@ -11,6 +11,7 @@ import { initDemo } from "./demo";
 import { slice, type Rect } from "./pet";
 import * as care from "./care";
 import * as usage from "./usage";
+import * as projectpets from "./projectpets";
 import * as sync from "./sync";
 import * as history from "./history";
 
@@ -695,6 +696,50 @@ function initBubble() {
   const reactive = document.getElementById("reactive") as HTMLInputElement;
   reactive.checked = localStorage.getItem("ap_reactive") !== "0";
   reactive.onchange = () => { localStorage.setItem("ap_reactive", reactive.checked ? "1" : "0"); changed(); };
+
+  const split = document.getElementById("split") as HTMLInputElement;
+  const splitList = document.getElementById("split-list") as HTMLElement;
+  const renderSplitList = () => {
+    splitList.style.display = split.checked ? "" : "none";
+    splitList.innerHTML = "";
+    if (!split.checked) return;
+    const lib = getLibrary();
+    const map = projectpets.projectPetMap();
+    const projects = usage.knownProjects();
+    if (!projects.length) {
+      const p = document.createElement("div");
+      p.className = "cap";
+      p.textContent = t("No projects yet. Use an agent in a project first.");
+      splitList.appendChild(p);
+      return;
+    }
+    for (const proj of projects) {
+      const row = document.createElement("label");
+      row.className = "row";
+      const name = document.createElement("span");
+      name.className = "rt";
+      name.textContent = proj.name;
+      const sel = document.createElement("select");
+      const none = document.createElement("option");
+      none.value = "";
+      none.textContent = t("Merged");
+      sel.appendChild(none);
+      for (const p of lib) {
+        const o = document.createElement("option");
+        o.value = p.slug;
+        o.textContent = p.name;
+        if (map[proj.id] === p.slug) o.selected = true;
+        sel.appendChild(o);
+      }
+      sel.onchange = () => { projectpets.setProjectPet(proj.id, sel.value); emit("split-changed"); };
+      row.appendChild(name);
+      row.appendChild(sel);
+      splitList.appendChild(row);
+    }
+  };
+  split.checked = projectpets.splitEnabled();
+  split.onchange = () => { projectpets.setSplit(split.checked); renderSplitList(); emit("split-changed"); };
+  renderSplitList();
 }
 
 // -------------------------------------------------- bubble display + layout ----
@@ -1192,6 +1237,8 @@ function applyStatic() {
   set("t-idle-sub", "The pet's chatter while no agent is running.");
   set("t-reactive", "Reactive comments");
   set("t-reactive-sub", "The pet reacts to token usage, streaks, hunger, and busy sessions.");
+  set("t-split", "Split pets by project");
+  set("t-split-sub", "Give a project its own pet window; the rest stay on the main pet.");
   set("t-display", "Display");
   set("t-rows", "Rows");
   set("o-bm-list", "All rows");

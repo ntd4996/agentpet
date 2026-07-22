@@ -27,6 +27,11 @@ function fnv1a(s: string): string {
   return "p" + (h >>> 0).toString(16).padStart(8, "0");
 }
 
+/// Stable id for a project path (shared with per-project pet mapping).
+export function projectId(path: string): string {
+  return fnv1a(path);
+}
+
 function projectIdentity(path: string): { id: string; name: string } {
   const parts = path.replace(/[\\/]+$/, "").split(/[\\/]/);
   const last = parts[parts.length - 1] || path;
@@ -85,6 +90,18 @@ export function todayCostUSD(): number {
 export function monthlyCostUSD(): number {
   const p = monthPrefix();
   return Object.values(load()).reduce((s, r) => (r.day.startsWith(p) ? s + (r.costUSD || 0) : s), 0);
+}
+
+/// Projects seen in usage history (for the split-pet assignment UI), most tokens
+/// first. Deduped by projectId.
+export function knownProjects(): { id: string; name: string }[] {
+  const byId = new Map<string, { id: string; name: string; tokens: number }>();
+  for (const r of Object.values(load())) {
+    const cur = byId.get(r.projectId);
+    if (cur) cur.tokens += r.tokens;
+    else byId.set(r.projectId, { id: r.projectId, name: r.projectName, tokens: r.tokens });
+  }
+  return [...byId.values()].sort((a, b) => b.tokens - a.tokens).map(({ id, name }) => ({ id, name }));
 }
 
 let pushTimer: number | undefined;
