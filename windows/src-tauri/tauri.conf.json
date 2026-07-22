@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "AgentPet",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "identifier": "online.thenightwatcher.agentpet",
   "build": {
     "frontendDist": "../dist",
@@ -36,10 +36,16 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "msi"],
+    "targets": [
+      "nsis",
+      "msi"
+    ],
     "category": "Utility",
     "license": "MIT",
-    "icon": ["icons/icon.ico", "icons/icon.png"],
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
     "publisher": "ntd4996",
     "homepage": "https://github.com/ntd4996/agentpet",
     "shortDescription": "A desktop pet that watches your AI coding agents.",
@@ -48,7 +54,11 @@
       "nsis": {
         "installMode": "currentUser",
         "displayLanguageSelector": true,
-        "languages": ["English", "SimpChinese", "Vietnamese"]
+        "languages": [
+          "English",
+          "SimpChinese",
+          "Vietnamese"
+        ]
       }
     },
     "linux": {
