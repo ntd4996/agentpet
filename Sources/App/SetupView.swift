@@ -390,6 +390,18 @@ private struct GeneralTab: View {
                 }
             }
 
+            Section("Bash approval gate") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Approve Bash from the bubble")
+                        Text("Claude Code Bash requests show Allow/Deny in the bubble instead of the terminal.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    ColorSwitch(isOn: $model.approvalGateEnabled)
+                }
+            }
+
             Section("About") {
                 LabeledContent("Version", value: appVersion)
             }

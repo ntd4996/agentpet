@@ -16,7 +16,26 @@ public enum ApprovalGateConfig {
         return Set(config.tools)
     }
 
-    private struct Config: Decodable {
+    /// Whether `tool` is currently gated.
+    public static func isEnabled(tool: String = "Bash", path: String? = nil) -> Bool {
+        gatedTools(path: path).contains(tool)
+    }
+
+    /// Turns the gate for `tool` on (writes the config file) or off (removes
+    /// it). Mirrors the opt-in default: no file on disk means disabled.
+    public static func setEnabled(_ enabled: Bool, tool: String = "Bash", path: String? = nil) {
+        let file = path ?? defaultPath
+        guard enabled else {
+            try? FileManager.default.removeItem(atPath: file)
+            return
+        }
+        let dir = (file as NSString).deletingLastPathComponent
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        guard let data = try? JSONEncoder().encode(Config(tools: [tool])) else { return }
+        try? data.write(to: URL(fileURLWithPath: file))
+    }
+
+    private struct Config: Codable {
         let tools: [String]
     }
 }
