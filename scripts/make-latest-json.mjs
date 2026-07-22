@@ -21,8 +21,10 @@ const REPO = "https://github.com/ntd4996/agentpet/releases/download";
 const winTag = `win-v${version}`;
 const linuxTag = `linux-v${version}`;
 
+// Tauri's Windows updater ships the NSIS .exe; its Linux updater ships the
+// AppImage itself (both with a sibling .sig).
 const winExe = `AgentPet_${version}_x64-setup.exe`;
-const linuxTar = `AgentPet_${version}_amd64.AppImage.tar.gz`;
+const linuxAppImage = `AgentPet_${version}_amd64.AppImage`;
 
 async function sig(url) {
   const res = await fetch(url);
@@ -32,7 +34,7 @@ async function sig(url) {
 
 const [winSig, linuxSig] = await Promise.all([
   sig(`${REPO}/${winTag}/${winExe}.sig`),
-  sig(`${REPO}/${linuxTag}/${linuxTar}.sig`),
+  sig(`${REPO}/${linuxTag}/${linuxAppImage}.sig`),
 ]);
 
 const latest = {
@@ -41,7 +43,7 @@ const latest = {
   pub_date: new Date().toISOString(),
   platforms: {
     "windows-x86_64": { signature: winSig, url: `${REPO}/${winTag}/${encodeURIComponent(winExe)}` },
-    "linux-x86_64": { signature: linuxSig, url: `${REPO}/${linuxTag}/${encodeURIComponent(linuxTar)}` },
+    "linux-x86_64": { signature: linuxSig, url: `${REPO}/${linuxTag}/${encodeURIComponent(linuxAppImage)}` },
   },
 };
 

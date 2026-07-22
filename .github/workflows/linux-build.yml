@@ -83,6 +83,5 @@ jobs:
           files: |
             windows/src-tauri/target/release/bundle/deb/*.deb
             windows/src-tauri/target/release/bundle/appimage/*.AppImage
-            windows/src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz
-            windows/src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig
+            windows/src-tauri/target/release/bundle/appimage/*.AppImage.sig
             windows/src-tauri/target/release/bundle/rpm/*.rpm
