@@ -602,5 +602,36 @@ export class BubbleRenderer {
       badge.style.display = g.count > 1 ? "" : "none";
       badge.textContent = `×${g.count}`;
     }
+
+    this.syncApproval(el, s);
+  }
+
+  /// Show Allow/Deny buttons on a row whose session is awaiting a gated tool
+  /// decision (the approval gate). Buttons stop propagation so they don't also
+  /// trigger the row's focus-terminal click.
+  private syncApproval(el: HTMLElement, s: Session) {
+    const ap = s.pendingApproval;
+    let box = el.querySelector<HTMLElement>(".approval");
+    if (!ap) { box?.remove(); return; }
+    if (!box) {
+      box = document.createElement("span");
+      box.className = "approval";
+      el.appendChild(box);
+    }
+    if (box.dataset.id === ap.id) return; // already built for this request
+    box.dataset.id = ap.id;
+    box.innerHTML = "";
+    const btn = (label: string, cls: string, decision: string) => {
+      const b = document.createElement("button");
+      b.className = cls;
+      b.textContent = label;
+      b.onclick = (ev) => {
+        ev.stopPropagation();
+        void invoke("resolve_approval", { id: ap.id, decision });
+      };
+      return b;
+    };
+    box.appendChild(btn(t("Allow"), "ap-allow", "allow"));
+    box.appendChild(btn(t("Deny"), "ap-deny", "deny"));
   }
 }

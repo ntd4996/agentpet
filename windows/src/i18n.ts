@@ -9,6 +9,8 @@ const DICT: Record<Exclude<Lang, "en">, Record<string, string>> = {
   vi: {
     "Today": "Hôm nay",
     "Month": "Tháng",
+    "Allow": "Cho phép",
+    "Deny": "Từ chối",
     "Your pet": "Pet của bạn",
     "Pick the companion that floats on your desktop.": "Chọn người bạn nổi trên màn hình của bạn.",
     "Search pets by name...": "Tìm pet theo tên...",
@@ -239,6 +241,8 @@ const DICT: Record<Exclude<Lang, "en">, Record<string, string>> = {
   zh: {
     "Today": "今天",
     "Month": "本月",
+    "Allow": "允许",
+    "Deny": "拒绝",
     "Your pet": "你的宠物",
     "Pick the companion that floats on your desktop.": "选择漂浮在你桌面上的伙伴。",
     "Search pets by name...": "按名称搜索宠物...",
@@ -467,6 +471,8 @@ const DICT: Record<Exclude<Lang, "en">, Record<string, string>> = {
     "zh-TW": {
     "Today": "今天",
     "Month": "本月",
+    "Allow": "允許",
+    "Deny": "拒絕",
     "Your pet": "你的寵物",
     "Pick the companion that floats on your desktop.": "選擇漂浮在你桌面上的夥伴。",
     "Search pets by name...": "按名稱搜尋寵物...",

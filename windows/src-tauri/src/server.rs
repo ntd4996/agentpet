@@ -12,9 +12,98 @@
 //! - resolves a human conversation title from the transcript
 
 use serde_json::Value;
+use std::collections::{HashMap, HashSet};
+use std::sync::mpsc::Sender;
+use std::sync::{Mutex, OnceLock};
 use tauri::{AppHandle, Emitter};
 
 pub const HOOK_PORT: u16 = 47628;
+
+// Held approval requests, keyed by request id. A gated PreToolUse parks its HTTP
+// response here until the user clicks Allow/Deny (or a 10 s timeout fires).
+fn pending() -> &'static Mutex<HashMap<String, Sender<String>>> {
+    static P: OnceLock<Mutex<HashMap<String, Sender<String>>>> = OnceLock::new();
+    P.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Frontend → daemon: deliver the user's decision to the parked hook request.
+pub fn resolve_approval(id: &str, decision: &str) {
+    if let Ok(mut map) = pending().lock() {
+        if let Some(tx) = map.remove(id) {
+            let _ = tx.send(decision.to_string());
+        }
+    }
+}
+
+/// Opt-in whitelist: the gate stays OFF unless `~/.agentpet/approval-gate.json`
+/// exists with `{"tools":["Bash",...]}`. Same config path as the macOS app.
+pub fn gated_tools() -> HashSet<String> {
+    let Some(home) = dirs::home_dir() else { return HashSet::new() };
+    let path = home.join(".agentpet").join("approval-gate.json");
+    let Ok(data) = std::fs::read_to_string(path) else { return HashSet::new() };
+    let Ok(v) = serde_json::from_str::<Value>(&data) else { return HashSet::new() };
+    v.get("tools")
+        .and_then(|t| t.as_array())
+        .map(|arr| arr.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+        .unwrap_or_default()
+}
+
+fn is_gated(body: &str) -> bool {
+    let Ok(v) = serde_json::from_str::<Value>(body) else { return false };
+    if str_of(&v, "agent") != "claude" || str_of(&v, "event") != "PreToolUse" {
+        return false;
+    }
+    let tool = str_of(&v, "tool");
+    !tool.is_empty() && gated_tools().contains(tool)
+}
+
+fn now_millis() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// Parks the hook's HTTP response while the pet bubble shows Allow/Deny. Runs on
+/// its own thread so the request loop is never blocked. Falls back to "ask" (the
+/// agent's normal prompt) on the 10 s timeout , never a silent allow/deny.
+fn handle_approval(app: AppHandle, body: String, req: tiny_http::Request) {
+    let v: Value = serde_json::from_str(&body).unwrap_or(Value::Null);
+    let session = str_of(&v, "session").to_string();
+    let tool = str_of(&v, "tool").to_string();
+    let summary: String = {
+        let s = [str_of(&v, "desc"), str_of(&v, "file"), &tool]
+            .into_iter()
+            .find(|s| !s.is_empty())
+            .unwrap_or("");
+        s.chars().take(80).collect()
+    };
+    let id = format!("{}-{}", session, now_millis());
+
+    let (tx, rx) = std::sync::mpsc::channel();
+    if let Ok(mut map) = pending().lock() {
+        map.insert(id.clone(), tx);
+    }
+
+    // Let the session surface as working, then ask the bubble for a decision.
+    handle_event(&app, &body);
+    let _ = app.emit(
+        "agent-approval",
+        serde_json::json!({ "id": id, "session": session, "tool": tool, "summary": summary }),
+    );
+
+    let decision = rx
+        .recv_timeout(std::time::Duration::from_secs(10))
+        .unwrap_or_else(|_| "ask".to_string());
+    if let Ok(mut map) = pending().lock() {
+        map.remove(&id);
+    }
+    let _ = app.emit(
+        "agent-approval-resolved",
+        serde_json::json!({ "id": id, "session": session }),
+    );
+    let _ = req.respond(tiny_http::Response::from_string(decision));
+}
 
 pub fn start(app: AppHandle) {
     // Replay events queued while the app was closed (name order = time order).
@@ -41,6 +130,14 @@ pub fn start(app: AppHandle) {
         for mut req in server.incoming_requests() {
             let mut body = String::new();
             let _ = req.as_reader().read_to_string(&mut body);
+            // A gated PreToolUse blocks on the user's decision; hand it to a
+            // dedicated thread (which owns `req` and responds later) so the
+            // request loop keeps serving other events.
+            if is_gated(&body) {
+                let app = app.clone();
+                std::thread::spawn(move || handle_approval(app, body, req));
+                continue;
+            }
             handle_event(&app, &body);
             let _ = req.respond(tiny_http::Response::from_string("ok"));
         }

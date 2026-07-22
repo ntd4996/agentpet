@@ -67,6 +67,10 @@ body.overlay, body.overlay * {
 }
 .bubble .brow.focusable { cursor: pointer; border-radius: 6px; transition: background 0.12s; }
 .bubble .brow.focusable:hover { background: rgba(127, 127, 127, 0.16); }
+.bubble .approval { display: inline-flex; gap: 4px; margin-left: 6px; }
+.bubble .approval button { font: inherit; font-size: 10px; font-weight: 600; border: none; border-radius: 999px; padding: 1px 8px; cursor: pointer; }
+.bubble .approval .ap-allow { background: rgba(34, 197, 94, 0.18); color: #22c55e; }
+.bubble .approval .ap-deny { background: rgba(220, 60, 60, 0.18); color: #dc3c3c; }
 .bubble .brow {
   display: flex;
   align-items: center;

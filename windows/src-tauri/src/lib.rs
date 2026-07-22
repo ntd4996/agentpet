@@ -209,6 +209,13 @@ fn focus_terminal(program: String, focus_url: String) {
     let _ = program;
 }
 
+/// Deliver the user's Allow/Deny decision for a gated tool call back to the
+/// parked hook request (see server::handle_approval).
+#[tauri::command]
+fn resolve_approval(id: String, decision: String) {
+    crate::server::resolve_approval(&id, &decision);
+}
+
 /// Persist the chosen language (for the tray on next launch) and re-label the
 /// tray menu items now. Called by the Settings language switcher.
 #[tauri::command]
@@ -356,6 +363,7 @@ pub fn run() {
             open_settings,
             open_url,
             focus_terminal,
+            resolve_approval,
             set_lang,
             set_tray_status,
             set_pet_visible,

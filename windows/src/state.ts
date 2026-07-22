@@ -20,6 +20,8 @@ export interface Session {
   /// Terminal this session runs in (for click-to-focus). Sticky.
   terminalProgram: string;
   terminalFocusUrl: string;
+  /// A gated tool call awaiting the user's Allow/Deny, if any.
+  pendingApproval?: { id: string; tool: string; summary: string };
 }
 
 export interface AgentEventPayload {
@@ -83,6 +85,18 @@ export class SessionStore {
   remove(session: string) {
     for (const k of [...this.sessions.keys()]) {
       if (k.endsWith(`:${session}`)) this.sessions.delete(k);
+    }
+  }
+
+  /// Attach / clear a pending approval on a session by its id (any agent).
+  setApproval(session: string, approval: { id: string; tool: string; summary: string }) {
+    for (const s of this.sessions.values()) {
+      if (s.session === session) { s.pendingApproval = approval; return; }
+    }
+  }
+  clearApproval(session: string) {
+    for (const s of this.sessions.values()) {
+      if (s.session === session) s.pendingApproval = undefined;
     }
   }
 

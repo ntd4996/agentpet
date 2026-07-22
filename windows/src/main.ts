@@ -280,6 +280,16 @@ listen<AgentEventPayload>("agent-event", (e) => {
   flashReactive(reactive.evaluate("sessionCount", store.active().length));
   render();
 });
+// Approval gate: the daemon parked a gated PreToolUse , show Allow/Deny.
+listen<{ id: string; session: string; tool: string; summary: string }>("agent-approval", (e) => {
+  const p = e.payload;
+  store.setApproval(p.session, { id: p.id, tool: p.tool, summary: p.summary });
+  render();
+});
+listen<{ id: string; session: string }>("agent-approval-resolved", (e) => {
+  store.clearApproval(e.payload.session);
+  render();
+});
 listen<string>("agent-end", (e) => {
   for (const k of [...lastState.keys()]) if (k.endsWith(`:${e.payload}`)) lastState.delete(k);
   for (const k of [...sessionStarts.keys()]) if (k.endsWith(`:${e.payload}`)) sessionStarts.delete(k);
