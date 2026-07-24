@@ -452,3 +452,6 @@
 "Allow" = "Allow";
 "Deny" = "Deny";
 "Click to open this terminal" = "Click to open this terminal";
+"Bash approval gate" = "Bash approval gate";
+"Approve Bash from the bubble" = "Approve Bash from the bubble";
+"Claude Code Bash requests show Allow/Deny in the bubble instead of the terminal." = "Claude Code Bash requests show Allow/Deny in the bubble instead of the terminal.";

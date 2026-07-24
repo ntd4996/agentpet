@@ -510,3 +510,6 @@
 "Allow" = "允許";
 "Deny" = "拒絕";
 "Click to open this terminal" = "點擊開啟此終端";
+"Bash approval gate" = "Bash 審批開關";
+"Approve Bash from the bubble" = "在氣泡中審批 Bash";
+"Claude Code Bash requests show Allow/Deny in the bubble instead of the terminal." = "Claude Code 的 Bash 請求會在氣泡中顯示允許/拒絕，而不必回到終端。";
