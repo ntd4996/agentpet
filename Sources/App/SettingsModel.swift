@@ -28,10 +28,16 @@ final class SettingsModel: ObservableObject {
         didSet { UserDefaults.standard.set(notificationsEnabled, forKey: NotificationManager.enabledKey) }
     }
 
+    /// Backed by `~/.agentpet/approval-gate.json` so the separate hook CLI process reads it too.
+    @Published var approvalGateEnabled: Bool {
+        didSet { ApprovalGateConfig.setEnabled(approvalGateEnabled) }
+    }
+
     let agents = AgentCatalog.all
 
     init() {
         notificationsEnabled = (UserDefaults.standard.object(forKey: NotificationManager.enabledKey) as? Bool) ?? true
+        approvalGateEnabled = ApprovalGateConfig.isEnabled()
     }
 
     func refresh() {

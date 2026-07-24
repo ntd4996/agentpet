@@ -170,4 +170,21 @@ final class ApprovalGateConfigTests: XCTestCase {
         defer { try? FileManager.default.removeItem(atPath: path) }
         XCTAssertEqual(ApprovalGateConfig.gatedTools(path: path), [])
     }
+
+    func testSetEnabledWritesFileAndIsEnabledReadsIt() {
+        let path = NSTemporaryDirectory() + "agentpet-gate-\(UUID().uuidString).json"
+        defer { try? FileManager.default.removeItem(atPath: path) }
+        ApprovalGateConfig.setEnabled(true, path: path)
+        XCTAssertTrue(ApprovalGateConfig.isEnabled(path: path))
+        XCTAssertEqual(ApprovalGateConfig.gatedTools(path: path), ["Bash"])
+    }
+
+    func testSetEnabledFalseRemovesFile() {
+        let path = NSTemporaryDirectory() + "agentpet-gate-\(UUID().uuidString).json"
+        ApprovalGateConfig.setEnabled(true, path: path)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: path))
+        ApprovalGateConfig.setEnabled(false, path: path)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: path))
+        XCTAssertFalse(ApprovalGateConfig.isEnabled(path: path))
+    }
 }
