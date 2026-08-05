@@ -193,7 +193,11 @@ final class PetWindowController: ObservableObject {
     /// bottom-right anchor shifted left by `index` so windows don't stack.
     private func placeWindow(_ managed: ManagedPetWindow, size: CGSize, index: Int) {
         if let origin = savedPosition(forKey: managed.model.key) {
-            managed.panel.setFrame(NSRect(origin: origin, size: size), display: true, animate: false)
+            // Clamp the restored position onto a live screen: a coordinate saved
+            // on a larger/other display can land off-screen after a resolution or
+            // monitor change, hiding the pet forever otherwise (issue #47).
+            let clamped = clampedOntoScreen(origin, size: size)
+            managed.panel.setFrame(NSRect(origin: clamped, size: size), display: true, animate: false)
             return
         }
         guard let visible = NSScreen.main?.visibleFrame else { return }
@@ -338,11 +342,19 @@ final class PetWindowController: ObservableObject {
 
     private func ensureOnScreen(_ managed: ManagedPetWindow) {
         let frame = managed.panel.frame
-        if currentScreen(for: frame) != nil { return }   // still on a live screen
-        guard let visible = NSScreen.main?.visibleFrame else { return }
-        let origin = NSPoint(x: visible.maxX - frame.width - 16, y: visible.minY + 24)
-        managed.panel.setFrameOrigin(origin)
+        let clamped = clampedOntoScreen(frame.origin, size: frame.size)
+        guard clamped != frame.origin else { return }   // already fully visible
+        managed.panel.setFrameOrigin(clamped)
         syncAnchor(managed)
+    }
+
+    /// Clamps `origin` so a window of `size` sits fully inside the visible frame
+    /// of the screen it's mostly on (or the main screen if it's off every screen).
+    private func clampedOntoScreen(_ origin: NSPoint, size: CGSize) -> NSPoint {
+        let frame = NSRect(origin: origin, size: size)
+        let screen = currentScreen(for: frame) ?? NSScreen.main
+        guard let visible = screen?.visibleFrame else { return origin }
+        return PetWindowGeometry.clampOrigin(origin, size: size, into: visible)
     }
 
     /// The screen whose frame contains the window's center, if any.

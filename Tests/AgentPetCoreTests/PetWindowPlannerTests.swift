@@ -164,3 +164,40 @@ final class PetWindowPlannerTests: XCTestCase {
         XCTAssertEqual(keys, ["default"])
     }
 }
+
+final class PetWindowGeometryTests: XCTestCase {
+    // 1920x1080 primary display, menu bar 25pt tall (visibleFrame excludes it).
+    private let visible = CGRect(x: 0, y: 0, width: 1920, height: 1055)
+    private let size = CGSize(width: 260, height: 320)
+
+    func testInsidePositionIsUnchanged() {
+        let p = CGPoint(x: 800, y: 400)
+        XCTAssertEqual(PetWindowGeometry.clampOrigin(p, size: size, into: visible), p)
+    }
+
+    func testOffRightEdgeClampsBackIn() {
+        // The issue's repro: X=2181 on a 1920-wide screen -> pulled fully on-screen.
+        let clamped = PetWindowGeometry.clampOrigin(CGPoint(x: 2181, y: 375), size: size, into: visible)
+        XCTAssertEqual(clamped.x, 1920 - 260)   // maxX - width
+        XCTAssertEqual(clamped.y, 375)
+        XCTAssertLessThanOrEqual(clamped.x + size.width, visible.maxX)
+    }
+
+    func testOffLeftAndBottomClampToMinEdges() {
+        let clamped = PetWindowGeometry.clampOrigin(CGPoint(x: -500, y: -200), size: size, into: visible)
+        XCTAssertEqual(clamped, CGPoint(x: 0, y: 0))
+    }
+
+    func testWindowLargerThanScreenPinsToMinEdge() {
+        let big = CGSize(width: 3000, height: 320)
+        let clamped = PetWindowGeometry.clampOrigin(CGPoint(x: 2181, y: 40), size: big, into: visible)
+        XCTAssertEqual(clamped.x, 0)   // wider than screen -> pin to minX, never negative
+    }
+
+    func testOffscreenOriginOnShiftedScreenClamps() {
+        // Secondary display whose frame starts at x=1920 (to the right).
+        let right = CGRect(x: 1920, y: 0, width: 1920, height: 1055)
+        let clamped = PetWindowGeometry.clampOrigin(CGPoint(x: 5000, y: 400), size: size, into: right)
+        XCTAssertEqual(clamped.x, 1920 + 1920 - 260)
+    }
+}

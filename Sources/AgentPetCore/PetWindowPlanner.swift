@@ -1,4 +1,21 @@
+import CoreGraphics
 import Foundation
+
+/// Keeps a pet window on-screen across resolution / monitor changes (issue #47).
+public enum PetWindowGeometry {
+    /// Clamps a bottom-left `origin` so a window of `size` sits fully inside the
+    /// screen's `visible` frame. If the window is larger than the visible area on
+    /// an axis, it pins to that axis's minimum edge. Pure (no AppKit) so it's unit
+    /// testable without a display.
+    public static func clampOrigin(_ origin: CGPoint, size: CGSize, into visible: CGRect) -> CGPoint {
+        let maxX = max(visible.minX, visible.maxX - size.width)
+        let maxY = max(visible.minY, visible.maxY - size.height)
+        return CGPoint(
+            x: min(max(origin.x, visible.minX), maxX),
+            y: min(max(origin.y, visible.minY), maxY)
+        )
+    }
+}
 
 public struct PetWindowSpec: Equatable, Sendable {
     public var key: String
