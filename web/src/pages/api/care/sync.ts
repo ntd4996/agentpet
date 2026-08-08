@@ -6,8 +6,11 @@ export const prerender = false;
 export { OPTIONS };
 
 // The desktop app pushes per-pet care stats with its device token. Upserts:
-// stats only ever move forward (MAX) so an out-of-date device can't shrink a
-// pet that levelled up elsewhere.
+// lifetime counters (xp/tokens/meals) only ever move forward (MAX) so an
+// out-of-date device can't shrink a pet that levelled up elsewhere. Streak
+// isn't monotonic (it resets on missed days), so streak + last_fed_at follow
+// the most recent feeding rather than the last write — mirroring the client
+// merge in PetCare.merging — so a stale device can't clobber a fresher streak.
 export const POST: APIRoute = async ({ request }) => {
   const auth = request.headers.get("authorization") || "";
   const token = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
@@ -61,8 +64,14 @@ export const POST: APIRoute = async ({ request }) => {
              xp=MAX(care_pets.xp, excluded.xp),
              tokens=MAX(care_pets.tokens, excluded.tokens),
              meals=MAX(care_pets.meals, excluded.meals),
-             streak=excluded.streak,
-             last_fed_at=excluded.last_fed_at,
+             streak=CASE
+               WHEN excluded.last_fed_at IS NOT NULL
+                 AND (care_pets.last_fed_at IS NULL OR excluded.last_fed_at > care_pets.last_fed_at)
+               THEN excluded.streak ELSE care_pets.streak END,
+             last_fed_at=CASE
+               WHEN excluded.last_fed_at IS NOT NULL
+                 AND (care_pets.last_fed_at IS NULL OR excluded.last_fed_at > care_pets.last_fed_at)
+               THEN excluded.last_fed_at ELSE care_pets.last_fed_at END,
              updated_at=excluded.updated_at,
              thumb=COALESCE(excluded.thumb, care_pets.thumb),
              week=COALESCE(excluded.week, care_pets.week),
