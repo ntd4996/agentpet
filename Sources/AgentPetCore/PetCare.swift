@@ -316,6 +316,9 @@ public enum PetCare {
             if s.lastFedAt == nil || cloudFed > s.lastFedAt! {
                 s.lastFedAt = cloudFed
                 s.streakDays = cloud.streak
+                // Keep the day bookkeeping in sync with the adopted feeding, or the
+                // next local feed sees a stale key and resets the streak to 1.
+                s.lastFedDayKey = dayKey(for: cloudFed)
             }
         }
         if !cloud.achievements.isEmpty {

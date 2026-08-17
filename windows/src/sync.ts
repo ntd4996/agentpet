@@ -114,6 +114,9 @@ export async function restore(): Promise<number> {
         if (s.lastFedAt == null || cloudFed > s.lastFedAt) {
           s.lastFedAt = cloudFed;
           s.streakDays = c.streak || 0;
+          // Keep the day bookkeeping in sync with the adopted feeding, or the
+          // next local feed sees a stale key and resets the streak to 1.
+          s.lastFedDayKey = care.dayKey(new Date(cloudFed));
         }
       }
       // Achievements union, then reconcile against the merged (higher) stats.

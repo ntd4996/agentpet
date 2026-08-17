@@ -66,6 +66,16 @@ final class RestoreMergeTests: XCTestCase {
         XCTAssertEqual(merged.lastFedAt, local.lastFedAt)
     }
 
+    // After adopting the cloud's more-recent feeding, lastFedDayKey must track it
+    // too, or the next local feed would reset the streak to 1 (issue: streak lost
+    // after multi-device sync).
+    func testAdoptingCloudFeedingSetsDayKey() {
+        let cloudFed = Date(timeIntervalSince1970: 1_782_690_000)
+        let merged = PetCare.merging(nil, with: cloud(streak: 5, lastFedAt: cloudFed), now: now)
+        XCTAssertEqual(merged.lastFedDayKey, PetCare.dayKey(for: cloudFed))
+        XCTAssertEqual(merged.streakDays, 5)
+    }
+
     // Achievements union across machines.
     func testAchievementsUnion() {
         var local = PetCareState()
