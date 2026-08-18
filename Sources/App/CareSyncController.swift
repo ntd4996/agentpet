@@ -95,23 +95,31 @@ final class CareSyncController: ObservableObject {
         guard let frame = ImagePetStore.shared.pack(id: petID)?.clip(0).first else { return nil }
         let size = frame.size
         guard size.width > 0, size.height > 0 else { return nil }
-        // Integer upscale to ~128px so the sprite is sharp at any display size.
-        let maxSide: CGFloat = 128
-        let scale = max(1, floor(min(maxSide / size.width, maxSide / size.height)))
-        let target = NSSize(width: size.width * scale, height: size.height * scale)
-        guard let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: Int(target.width), pixelsHigh: Int(target.height),
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
-        ) else { return nil }
-        NSGraphicsContext.saveGraphicsState()
-        let ctx = NSGraphicsContext(bitmapImageRep: rep)
-        NSGraphicsContext.current = ctx
-        ctx?.imageInterpolation = .none   // keep the pixel art crisp
-        frame.draw(in: NSRect(origin: .zero, size: target))
-        NSGraphicsContext.restoreGraphicsState()
-        guard let png = rep.representation(using: .png, properties: [:]), png.count < 48_000 else { return nil }
-        return "data:image/png;base64," + png.base64EncodedString()
+        // Render the first frame, downscaling until the PNG fits the payload cap.
+        // The web shows this at ~40px, so a smaller thumb is fine , and always
+        // producing one beats leaving a detailed sprite as a bare letter on the
+        // leaderboard (the old fixed 128px overshot the cap for busy pixel art).
+        for maxSide in [96.0, 72.0, 56.0, 44.0] as [CGFloat] {
+            let scale = max(1, floor(min(maxSide / size.width, maxSide / size.height)))
+            let target = NSSize(width: size.width * scale, height: size.height * scale)
+            guard let rep = NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: Int(target.width), pixelsHigh: Int(target.height),
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+            ) else { continue }
+            NSGraphicsContext.saveGraphicsState()
+            let ctx = NSGraphicsContext(bitmapImageRep: rep)
+            NSGraphicsContext.current = ctx
+            ctx?.imageInterpolation = .none   // keep the pixel art crisp
+            frame.draw(in: NSRect(origin: .zero, size: target))
+            NSGraphicsContext.restoreGraphicsState()
+            // Cap the PNG so the base64 data URL stays under the server's 70k-char
+            // limit (care/sync.ts); the loop shrinks the sprite until it fits.
+            if let png = rep.representation(using: .png, properties: [:]), png.count < 46_000 {
+                return "data:image/png;base64," + png.base64EncodedString()
+            }
+        }
+        return nil
     }
 
     func push() async {

@@ -4,7 +4,8 @@
 // the pet works fully offline without ever signing in.
 
 import * as care from "./care";
-import { petDisplayName } from "./catalog";
+import { petDisplayName, getLibrary } from "./catalog";
+import { slice } from "./pet";
 
 const BASE = "https://agentpet.thenightwatcher.online";
 const TOKEN_KEY = "ap_care_token";
@@ -50,12 +51,50 @@ function petName(id: string): string {
   return petDisplayName(id);
 }
 
+/// Renders a pet's first sprite frame to a small PNG data URL so the web
+/// leaderboard/profile can show the actual pet , including local custom pets
+/// whose sprite the site has never seen (parity with the macOS thumbDataURL).
+/// Returns null if the sheet can't be loaded/read (e.g. CORS) , the site then
+/// falls back to resolving the sprite by slug, or a letter.
+function makeThumb(slug: string): Promise<string | null> {
+  const url = getLibrary().find((p) => p.slug === slug)?.url;
+  if (!url) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous"; // CDN sends CORS so the canvas isn't tainted
+    img.onload = () => {
+      try {
+        const rect = slice(img)[0]?.[0];
+        if (!rect || rect.w <= 0 || rect.h <= 0) { resolve(null); return; }
+        const cv = document.createElement("canvas");
+        const ctx = cv.getContext("2d");
+        if (!ctx) { resolve(null); return; }
+        ctx.imageSmoothingEnabled = false; // crisp pixel art
+        // Downscale until the data URL fits the server's 70k-char cap (matches
+        // the macOS thumbDataURL loop); a smaller thumb beats a bare letter.
+        for (const maxSide of [96, 72, 56, 44]) {
+          const scale = Math.max(1, Math.floor(Math.min(maxSide / rect.w, maxSide / rect.h)));
+          cv.width = rect.w * scale; cv.height = rect.h * scale;
+          ctx.imageSmoothingEnabled = false;
+          ctx.clearRect(0, 0, cv.width, cv.height);
+          ctx.drawImage(img, rect.x, rect.y, rect.w, rect.h, 0, 0, cv.width, cv.height);
+          const data = cv.toDataURL("image/png");
+          if (data.length < 68_000) { resolve(data); return; }
+        }
+        resolve(null);
+      } catch { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url.startsWith("data:") ? url : url + (url.includes("?") ? "&" : "?") + "cors=1";
+  });
+}
+
 /** Pushes every raised pet's stats to the profile. */
 export async function push(): Promise<void> {
   const tok = token();
   if (!tok) return;
   const states = care.allStates();
-  const pets = Object.entries(states).map(([id, s]) => ({
+  const pets = await Promise.all(Object.entries(states).map(async ([id, s]) => ({
     id,
     name: petName(id),
     xp: s.xp,
@@ -63,9 +102,10 @@ export async function push(): Promise<void> {
     meals: s.totalMeals,
     streak: s.streakDays,
     lastFedAt: s.lastFedAt ? Math.floor(s.lastFedAt / 1000) : null,
+    thumb: await makeThumb(id),
     week: care.recentDays(s, 7).map((d) => d.tokens),
     achievements: s.unlockedAchievements || [],
-  }));
+  })));
   if (!pets.length) return;
   try {
     const res = await fetch(`${BASE}/api/care/sync`, {
