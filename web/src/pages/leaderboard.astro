@@ -218,7 +218,9 @@ import Hero from "../components/Hero.astro";
           <span class="w-5 shrink-0 text-center font-display text-sm font-bold ${i < 3 ? "text-amber-600" : "text-faint"}">${i + 1}</span>
           <span class="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl sprite-checker" style="background:${color}14">${preview}<span class="absolute -bottom-1 -right-1 rounded-full bg-white px-1 text-[9px] font-bold shadow" style="color:${color}">${dispLv}</span></span>
           <span class="min-w-0 flex-1">
-            <span class="block truncate font-display font-semibold text-ink">${esc(p.name)}</span>
+            ${p.slug
+              ? `<a href="/pet/${p.slug}" class="block truncate font-display font-semibold text-ink transition hover:text-brand-700">${esc(p.name)}</a>`
+              : `<span class="block truncate font-display font-semibold text-ink">${esc(p.name)}</span>`}
             ${ownerTag}
           </span>
           <span class="shrink-0 text-right">

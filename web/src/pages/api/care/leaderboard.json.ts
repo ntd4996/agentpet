@@ -1,7 +1,11 @@
 import type { APIRoute } from "astro";
-import { getDB, ensureSchema } from "../../../lib/db";
+import { getDB, ensureSchema, getOverrides } from "../../../lib/db";
+import { loadManifest } from "../../../lib/pets";
 
 export const prerender = false;
+
+// Same sanitiser the leaderboard client uses to derive a pet's URL slug.
+const urlSlug = (s: string) => String(s).replace(/[^a-zA-Z0-9 ._-]/g, "");
 
 // Public top-companions board. `?by=tokens` ranks by lifetime tokens fed;
 // anything else ranks by XP (level). The owner comes from the users table.
@@ -30,17 +34,33 @@ export const GET: APIRoute = async ({ url }) => {
     )
     .all();
 
-  const pets = (rows?.results ?? []).map((r: any) => ({
-    id: r.pet_id,
-    name: r.name || r.pet_id,
-    xp: r.xp,
-    tokens: r.tokens,
-    meals: r.meals,
-    streak: r.streak,
-    thumb: r.thumb || null,
-    owner: r.login || null,
-    ownerAvatar: r.avatar || null,
-  }));
+  // Which pets have a public detail page (/pet/<slug>): those in the gallery
+  // manifest and not hidden. Custom/local pets have no detail page, so their
+  // name stays plain text on the board instead of a broken link.
+  let gallery = new Set<string>();
+  try {
+    const ovr: any = await getOverrides(db);
+    gallery = new Set(
+      (await loadManifest()).map((p) => p.slug).filter((sl) => !ovr?.[sl]?.hidden)
+    );
+  } catch {}
+
+  const pets = (rows?.results ?? []).map((r: any) => {
+    const sl = urlSlug(r.pet_id);
+    return {
+      id: r.pet_id,
+      name: r.name || r.pet_id,
+      xp: r.xp,
+      tokens: r.tokens,
+      meals: r.meals,
+      streak: r.streak,
+      thumb: r.thumb || null,
+      owner: r.login || null,
+      ownerAvatar: r.avatar || null,
+      // Non-null only when a /pet/<slug> detail page exists.
+      slug: gallery.has(sl) ? sl : null,
+    };
+  });
 
   return new Response(JSON.stringify({ pets }), {
     headers: { "content-type": "application/json", "cache-control": "public, max-age=60" },
