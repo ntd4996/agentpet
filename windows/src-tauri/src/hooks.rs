@@ -56,6 +56,11 @@ fn spec(kind: &str) -> Option<Spec> {
             events: &["SessionStart", "UserPromptSubmit", "PreToolUse", "Notification", "Stop", "SubagentStop", "SessionEnd"] },
         "pi" => Spec { style: Style::PiExtension, rel_path: &[".pi", "agent", "extensions", "agentpet.ts"],
             events: &[] },
+        // xAI Grok Build: ~/.grok/hooks/agentpet.json, Claude-compatible nested
+        // shape (PascalCase config keys). PreToolUse is omitted , Grok treats a
+        // hook's exit 2 as deny/keep-working, and our hook always exits 0.
+        "grok" => Spec { style: Style::ClaudeNested, rel_path: &[".grok", "hooks", "agentpet.json"],
+            events: &["SessionStart", "UserPromptSubmit", "PostToolUse", "Notification", "Stop", "SessionEnd"] },
         _ => return None,
     })
 }
@@ -73,6 +78,7 @@ pub fn catalog() -> Vec<AgentInfo> {
         ("kiro", "Kiro CLI", Some("Hooks the default Kiro CLI agent")),
         ("droid", "Factory Droid", Some("Factory Droid CLI (~/.factory/hooks.json)")),
         ("pi", "Pi", Some("Pi extension (~/.pi/agent/extensions). No \"needs input\" alerts")),
+        ("grok", "Grok Build", Some("xAI Grok Build CLI (~/.grok/hooks/agentpet.json)")),
     ];
     entries.iter().map(|(kind, name, note)| AgentInfo {
         kind: kind.to_string(),

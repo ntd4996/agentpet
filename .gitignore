@@ -26,3 +26,6 @@ landing/node_modules/
 
 # Claude Code local tooling
 .claude/
+
+# Local agent memory , never commit
+/CLAUDE.md

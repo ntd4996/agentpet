@@ -88,6 +88,35 @@ public struct WindsurfHookPayload: Decodable, Equatable {
     }
 }
 
+/// The JSON xAI's Grok Build writes to a hook's stdin. Keys are camelCase
+/// (matching the property names, so no CodingKeys mapping is needed) and the
+/// `hookEventName` VALUE is snake_case (e.g. `pre_tool_use`, `stop`) , the
+/// StateMapper `.grok` cases match those.
+public struct GrokHookPayload: Decodable, Equatable {
+    public let sessionId: String?
+    public let hookEventName: String?
+    public let cwd: String?
+    public let workspaceRoot: String?
+    public let toolName: String?
+    public let toolInput: ToolActivityInput?
+
+    public static func decode(from data: Data) -> GrokHookPayload? {
+        try? JSONDecoder().decode(GrokHookPayload.self, from: data)
+    }
+
+    public func makeEvent(now: Date) -> AgentEvent? {
+        guard let sessionId, let hookEventName else { return nil }
+        let context = ActivityFormatter.activityMessage(
+            eventName: hookEventName, sessionId: sessionId,
+            toolName: toolName, toolInput: toolInput, explicitMessage: nil
+        )
+        return AgentEvent(
+            sessionId: sessionId, agentKind: .grok, eventName: hookEventName,
+            project: cwd ?? workspaceRoot, message: context, timestamp: now
+        )
+    }
+}
+
 /// Decodes a hook's stdin payload into an `AgentEvent`, choosing the field
 /// convention by agent kind. opencode sends explicit flags instead of stdin.
 public enum HookPayload {
@@ -99,6 +128,8 @@ public enum HookPayload {
             return WindsurfHookPayload.decode(from: data)?.makeEvent(now: now)
         case .antigravity:
             return AntigravityHookPayload.decode(from: data)?.makeEvent(now: now)
+        case .grok:
+            return GrokHookPayload.decode(from: data)?.makeEvent(now: now)
         default:
             return ClaudeHookPayload.decode(from: data)?.makeEvent(now: now, kind: kind)
         }

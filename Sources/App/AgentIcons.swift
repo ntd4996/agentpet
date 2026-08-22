@@ -51,6 +51,7 @@ enum AgentIcons {
         case .kiroCLI:   return kiroSVG
         case .droid:     return droidSVG
         case .pi:        return piSVG
+        case .grok:      return grokSVG
         // Antigravity ships as a PNG (its SVG uses blur filters macOS can't render).
         case .antigravity, .cli, .unknown: return nil
         }
@@ -63,6 +64,15 @@ enum AgentIcons {
     }
 
     // MARK: - Embedded SVG strings (sourced from thesvg.org CDN, MIT codebase)
+
+    /// xAI Grok , mono angular slash mark, 24×24 viewBox.
+    private static let grokSVG = """
+    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path fill="#000000" d="M3 21 15.4 3h3.4L6.4 21H3Z"/>
+      <path fill="#000000" d="M13.9 21l3.3-4.8 1.7 2.4L21.5 21h-7.6Z"/>
+      <path fill="#000000" d="M18.1 13.1 21.5 8l-1.7-2.5-3.4 5.1 1.7 2.5Z"/>
+    </svg>
+    """
 
     /// Anthropic "A" wordmark — mono variant, 24×24 viewBox.
     private static let anthropicSVG = """

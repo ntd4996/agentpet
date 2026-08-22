@@ -117,6 +117,17 @@ public enum AgentHooks {
                 kind: .pi, style: .piExtension,
                 events: [],
                 settingsPath: home + "/.pi/agent/extensions/agentpet.ts")
+        case .grok:
+            // xAI Grok Build: ~/.grok/hooks/*.json, Claude-compatible nested shape,
+            // registered with PascalCase event names (Grok also accepts these).
+            // Grok's payload uses camelCase keys + snake_case event VALUES.
+            // PreToolUse is omitted: Grok treats a hook's exit 2 on PreToolUse as
+            // "deny" and on Stop as "keep working", and our hook always exits 0,
+            // so the remaining events report state without any risk of blocking.
+            return AgentHookSpec(
+                kind: .grok, style: .claudeNested,
+                events: ["SessionStart", "UserPromptSubmit", "PostToolUse", "Notification", "Stop", "SessionEnd"],
+                settingsPath: home + "/.grok/hooks/agentpet.json")
         case .cli, .unknown:
             return nil
         }

@@ -89,6 +89,14 @@ pub fn state(kind: &str, event: &str) -> Option<&'static str> {
             "stop" | "Stop" => Some("done"),
             _ => None,
         },
+        // xAI Grok Build sends snake_case event VALUES in its payload.
+        "grok" => match event {
+            "session_start" => Some("registered"),
+            "user_prompt_submit" | "pre_tool_use" | "post_tool_use" => Some("working"),
+            "notification" => Some("waiting"),
+            "stop" => Some("done"),
+            _ => None,
+        },
         _ => None,
     }
 }
@@ -98,5 +106,6 @@ pub fn is_session_end(kind: &str, event: &str) -> bool {
     matches!(
         (kind, event),
         ("claude", "SessionEnd") | ("gemini", "SessionEnd") | ("cursor", "sessionEnd") | ("droid", "SessionEnd")
+            | ("grok", "session_end")
     )
 }

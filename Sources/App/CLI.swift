@@ -24,7 +24,11 @@ enum HookCLI {
             FileHandle.standardError.write(Data(
                 "usage: agentpet hook --event <name> --session <id> [--project <path>] [--agent <kind>] [--message <text>]\n         or pipe a Claude Code hook JSON payload on stdin\n".utf8
             ))
-            exit(2)
+            // Fail OPEN: a monitoring hook must never block the agent. Some agents
+            // (e.g. Grok Build) scan ~/.claude / ~/.cursor and feed us a payload we
+            // can't decode; exit 2 there would be read as a Stop-gate "keep going"
+            // (re-prompt loop) or a PreToolUse "deny". Exit 0 = do nothing, safely.
+            exit(0)
         }
         // Approval-gated events must reply with the hook's permission decision on
         // stdout so Claude Code can allow/deny the tool call synchronously.
