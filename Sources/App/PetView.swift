@@ -64,6 +64,10 @@ struct FloatingPetView: View {
     @ObservedObject private var bubbleSettings = BubbleSettings.shared
     @ObservedObject private var appLang = AppLanguage.shared
 
+    @State private var petDragging = false
+    @State private var petDragStartOrigin: NSPoint = .zero
+    @State private var petDragStartMouse: NSPoint = .zero
+
     var body: some View {
         VStack(spacing: 2) {
             if pet.showChat && model.petID != nil {
@@ -114,9 +118,7 @@ struct FloatingPetView: View {
                     anchor: .bottom
                 )
                 .animation(.interpolatingSpring(stiffness: 300, damping: 8), value: model.isPetted)
-                .onTapGesture {
-                    model.petTap()
-                }
+                .gesture(petDragOrTap)
         }
         .fixedSize(horizontal: true, vertical: true)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: model.petReactionLine)
@@ -134,6 +136,34 @@ struct FloatingPetView: View {
         // Re-resolve bubble text when the app language changes at runtime.
         .environment(\.locale, appLang.locale)
         .environment(\.animationsEnabled, pet.animationsEnabled)
+    }
+
+    /// One gesture drives both interactions so they never fight: a drag past a
+    /// small threshold moves the pet's window; a press that never crosses it is
+    /// a tap (pet the pet). A plain `onTapGesture` here made the pet region
+    /// interactive, which stopped `isMovableByWindowBackground` from dragging it
+    /// (issue #55: "unable to move my pets"). We move the window by the cursor's
+    /// screen-space delta so it tracks 1:1 without feeding back on itself.
+    private var petDragOrTap: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .onChanged { value in
+                if !petDragging {
+                    if abs(value.translation.width) < 5 && abs(value.translation.height) < 5 { return }
+                    petDragging = true
+                    petDragStartOrigin = PetWindowController.shared.windowOrigin(forKey: model.key) ?? .zero
+                    petDragStartMouse = NSEvent.mouseLocation
+                }
+                let now = NSEvent.mouseLocation
+                PetWindowController.shared.moveWindow(
+                    forKey: model.key,
+                    to: NSPoint(x: petDragStartOrigin.x + now.x - petDragStartMouse.x,
+                                y: petDragStartOrigin.y + now.y - petDragStartMouse.y))
+            }
+            .onEnded { _ in
+                let wasDrag = petDragging
+                petDragging = false
+                if !wasDrag { model.petTap() }
+            }
     }
 }
 

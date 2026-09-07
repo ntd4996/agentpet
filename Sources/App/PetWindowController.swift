@@ -238,6 +238,19 @@ final class PetWindowController: ObservableObject {
         }
     }
 
+    // MARK: - Drag to move (pet body)
+
+    /// Current on-screen origin of a window, so a pet-body drag can anchor from it.
+    func windowOrigin(forKey key: String) -> NSPoint? {
+        windows[key]?.panel.frame.origin
+    }
+
+    /// Moves a window during a pet-body drag. `didMoveNotification` fires, which
+    /// re-anchors and persists the position exactly like a window-background drag.
+    func moveWindow(forKey key: String, to origin: NSPoint) {
+        windows[key]?.panel.setFrameOrigin(origin)
+    }
+
     // MARK: - Stats popover (per window)
 
     /// Transient stats-only popover anchored at the pet.
