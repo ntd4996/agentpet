@@ -650,6 +650,12 @@ body.settings:not(.demo-open) .main-col { flex: 1 1 auto; width: auto; }
 .bubble .icon-slot { display: inline-flex; align-items: center; flex: 0 0 auto; }
 .bubble .icon-slot.emoji { font-size: 12px; line-height: 14px; }
 .bubble .icon-slot .aicon { width: 14px; height: 14px; }
+/* Lettered badge for a custom agent with no brand logo (issue #56). */
+.bubble .icon-slot.letter {
+  width: 14px; height: 14px; border-radius: 50%;
+  justify-content: center; color: #fff;
+  font-size: 9px; font-weight: 700; line-height: 14px;
+}
 
 /* ---- mac-exact tweaks ---- */
 .small-btn {

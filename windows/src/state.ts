@@ -162,6 +162,10 @@ export function agentLabel(kind: string): string {
     case "antigravity": return "Antigravity";
     case "copilot": return "Copilot";
     case "kiro": return "Kiro";
-    default: return "Agent";
+    case "hermes": return "Hermes";
+    case "openclaw": return "OpenClaw";
+    // A custom agent hooked via `--agent <name>`: show its own name, not a
+    // generic label, so distinct customs read distinctly (issue #56).
+    default: return kind ? kind.charAt(0).toUpperCase() + kind.slice(1) : "Agent";
   }
 }

@@ -10,6 +10,14 @@ import { agentIconUrl, uiIcon } from "./icons";
 import { stateMessage, bubbleLine } from "./activity";
 import { t } from "./i18n";
 
+/// Stable hue from a custom agent's name so its lettered badge always gets the
+/// same color (issue #56, parity with the macOS CustomAgentIcon).
+function customAgentColor(name: string): string {
+  let hash = 5381;
+  for (const ch of name.toLowerCase()) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return `hsl(${hash % 360} 55% 50%)`;
+}
+
 export type BubbleToken =
   | "dot" | "icon" | "title" | "project" | "separator" | "message" | "stateLabel" | "elapsed";
 
@@ -564,6 +572,7 @@ export class BubbleRenderer {
       if (slot.dataset.choice !== choice) {
         slot.dataset.choice = choice;
         slot.title = agentLabel(s.agent);
+        slot.style.background = ""; // clear any stale lettered-badge fill
         if (choice.startsWith("sym:")) {
           slot.innerHTML = uiIcon(choice.slice(4));
           slot.className = "icon-slot sym";
@@ -572,8 +581,16 @@ export class BubbleRenderer {
           slot.className = "icon-slot emoji";
         } else {
           const url = agentIconUrl(choice.slice(6));
-          slot.className = "icon-slot";
-          slot.innerHTML = url ? `<img class="aicon" src="${url}" alt="">` : "";
+          if (url) {
+            slot.className = "icon-slot";
+            slot.innerHTML = `<img class="aicon" src="${url}" alt="">`;
+          } else {
+            // Custom agent with no brand logo: a deterministic lettered badge so
+            // distinct customs still look distinct (issue #56, parity with macOS).
+            slot.className = "icon-slot letter";
+            slot.textContent = s.agent.slice(0, 1).toUpperCase();
+            slot.style.background = customAgentColor(s.agent);
+          }
         }
       }
     }
