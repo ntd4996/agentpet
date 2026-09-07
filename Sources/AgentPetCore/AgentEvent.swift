@@ -36,6 +36,10 @@ public struct AgentEvent: Codable, Sendable, Equatable {
     /// Deep link that focuses the exact tab/pane (Warp's `WARP_FOCUS_URL`). Used
     /// for terminals that expose a URL scheme instead of AppleScript.
     public var terminalFocusURL: String?
+    /// Raw `--agent` value when it names an agent AgentPet doesn't recognize.
+    /// Lets distinct custom agents keep their own identity instead of all
+    /// collapsing into one `.unknown` row (issue #56). `nil` for known kinds.
+    public var agentName: String?
     public var timestamp: Date
 
     public init(
@@ -53,6 +57,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         terminalProgram: String? = nil,
         terminalTTY: String? = nil,
         terminalFocusURL: String? = nil,
+        agentName: String? = nil,
         timestamp: Date
     ) {
         self.sessionId = sessionId
@@ -69,6 +74,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         self.terminalProgram = terminalProgram
         self.terminalTTY = terminalTTY
         self.terminalFocusURL = terminalFocusURL
+        self.agentName = agentName
         self.timestamp = timestamp
     }
 }

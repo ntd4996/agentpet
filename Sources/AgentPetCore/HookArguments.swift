@@ -40,13 +40,23 @@ public struct HookArguments: Equatable {
     }
 
     /// Builds an `AgentEvent`, or `nil` if required flags are missing.
-    /// Defaults to `.claude` since it is the only hook-supported agent in v1.
+    /// A missing `--agent` still defaults to `.claude` (Claude's hooks omit the
+    /// flag). A recognized name maps to its kind. An unrecognized name maps to
+    /// `.unknown` but keeps its raw name, so custom agents neither masquerade as
+    /// Claude nor collapse into one shared row (issue #56).
     public func makeEvent(now: Date) -> AgentEvent? {
         guard let event, let session else { return nil }
-        let kind = agent.flatMap(AgentKind.init(rawValue:)) ?? .claude
+        let kind: AgentKind
+        let name: String?
+        if let agent {
+            if let known = AgentKind(rawValue: agent) { kind = known; name = nil }
+            else { kind = .unknown; name = agent }
+        } else {
+            kind = .claude; name = nil
+        }
         return AgentEvent(
             sessionId: session, agentKind: kind, eventName: event,
-            project: project, message: message, timestamp: now
+            project: project, message: message, agentName: name, timestamp: now
         )
     }
 }

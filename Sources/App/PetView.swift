@@ -173,7 +173,7 @@ struct FloatingPetView: View {
 private struct GroupedSession: Identifiable {
     let session: AgentSession   // highest-priority session in the group
     let count: Int              // total sessions sharing this agent kind
-    var id: String { "\(session.agentKind.rawValue)-\(session.id)" }
+    var id: String { "\(session.groupKey)-\(session.id)" }
 }
 
 /// Speech bubble listing one row per (agentKind, project) group.
@@ -200,8 +200,8 @@ struct AgentBubble: View {
         let sortByKind = settings.sessionGrouping == .byKind || settings.groupByKind
         if sortByKind {
             sorted.sort {
-                if $0.agentKind.rawValue != $1.agentKind.rawValue {
-                    return $0.agentKind.rawValue < $1.agentKind.rawValue
+                if $0.groupKey != $1.groupKey {
+                    return $0.groupKey < $1.groupKey
                 }
                 if rank($0.state) != rank($1.state) { return rank($0.state) > rank($1.state) }
                 return $0.updatedAt > $1.updatedAt
@@ -216,13 +216,13 @@ struct AgentBubble: View {
         // 3. Collapse by agent kind when grouped (highest-priority session per kind).
         var result: [GroupedSession]
         if settings.sessionGrouping == .byKind {
-            var seen: [AgentKind: Int] = [:]
+            var seen: [String: Int] = [:]
             result = []
             for s in sorted {
-                if let idx = seen[s.agentKind] {
+                if let idx = seen[s.groupKey] {
                     result[idx] = GroupedSession(session: result[idx].session, count: result[idx].count + 1)
                 } else {
-                    seen[s.agentKind] = result.count
+                    seen[s.groupKey] = result.count
                     result.append(GroupedSession(session: s, count: 1))
                 }
             }
@@ -797,10 +797,14 @@ private struct AgentRow: View {
         case .dot:
             StateDot(color: stateDotColor, spins: dotSpins, style: settings.dotStyle)
         case .icon:
-            ResolvedIconView(
-                choice: settings.iconChoice(for: session.agentKind),
-                size: iconPt
-            )
+            if session.agentKind == .unknown, let name = session.agentName {
+                CustomAgentIcon(name: name, size: iconPt)
+            } else {
+                ResolvedIconView(
+                    choice: settings.iconChoice(for: session.agentKind),
+                    size: iconPt
+                )
+            }
         case .title:
             if let title = session.title {
                 Text(title)

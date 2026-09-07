@@ -43,6 +43,17 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
     public var terminalTTY: String?
     /// Deep link that focuses the exact tab/pane (Warp). Sticky.
     public var terminalFocusURL: String?
+    /// Raw agent name for a custom (`.unknown`) agent; `nil` for known kinds.
+    /// Sticky. Keeps distinct custom agents from merging and drives their
+    /// bubble icon (issue #56).
+    public var agentName: String?
+
+    /// Grouping/identity key for the bubble. Known kinds group by kind; custom
+    /// (`.unknown`) agents group by their raw name so two different custom
+    /// agents don't collapse into one row (issue #56).
+    public var groupKey: String {
+        agentKind == .unknown ? "unknown:\(agentName?.lowercased() ?? "")" : agentKind.rawValue
+    }
 
     public init(
         id: String,
@@ -59,7 +70,8 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
         pendingApproval: PendingApproval? = nil,
         terminalProgram: String? = nil,
         terminalTTY: String? = nil,
-        terminalFocusURL: String? = nil
+        terminalFocusURL: String? = nil,
+        agentName: String? = nil
     ) {
         self.id = id
         self.agentKind = agentKind
@@ -76,5 +88,6 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
         self.terminalProgram = terminalProgram
         self.terminalTTY = terminalTTY
         self.terminalFocusURL = terminalFocusURL
+        self.agentName = agentName
     }
 }

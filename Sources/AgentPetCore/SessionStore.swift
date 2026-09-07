@@ -109,6 +109,7 @@ public final class SessionStore {
             if let program = event.terminalProgram { existing.terminalProgram = program }
             if let tty = event.terminalTTY { existing.terminalTTY = tty }
             if let focusURL = event.terminalFocusURL { existing.terminalFocusURL = focusURL }
+            if let name = event.agentName { existing.agentName = name }
             existing.message = event.message
             existing.pendingApproval = pendingApproval
             byID[event.sessionId] = existing
@@ -126,7 +127,8 @@ public final class SessionStore {
             pendingApproval: pendingApproval,
             terminalProgram: event.terminalProgram,
             terminalTTY: event.terminalTTY,
-            terminalFocusURL: event.terminalFocusURL
+            terminalFocusURL: event.terminalFocusURL,
+            agentName: event.agentName
         )
         byID[event.sessionId] = session
         return session

@@ -63,6 +63,50 @@ enum AgentIcons {
         kind == .antigravity ? antigravityPNG : nil
     }
 
+    // MARK: - Custom (unknown-kind) agents, keyed by raw name
+
+    @MainActor private static var customCache: [String: NSImage] = [:]
+
+    /// A shipped brand glyph for a custom agent identified only by its raw
+    /// `--agent` name (Hermes, OpenClaw), or `nil` when we don't ship one — the
+    /// caller then falls back to a lettered badge. Cached by lowercased name.
+    /// These are simple original glyphs; swap in official logos when provided.
+    @MainActor
+    static func customBrandImage(named name: String) -> NSImage? {
+        let key = name.lowercased()
+        if let hit = customCache[key] { return hit }
+        guard let svg = customBrandSVG(for: key), let data = svg.data(using: .utf8) else { return nil }
+        let url = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("agentpet-custom-\(key).svg")
+        do { try data.write(to: url) } catch { return nil }
+        guard let img = NSImage(contentsOf: url) else { return nil }
+        customCache[key] = img
+        return img
+    }
+
+    private static func customBrandSVG(for name: String) -> String? {
+        switch name {
+        case "hermes":   return hermesSVG
+        case "openclaw": return openclawSVG
+        default:         return nil
+        }
+    }
+
+    /// Hermes , a winged "H" (messenger motif), 24×24 viewBox.
+    private static let hermesSVG = """
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+      <path d="M8 6.5v11M16 6.5v11M8 12h8" stroke="#6366F1" stroke-width="2.2" stroke-linecap="round"/>
+      <path d="M3.5 9c1.6-1.2 3.2-1.2 4.3-.3M20.5 9c-1.6-1.2-3.2-1.2-4.3-.3" stroke="#6366F1" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    """
+
+    /// OpenClaw , three curved talons (a claw), 24×24 viewBox.
+    private static let openclawSVG = """
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+      <path d="M7 4.5c-1.6 5-1.6 9.5 1 15M12 4.5c0 6 0 10.5 0 15M17 4.5c1.6 5 1.6 9.5-1 15" stroke="#D97706" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    """
+
     // MARK: - Embedded SVG strings (sourced from thesvg.org CDN, MIT codebase)
 
     /// xAI Grok , mono angular slash mark, 24×24 viewBox.
@@ -278,5 +322,36 @@ struct ResolvedIconView: View {
         case .unknown: return "questionmark.circle"
         default:       return "sparkle"
         }
+    }
+}
+
+// MARK: - CustomAgentIcon
+
+/// Icon for a custom (`.unknown`) agent known only by its raw name: a built-in
+/// brand glyph when we ship one (Hermes, OpenClaw), otherwise a deterministic
+/// lettered badge so distinct custom agents still look distinct (issue #56).
+struct CustomAgentIcon: View {
+    let name: String
+    var size: CGFloat = 14
+
+    var body: some View {
+        if let img = AgentIcons.customBrandImage(named: name) {
+            Image(nsImage: img)
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: size, height: size)
+        } else {
+            Text(String(name.prefix(1)).uppercased())
+                .font(.system(size: size * 0.7, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: size, height: size)
+                .background(Circle().fill(Self.color(for: name)))
+        }
+    }
+
+    /// Stable hue from the name so a given agent always gets the same color.
+    private static func color(for name: String) -> Color {
+        let hash = name.lowercased().unicodeScalars.reduce(UInt32(5381)) { ($0 &* 31) &+ $1.value }
+        return Color(hue: Double(hash % 360) / 360.0, saturation: 0.55, brightness: 0.62)
     }
 }
