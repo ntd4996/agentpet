@@ -118,6 +118,8 @@ Install a hook from **Settings** with one click, or wrap any command.
 | GLM (Z.AI) | works through Claude Code automatically |
 | **Anything else** | `agentpet run -- <command>` , working while it runs, done when it exits |
 
+**Custom agent icons.** A custom agent (`agentpet hook --agent <name>`) shows a lettered badge by default. Drop `~/.agentpet/icons/<name>.png` (or `.svg`/`.jpg`) and it shows that image instead; picked up on next launch.
+
 ## Screenshots
 
 <div align="center">

@@ -67,14 +67,19 @@ enum AgentIcons {
 
     @MainActor private static var customCache: [String: NSImage] = [:]
 
-    /// A shipped brand glyph for a custom agent identified only by its raw
-    /// `--agent` name (Hermes, OpenClaw), or `nil` when we don't ship one — the
-    /// caller then falls back to a lettered badge. Cached by lowercased name.
-    /// These are simple original glyphs; swap in official logos when provided.
+    /// Icon for a custom agent identified only by its raw `--agent` name:
+    /// a user-supplied `~/.agentpet/icons/<name>.png|svg|jpg` wins, then a
+    /// shipped brand glyph (Hermes, OpenClaw), else `nil` — the caller then
+    /// falls back to a lettered badge. Cached by lowercased name, so a new icon
+    /// file is picked up on the next app launch.
     @MainActor
     static func customBrandImage(named name: String) -> NSImage? {
         let key = name.lowercased()
         if let hit = customCache[key] { return hit }
+        if let url = CustomIconLocator.iconURL(forAgentName: key), let img = NSImage(contentsOf: url) {
+            customCache[key] = img
+            return img
+        }
         guard let svg = customBrandSVG(for: key), let data = svg.data(using: .utf8) else { return nil }
         let url = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("agentpet-custom-\(key).svg")
