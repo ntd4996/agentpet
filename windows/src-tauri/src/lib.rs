@@ -594,12 +594,20 @@ pub fn run() {
             }
 
             dlog("setup complete, tray + loop running");
-            // First run: open Settings so the user knows to pick a pet and
-            // connect an agent (otherwise the pet just sits there silently).
+            // First run: open Settings with the welcome overlay so the user knows
+            // to pick a pet and connect an agent (a port of the macOS onboarding).
             let marker = dirs::config_dir().map(|d| d.join("AgentPet").join(".onboarded"));
             if let Some(m) = marker {
                 if !m.exists() {
-                    open_settings(app.handle().clone());
+                    let h = app.handle().clone();
+                    std::thread::spawn(move || {
+                        let _ = WebviewWindowBuilder::new(
+                            &h, "settings", WebviewUrl::App("settings.html?onboarding=1".into()))
+                            .title("AgentPet")
+                            .inner_size(640.0, 620.0)
+                            .resizable(false)
+                            .build();
+                    });
                     if let Some(parent) = m.parent() {
                         let _ = std::fs::create_dir_all(parent);
                     }

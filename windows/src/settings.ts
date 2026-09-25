@@ -1299,6 +1299,17 @@ function applyStatic() {
   set("t-star", "Star on GitHub");
   set("t-discord", "Join the Discord");
   set("t-coffee", "Buy me a coffee");
+  // onboarding (first-run welcome)
+  set("t-ob-title", "Welcome to AgentPet");
+  set("t-ob-sub", "A desktop pet for your AI coding agents. A few steps to get going.");
+  set("t-ob-s1t", "Pick your pet");
+  set("t-ob-s1d", "Choose a starter pet or import your own.");
+  set("t-ob-s2t", "Connect your agent");
+  set("t-ob-s2d", "Set up Claude, Codex, Cursor and more below.");
+  set("t-ob-s3t", "Turn on notifications");
+  set("t-ob-s3d", "Get alerts when an agent finishes or needs input.");
+  set("t-ob-pet", "Choose a pet");
+  set("t-ob-go", "Get started");
   set("t-author", "Author");
   set("t-version2", "Version");
   // bottom bar + demo panel
@@ -1389,3 +1400,21 @@ initSliders();
 initSegs();
 initMisc();
 initDemo();
+initOnboarding();
+
+// First-run welcome overlay (opened as settings.html?onboarding=1 by the tray /
+// Rust on first launch). Mirrors the macOS OnboardingView: pick a pet, connect
+// an agent, turn on notifications, then Get started. Reuses the real Settings
+// tabs underneath, so the buttons just guide the user there.
+function initOnboarding() {
+  if (new URLSearchParams(location.search).get("onboarding") !== "1") return;
+  const ov = document.getElementById("onboarding");
+  if (!ov) return;
+  ov.hidden = false;
+  const dismiss = () => { ov.hidden = true; };
+  document.getElementById("ob-go")?.addEventListener("click", dismiss);
+  document.getElementById("ob-pet")?.addEventListener("click", () => {
+    (document.querySelector('.tab[data-tab="pet"]') as HTMLButtonElement | null)?.click();
+    dismiss();
+  });
+}

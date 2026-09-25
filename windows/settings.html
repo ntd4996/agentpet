@@ -6,6 +6,27 @@
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body class="settings">
+    <!-- First-run welcome (shown when opened with ?onboarding=1). -->
+    <div id="onboarding" hidden>
+      <div class="ob-card">
+        <div class="ob-head">
+          <div class="ob-logo">🐾</div>
+          <div>
+            <div class="ob-title" id="t-ob-title">Welcome to AgentPet</div>
+            <div class="ob-sub" id="t-ob-sub">A desktop pet for your AI coding agents. A few steps to get going.</div>
+          </div>
+        </div>
+        <div class="ob-steps">
+          <div class="ob-step"><span class="ob-n">1</span><div><div class="ob-st" id="t-ob-s1t">Pick your pet</div><div class="ob-sd" id="t-ob-s1d">Choose a starter pet or import your own.</div></div></div>
+          <div class="ob-step"><span class="ob-n">2</span><div><div class="ob-st" id="t-ob-s2t">Connect your agent</div><div class="ob-sd" id="t-ob-s2d">Set up Claude, Codex, Cursor and more below.</div></div></div>
+          <div class="ob-step"><span class="ob-n">3</span><div><div class="ob-st" id="t-ob-s3t">Turn on notifications</div><div class="ob-sd" id="t-ob-s3d">Get alerts when an agent finishes or needs input.</div></div></div>
+        </div>
+        <div class="ob-actions">
+          <button class="ghost-btn pill" id="ob-pet"><span id="t-ob-pet">Choose a pet</span></button>
+          <button class="prim-btn" id="ob-go"><span id="t-ob-go">Get started</span></button>
+        </div>
+      </div>
+    </div>
     <div class="shell">
     <div class="main-col">
     <!-- macOS preferences-style tab bar -->

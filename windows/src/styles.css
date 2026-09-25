@@ -650,6 +650,39 @@ body.settings:not(.demo-open) .main-col { flex: 1 1 auto; width: auto; }
 .bubble .icon-slot { display: inline-flex; align-items: center; flex: 0 0 auto; }
 .bubble .icon-slot.emoji { font-size: 12px; line-height: 14px; }
 .bubble .icon-slot .aicon { width: 14px; height: 14px; }
+/* First-run onboarding overlay (parity with the macOS OnboardingView). */
+#onboarding {
+  position: fixed; inset: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg, #1c1c1e);
+  padding: 28px;
+}
+#onboarding[hidden] { display: none !important; }
+.ob-card { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 22px; }
+.ob-head { display: flex; align-items: center; gap: 14px; }
+.ob-logo {
+  width: 42px; height: 42px; border-radius: 11px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center; font-size: 22px;
+  background: rgba(255,255,255,0.08);
+}
+.ob-title { font-size: 20px; font-weight: 700; }
+.ob-sub { font-size: 13px; opacity: 0.65; margin-top: 3px; }
+.ob-steps { display: flex; flex-direction: column; gap: 12px; }
+.ob-step { display: flex; align-items: flex-start; gap: 12px; }
+.ob-n {
+  width: 24px; height: 24px; border-radius: 50%; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: #fff; background: #6366F1;
+}
+.ob-st { font-size: 14px; font-weight: 600; }
+.ob-sd { font-size: 12.5px; opacity: 0.62; margin-top: 2px; }
+.ob-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+.prim-btn {
+  background: #6366F1; border: 0; border-radius: 8px; color: #fff;
+  padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.prim-btn:hover { filter: brightness(1.08); }
+
 /* Lettered badge for a custom agent with no brand logo (issue #56). */
 .bubble .icon-slot.letter {
   width: 14px; height: 14px; border-radius: 50%;
