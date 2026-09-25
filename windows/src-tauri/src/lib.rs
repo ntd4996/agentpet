@@ -14,6 +14,7 @@ use tauri::{Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder
 struct TrayItems {
     show_pet: tauri::menu::CheckMenuItem<tauri::Wry>,
     settings: MenuItem<tauri::Wry>,
+    updates: MenuItem<tauri::Wry>,
     quit: MenuItem<tauri::Wry>,
     tray: tauri::tray::TrayIcon<tauri::Wry>,
 }
@@ -105,11 +106,12 @@ fn write_lang(code: &str) {
 }
 
 /// Localised tray labels (the only app text on the Rust side).
-fn tray_labels(code: &str) -> (&'static str, &'static str, &'static str) {
+fn tray_labels(code: &str) -> (&'static str, &'static str, &'static str, &'static str) {
     match code {
-        "vi" => ("Hiện pet", "Cài đặt", "Thoát AgentPet"),
-        "zh" => ("显示宠物", "设置", "退出 AgentPet"),
-        _ => ("Show pet", "Settings", "Quit AgentPet"),
+        "vi" => ("Hiện pet", "Cài đặt", "Kiểm tra cập nhật", "Thoát AgentPet"),
+        "zh" => ("显示宠物", "设置", "检查更新", "退出 AgentPet"),
+        "zh-TW" => ("顯示寵物", "設定", "檢查更新", "結束 AgentPet"),
+        _ => ("Show pet", "Settings", "Check for updates", "Quit AgentPet"),
     }
 }
 
@@ -266,11 +268,12 @@ fn sync_project_windows(app: tauri::AppHandle, projects: Vec<String>) {
 #[tauri::command]
 fn set_lang(app: tauri::AppHandle, code: String) {
     write_lang(&code);
-    let (p, s, q) = tray_labels(&code);
+    let (p, s, u, q) = tray_labels(&code);
     if let Some(items) = app.try_state::<Mutex<TrayItems>>() {
         if let Ok(it) = items.lock() {
             let _ = it.show_pet.set_text(p);
             let _ = it.settings.set_text(s);
+            let _ = it.updates.set_text(u);
             let _ = it.quit.set_text(q);
         }
     }
@@ -523,7 +526,7 @@ pub fn run() {
             // Tray menu , the pet window is frameless, so this is how you reach
             // Settings or quit the app. Labels start in the saved language; the
             // Settings switcher re-labels them live via the `set_lang` command.
-            let (p_lbl, s_lbl, q_lbl) = tray_labels(&read_lang());
+            let (p_lbl, s_lbl, u_lbl, q_lbl) = tray_labels(&read_lang());
             let pet_visible = dirs::config_dir()
                 .map(|d| d.join("AgentPet").join("petvisible"))
                 .and_then(|p| std::fs::read_to_string(p).ok())
@@ -532,8 +535,9 @@ pub fn run() {
             let show_pet_i = tauri::menu::CheckMenuItem::with_id(
                 app, "show_pet", p_lbl, true, pet_visible, None::<&str>)?;
             let settings_i = MenuItem::with_id(app, "settings", s_lbl, true, None::<&str>)?;
+            let updates_i = MenuItem::with_id(app, "check_updates", u_lbl, true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", q_lbl, true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_pet_i, &settings_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&show_pet_i, &settings_i, &updates_i, &quit_i])?;
             let mut tray = TrayIconBuilder::new()
                 .tooltip("AgentPet")
                 .menu(&menu)
@@ -559,6 +563,16 @@ pub fn run() {
                         set_pet_visible(app.clone(), !now_visible);
                     }
                     "settings" => open_settings_impl(app.clone()),
+                    "check_updates" => {
+                        // The updater plugin is driven from JS; the pet window is
+                        // always alive (hidden, never closed) so it receives this
+                        // and runs check()/downloadAndInstall() with notification
+                        // feedback. Gives Linux (appindicator has no tray-click)
+                        // and Windows a reliable Updates entry point.
+                        if let Some(win) = app.get_webview_window("pet") {
+                            let _ = win.emit("check-updates", ());
+                        }
+                    }
                     "quit" => app.exit(0),
                     _ => {}
                 });
@@ -569,6 +583,7 @@ pub fn run() {
             app.manage(Mutex::new(TrayItems {
                 show_pet: show_pet_i.clone(),
                 settings: settings_i.clone(),
+                updates: updates_i.clone(),
                 quit: quit_i.clone(),
                 tray,
             }));

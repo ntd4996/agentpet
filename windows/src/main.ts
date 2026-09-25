@@ -404,6 +404,28 @@ listen<Lang>("lang-changed", (e) => { setLang(e.payload); render(); });
 // Bubble theme / opacity / messages changed from Settings.
 listen("bubble-changed", () => { applyBubble(); applyPet(); moodLine = ""; render(); });
 
+// Tray "Check for updates" (Rust emits this to the main pet window only). The
+// popover has a labelled Updates button, but on Linux appindicator can't open
+// the popover from a tray click, so the tray menu item is the reliable entry
+// point. Feedback goes through notifications since the tray has no live label.
+listen("check-updates", async () => {
+  if (!IS_MAIN) return;
+  const note = (body: string) => { try { if (notifyReady) sendNotification({ title: "AgentPet", body }); } catch {} };
+  note(t("Checking…"));
+  try {
+    const update = await check();
+    if (update) {
+      note(t("Installing…"));
+      await update.downloadAndInstall();
+      await relaunch();
+    } else {
+      note(t("Up to date"));
+    }
+  } catch {
+    note(t("Up to date"));
+  }
+});
+
 // --- interactions ------------------------------------------------------------
 // Drag works only when grabbing the PET SPRITE itself or the bubble , clicks
 // on the transparent area beside the pet fall through (like the macOS panel,
