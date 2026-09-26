@@ -16,6 +16,12 @@ extension EnvironmentValues {
 private let ERASE_INTERVAL: TimeInterval = 0.080
 private let TYPE_INTERVAL: TimeInterval = 0.045
 private let DOT_CYCLE_INTERVAL: TimeInterval = 0.400
+/// A message that replaces one shown for less than this is swapped in
+/// instantly instead of erase/retyped. Busy agents change the activity line
+/// every second or two, and each typed character is a full SwiftUI re-render
+/// of the bubble, so animating every change kept the app (and WindowServer)
+/// busy continuously. The typewriter still plays for "calm" transitions.
+private let SNAP_WINDOW: TimeInterval = 3.0
 
 /// The pet sprite alone (imported pack, reacting to mood). Shows a paw
 /// placeholder if no pet is selected yet. The pet id and mood come from the
@@ -592,6 +598,7 @@ private struct AnimatedStatusText: View {
 
     @State private var typeTarget: [Character] = []
     @State private var typeIndex = 0
+    @State private var lastRestart = Date.distantPast
 
     @State private var eraseTimer: Timer?
     @State private var typeTimer: Timer?
@@ -616,7 +623,11 @@ private struct AnimatedStatusText: View {
             }
             content
         }
-        .onAppear { restart(to: message) }
+        // Appear shows the message at once: in carousel mode every rotation
+        // (every few seconds) re-creates the row, and retyping it each time
+        // was a steady stream of per-character re-renders. The typewriter is
+        // kept for actual message changes.
+        .onAppear { snap(to: message) }
         .onChange(of: message) { restart(to: $0) }
         .onDisappear { cancelAll() }
     }
@@ -644,6 +655,13 @@ private struct AnimatedStatusText: View {
     // MARK: Phase transitions
 
     private func restart(to newMessage: String) {
+        let now = Date()
+        let rapid = now.timeIntervalSince(lastRestart) < SNAP_WINDOW
+        lastRestart = now
+        if rapid && !displayed.isEmpty {
+            snap(to: newMessage)
+            return
+        }
         reserveText = newMessage.count >= displayed.count ? newMessage : displayed
         cancelAll()
         isStable = false
@@ -652,6 +670,18 @@ private struct AnimatedStatusText: View {
         } else {
             startErasing(to: newMessage)
         }
+    }
+
+    /// Shows `newMessage` immediately in its stable phase (no erase/retype).
+    private func snap(to newMessage: String) {
+        cancelAll()
+        let stripped = Self.stripEllipsis(newMessage)
+        baseText = stripped.text
+        hasEllipsis = stripped.hasEllipsis
+        typeTarget = Array(hasEllipsis ? stripped.text : newMessage)
+        typeIndex = typeTarget.count
+        displayed = String(typeTarget)
+        enterStablePhase()
     }
 
     private func startErasing(to newMessage: String) {
@@ -858,9 +888,10 @@ private struct AgentRow: View {
             }
         case .elapsed:
             if animationsEnabled {
-                // Tick every second so the elapsed time counts up live instead of
-                // freezing at the value sampled when the row was last re-rendered.
-                TimelineView(.periodic(from: .now, by: 1)) { context in
+                // Tick live, but only as often as the label can change: every
+                // second under a minute, then on minute boundaries ("3m",
+                // "1h 5m"), instead of a 1 Hz re-render per row forever.
+                TimelineView(ElapsedSchedule(since: session.stateSince)) { context in
                     Text(elapsedString(since: session.stateSince, now: context.date))
                         .font(.system(size: secondaryPt, weight: .regular))
                         .foregroundStyle(textColor(0.45))
@@ -1211,9 +1242,15 @@ private struct StateDotLayer: NSViewRepresentable {
 final class StateDotNSView: NSView {
     private static let glyphFrames = ["✶", "✳", "✢", "✻", "✽", "✺"]
     private static let glyphInterval: TimeInterval = 0.15
+    /// Rendered glyph frames keyed by color+scale. Rows are re-created on
+    /// every carousel rotation, so re-rasterising six glyphs per row each time
+    /// showed up as the top app-side cost. Only a handful of state colors
+    /// exist, so this stays tiny.
+    @MainActor private static var glyphCache: [String: [CGImage]] = [:]
 
     private var lastColor: NSColor?
     private var lastStyle: BubbleSettings.DotStyle?
+    private var builtScale: CGFloat?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -1240,6 +1277,7 @@ final class StateDotNSView: NSView {
     private var currentScale: CGFloat { window?.backingScaleFactor ?? 2 }
 
     private func rebuild(nsColor: NSColor, style: BubbleSettings.DotStyle) {
+        builtScale = currentScale
         let host = layer ?? CALayer()
         host.sublayers?.forEach { $0.removeFromSuperlayer() }
         host.removeAllAnimations()
@@ -1294,7 +1332,14 @@ final class StateDotNSView: NSView {
     /// pre-rendered glyph images via a discrete keyframe animation.
     private func buildClaude(on host: CALayer, nsColor: NSColor) {
         let scale = currentScale
-        let images = Self.glyphFrames.compactMap { glyphImage($0, color: nsColor, scale: scale) }
+        let cacheKey = "\(nsColor.usingColorSpace(.sRGB)?.description ?? nsColor.description)@\(scale)"
+        let images: [CGImage]
+        if let cached = Self.glyphCache[cacheKey] {
+            images = cached
+        } else {
+            images = Self.glyphFrames.compactMap { glyphImage($0, color: nsColor, scale: scale) }
+            Self.glyphCache[cacheKey] = images
+        }
 
         let content = CALayer()
         content.frame = bounds
@@ -1354,7 +1399,10 @@ final class StateDotNSView: NSView {
     override func viewDidChangeBackingProperties() {
         super.viewDidChangeBackingProperties()
         // Re-render at the new backing scale for crispness on display changes.
-        if let style = lastStyle, let color = lastColor {
+        // Skip when the scale is unchanged (e.g. the first attach to a window),
+        // which otherwise rebuilt every freshly created dot a second time.
+        let scale = currentScale
+        if scale != builtScale, let style = lastStyle, let color = lastColor {
             rebuild(nsColor: color, style: style)
         }
     }
@@ -1371,24 +1419,63 @@ final class StateDotNSView: NSView {
 // MARK: - Waiting text flash
 
 /// Gently pulses row text opacity when waiting for input (no strikethrough).
+/// Implemented as a short eased toggle on a timer rather than a SwiftUI
+/// `repeatForever` animation: the latter re-renders the bubble at display rate
+/// for as long as a session waits (often minutes), which was a steady CPU and
+/// WindowServer cost. Here SwiftUI only animates ~30% of each cycle.
 private struct WaitingTextFlash: ViewModifier {
     let active: Bool
+    private static let cycle: TimeInterval = 1.0
+    private static let fade: TimeInterval = 0.3
     @State private var dimmed = false
+    @State private var timer: Timer?
 
     func body(content: Content) -> some View {
         content
             .opacity(active ? (dimmed ? 0.65 : 1.0) : 1.0)
             .onAppear { sync() }
             .onChange(of: active) { _ in sync() }
+            .onDisappear { stop() }
     }
 
     private func sync() {
+        stop()
         if active {
-            withAnimation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true)) {
-                dimmed = true
+            let t = Timer(timeInterval: Self.cycle, repeats: true) { _ in
+                Task { @MainActor in
+                    withAnimation(.easeInOut(duration: Self.fade)) { dimmed.toggle() }
+                }
             }
-        } else {
-            dimmed = false
+            RunLoop.main.add(t, forMode: .common)
+            timer = t
+        }
+    }
+
+    private func stop() {
+        timer?.invalidate()
+        timer = nil
+        dimmed = false
+    }
+}
+
+/// Timeline for the elapsed-time token: one entry per second while the label
+/// shows seconds, then one per whole minute since `since`.
+private struct ElapsedSchedule: TimelineSchedule {
+    let since: Date
+
+    func entries(from startDate: Date, mode: TimelineScheduleMode) -> AnyIterator<Date> {
+        var next = startDate
+        let since = since
+        return AnyIterator {
+            let current = next
+            let elapsed = max(0, current.timeIntervalSince(since))
+            if elapsed < 59 {
+                next = current.addingTimeInterval(1)
+            } else {
+                let intoMinute = elapsed.truncatingRemainder(dividingBy: 60)
+                next = current.addingTimeInterval(60 - intoMinute)
+            }
+            return current
         }
     }
 }
