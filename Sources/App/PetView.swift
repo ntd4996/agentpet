@@ -5,10 +5,17 @@ import AgentPetCore
 // MARK: - Animations environment key
 
 private struct AnimationsEnabledKey: EnvironmentKey { static let defaultValue = true }
+private struct PetOnScreenKey: EnvironmentKey { static let defaultValue = true }
 extension EnvironmentValues {
     var animationsEnabled: Bool {
         get { self[AnimationsEnabledKey.self] }
         set { self[AnimationsEnabledKey.self] = newValue }
+    }
+    /// False while the pet window can't be seen (occluded, displays asleep).
+    /// Pauses non-visual timers such as the carousel rotation.
+    var petOnScreen: Bool {
+        get { self[PetOnScreenKey.self] }
+        set { self[PetOnScreenKey.self] = newValue }
     }
 }
 
@@ -141,7 +148,10 @@ struct FloatingPetView: View {
         .animation(.easeInOut, value: pet.showChat)
         // Re-resolve bubble text when the app language changes at runtime.
         .environment(\.locale, appLang.locale)
-        .environment(\.animationsEnabled, pet.animationsEnabled)
+        // An unseen pet runs no animation at all (sprite, dot, typewriter,
+        // pulse, elapsed tick); it resumes as soon as the window is visible.
+        .environment(\.animationsEnabled, pet.animationsEnabled && model.isOnScreen)
+        .environment(\.petOnScreen, model.isOnScreen)
     }
 
     /// One gesture drives both interactions so they never fight: a drag past a
@@ -350,6 +360,7 @@ private struct BubbleCarousel: View {
     let groups: [GroupedSession]
     var chatStyle: Bool = false
     @ObservedObject private var settings = BubbleSettings.shared
+    @Environment(\.petOnScreen) private var onScreen
     @State private var index = 0
     @State private var timer: Timer?
     @State private var dragOffset: CGFloat = 0
@@ -394,6 +405,7 @@ private struct BubbleCarousel: View {
         .highPriorityGesture(swipeGesture)
         .onAppear { syncTimer() }
         .onDisappear { stopTimer() }
+        .onChange(of: onScreen) { _ in syncTimer() }
         .onChange(of: groups.map(\.id)) { _ in
             index = 0
             dragOffset = 0
@@ -443,7 +455,7 @@ private struct BubbleCarousel: View {
 
     private func syncTimer() {
         stopTimer()
-        guard groups.count > 1 else { return }
+        guard groups.count > 1, onScreen else { return }
         timer = Timer.scheduledTimer(withTimeInterval: Self.interval, repeats: true) { _ in
             Task { @MainActor in step(by: 1) }
         }

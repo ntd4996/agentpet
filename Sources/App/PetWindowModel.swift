@@ -17,6 +17,10 @@ final class PetWindowModel: ObservableObject {
     @Published var sessions: [AgentSession]
     @Published var count: Int
     @Published var chatLine: String
+    /// False while this pet's panel is fully occluded or the displays are
+    /// asleep/locked. Views pause every animation and timer while false so an
+    /// unseen pet costs ~no CPU. Driven by `PetWindowController`.
+    @Published var isOnScreen = true
 
     init(
         key: String,

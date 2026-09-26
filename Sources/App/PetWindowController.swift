@@ -20,6 +20,7 @@ final class PetWindowController: ObservableObject {
         let panel: NSPanel
         let model: PetWindowModel
         var moveObserver: Any?
+        var occlusionObserver: Any?
 
         /// Screen position of the pet's bottom-center; kept stable across resizes.
         var anchorBottomCenter: NSPoint?
@@ -39,6 +40,9 @@ final class PetWindowController: ObservableObject {
     private var chatLineCancellable: AnyCancellable?
     private var rightClickMonitor: Any?
     private var screenObserver: Any?
+    private var sleepObservers: [Any] = []
+    /// True while displays sleep or the session is locked/switched away.
+    private var screensAsleep = false
 
     private static let positionsKey = "agentpet.petPositions"
 
@@ -63,6 +67,26 @@ final class PetWindowController: ObservableObject {
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.ensureAllOnScreen() }
+        }
+
+        // Pause animations while nobody can see the pets: displays asleep,
+        // screen locked / fast user switch. Occlusion (covered, hidden) is
+        // tracked per panel in `ensureWindow`.
+        let ws = NSWorkspace.shared.notificationCenter
+        let pauses: [(Notification.Name, Bool)] = [
+            (NSWorkspace.screensDidSleepNotification, true),
+            (NSWorkspace.screensDidWakeNotification, false),
+            (NSWorkspace.sessionDidResignActiveNotification, true),
+            (NSWorkspace.sessionDidBecomeActiveNotification, false),
+        ]
+        sleepObservers = pauses.map { name, asleep in
+            ws.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.screensAsleep = asleep
+                    for managed in self.windows.values { self.updateOnScreen(managed) }
+                }
+            }
         }
 
         // Right-click a pet to show ITS stats card (info only — controls stay in
@@ -164,10 +188,25 @@ final class PetWindowController: ObservableObject {
                 self.savePosition(managed)
             }
         }
+        managed.occlusionObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didChangeOcclusionStateNotification, object: panel, queue: .main
+        ) { [weak self, key] _ in
+            MainActor.assumeIsolated {
+                guard let self, let managed = self.windows[key] else { return }
+                self.updateOnScreen(managed)
+            }
+        }
 
         placeWindow(managed, size: size, index: index)
         syncAnchor(managed)
         return managed
+    }
+
+    /// Recomputes whether a pet can be seen; only publishes on change so
+    /// SwiftUI is not invalidated by redundant occlusion callbacks.
+    private func updateOnScreen(_ managed: ManagedPetWindow) {
+        let visible = !screensAsleep && managed.panel.occlusionState.contains(.visible)
+        if managed.model.isOnScreen != visible { managed.model.isOnScreen = visible }
     }
 
     /// Factory: a borderless, non-activating, floating, click-through panel.
@@ -213,6 +252,7 @@ final class PetWindowController: ObservableObject {
         guard let managed = windows.removeValue(forKey: key) else { return }
         managed.resizeDebounce?.cancel()
         if let obs = managed.moveObserver { NotificationCenter.default.removeObserver(obs) }
+        if let obs = managed.occlusionObserver { NotificationCenter.default.removeObserver(obs) }
         managed.panel.orderOut(nil)
     }
 
