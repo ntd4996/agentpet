@@ -15,6 +15,42 @@ public enum PetWindowGeometry {
             y: min(max(origin.y, visible.minY), maxY)
         )
     }
+
+    /// Horizontal placement for a pet window of `width` whose pet (`petWidth`
+    /// wide) should stay centred at `anchorX`. The window is kept inside
+    /// `[visibleMinX, visibleMaxX]` so a wide bubble never spills onto another
+    /// display; the pet is then shifted inside the window by `petOffset` so it
+    /// doesn't move on screen. The offset is limited so the pet stays inside the
+    /// window (it only moves if the pet itself was dragged past the edge).
+    public static func horizontalLayout(anchorX: CGFloat, width: CGFloat, petWidth: CGFloat,
+                                        visibleMinX: CGFloat, visibleMaxX: CGFloat)
+        -> (originX: CGFloat, petOffset: CGFloat) {
+        let maxOriginX = max(visibleMinX, visibleMaxX - width)
+        let originX = (anchorX - width / 2).clamped(visibleMinX, maxOriginX)
+        let limit = max(0, (width - petWidth) / 2)
+        let offset = (anchorX - (originX + width / 2)).clamped(-limit, limit)
+        return (originX, offset)
+    }
+
+    /// Keeps a pet's speech bubble over the pet when the pet is offset inside
+    /// its window by `petOffset` (see `horizontalLayout`). The bubble moves
+    /// toward the pet as far as the window allows (`windowWidth`, the real
+    /// window, which lags a content resize); the tail covers the rest, kept
+    /// `tailClearance` away from the rounded corners. `bubbleWidth` includes
+    /// `bubbleInset` of padding on each side.
+    public static func bubbleLayout(petOffset: CGFloat, windowWidth: CGFloat, bubbleWidth: CGFloat,
+                                    bubbleInset: CGFloat, tailClearance: CGFloat)
+        -> (bubbleShift: CGFloat, tailShift: CGFloat) {
+        let room = max(0, (windowWidth - bubbleWidth) / 2)
+        let bubbleShift = petOffset.clamped(-room, room)
+        let tailLimit = max(0, (bubbleWidth - 2 * bubbleInset) / 2 - tailClearance)
+        return (bubbleShift, (petOffset - bubbleShift).clamped(-tailLimit, tailLimit))
+    }
+}
+
+extension Comparable {
+    /// `self` limited to `lo...hi` (returns `hi` if `lo > hi`, like `min(max())`).
+    func clamped(_ lo: Self, _ hi: Self) -> Self { min(max(self, lo), hi) }
 }
 
 public struct PetWindowSpec: Equatable, Sendable {

@@ -200,4 +200,84 @@ final class PetWindowGeometryTests: XCTestCase {
         let clamped = PetWindowGeometry.clampOrigin(CGPoint(x: 5000, y: 400), size: size, into: right)
         XCTAssertEqual(clamped.x, 1920 + 1920 - 260)
     }
+
+    // MARK: horizontalLayout (bubble stays on the pet's screen, pet stays put)
+
+    func testLayoutCentredWhenRoomOnBothSides() {
+        let r = PetWindowGeometry.horizontalLayout(anchorX: 800, width: 364, petWidth: 120,
+                                                   visibleMinX: 0, visibleMaxX: 1680)
+        XCTAssertEqual(r.originX, 800 - 182)
+        XCTAssertEqual(r.petOffset, 0)
+    }
+
+    func testLayoutNearRightEdgeShiftsWindowButNotPet() {
+        // Repro: pet at x=1558 on a 1680-wide display with a second display to the right.
+        let r = PetWindowGeometry.horizontalLayout(anchorX: 1558, width: 364, petWidth: 120,
+                                                   visibleMinX: 0, visibleMaxX: 1680)
+        XCTAssertEqual(r.originX, 1680 - 364)                     // fully on this screen
+        XCTAssertEqual(r.originX + 364 / 2 + r.petOffset, 1558)   // pet unchanged
+    }
+
+    func testLayoutNearLeftEdgeOnShiftedScreen() {
+        // Pet fully on the right display (spans 1700...1820), bubble would spill left.
+        let r = PetWindowGeometry.horizontalLayout(anchorX: 1760, width: 364, petWidth: 120,
+                                                   visibleMinX: 1680, visibleMaxX: 3728)
+        XCTAssertEqual(r.originX, 1680)
+        XCTAssertEqual(r.originX + 182 + r.petOffset, 1760)
+    }
+
+    func testLayoutPetPastEdgeIsPulledInsideWindow() {
+        // Pet dragged half off the right edge: offset is limited to keep it in the window.
+        let r = PetWindowGeometry.horizontalLayout(anchorX: 1670, width: 364, petWidth: 120,
+                                                   visibleMinX: 0, visibleMaxX: 1680)
+        XCTAssertEqual(r.originX, 1316)
+        XCTAssertEqual(r.petOffset, 122)   // (364 - 120) / 2
+    }
+
+    func testLayoutWindowWiderThanScreenPinsToMinX() {
+        let r = PetWindowGeometry.horizontalLayout(anchorX: 100, width: 500, petWidth: 120,
+                                                   visibleMinX: 0, visibleMaxX: 400)
+        XCTAssertEqual(r.originX, 0)
+        XCTAssertEqual(r.petOffset, -150)
+    }
+
+    // MARK: bubbleLayout (bubble + tail follow the offset pet)
+
+    private func bubble(offset: CGFloat, window: CGFloat, bubble: CGFloat) -> (bubbleShift: CGFloat, tailShift: CGFloat) {
+        PetWindowGeometry.bubbleLayout(petOffset: offset, windowWidth: window, bubbleWidth: bubble,
+                                       bubbleInset: 10, tailClearance: 20)
+    }
+
+    func testSettledWideBubbleStaysPutAndTailPointsAtPet() {
+        let r = bubble(offset: 60, window: 364, bubble: 364)
+        XCTAssertEqual(r.bubbleShift, 0)   // no room left in the window
+        XCTAssertEqual(r.tailShift, 60)
+    }
+
+    func testNarrowBubbleMovesOverPet() {
+        // Mid scale-in/out: plenty of room, the whole bubble sits over the pet.
+        let r = bubble(offset: 60, window: 364, bubble: 120)
+        XCTAssertEqual(r.bubbleShift, 60)
+        XCTAssertEqual(r.tailShift, 0)
+    }
+
+    func testShrinkingBubbleUsesOldWindowWidth() {
+        // Bubble already narrow, window still wide: bubble can reach the pet.
+        let r = bubble(offset: -100, window: 364, bubble: 150)
+        XCTAssertEqual(r.bubbleShift, -100)
+        XCTAssertEqual(r.tailShift, 0)
+    }
+
+    func testTailClearOfCorners() {
+        // Tail limit = (100 - 2*10)/2 - 20 = 20.
+        let r = bubble(offset: 50, window: 100, bubble: 100)
+        XCTAssertEqual(r.bubbleShift, 0)
+        XCTAssertEqual(r.tailShift, 20)
+    }
+
+    func testNoOffsetIsNoShift() {
+        let r = bubble(offset: 0, window: 364, bubble: 200)
+        XCTAssertEqual(r.bubbleShift, 0)
+        XCTAssertEqual(r.tailShift, 0)
+    }
 }

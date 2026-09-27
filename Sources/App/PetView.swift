@@ -6,6 +6,7 @@ import AgentPetCore
 
 private struct AnimationsEnabledKey: EnvironmentKey { static let defaultValue = true }
 private struct PetOnScreenKey: EnvironmentKey { static let defaultValue = true }
+private struct BubbleTailOffsetKey: EnvironmentKey { static let defaultValue: CGFloat = 0 }
 extension EnvironmentValues {
     var animationsEnabled: Bool {
         get { self[AnimationsEnabledKey.self] }
@@ -16,6 +17,12 @@ extension EnvironmentValues {
     var petOnScreen: Bool {
         get { self[PetOnScreenKey.self] }
         set { self[PetOnScreenKey.self] = newValue }
+    }
+    /// Horizontal shift of a pet bubble's bottom tail so it points at the pet
+    /// when the pet is offset inside its window.
+    var bubbleTailOffset: CGFloat {
+        get { self[BubbleTailOffsetKey.self] }
+        set { self[BubbleTailOffsetKey.self] = newValue }
     }
 }
 
@@ -68,6 +75,14 @@ private struct PetContentSizeKey: PreferenceKey {
     }
 }
 
+/// Layout width of the pet's speech bubble (widest one while two cross-fade).
+private struct BubbleWidthKey: PreferenceKey {
+    static var defaultValue: CGFloat { 0 }
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
 /// The full floating window content: a chat bubble above the pet. Per-window
 /// fields (mood/petID/sessions/chatLine) come from `model`; global toggles and
 /// the tap-interaction state still come from `PetController.shared`.
@@ -85,14 +100,10 @@ struct FloatingPetView: View {
         VStack(spacing: 2) {
             if pet.showChat && model.petID != nil {
                 if bubbleSettings.multiAgentBubbleEnabled && !model.sessions.isEmpty {
-                    AgentBubble(sessions: model.sessions)
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .transition(AnyTransition.scale(scale: 0.6).combined(with: .opacity))
+                    alignedToPet(AgentBubble(sessions: model.sessions))
                 } else if !model.chatLine.isEmpty {
-                    ChatBubble(text: model.chatLine,
-                               projectName: pet.splitPet ? model.projectName : nil)
-                        .padding(.horizontal, 10).padding(.vertical, 6)
-                        .transition(AnyTransition.scale(scale: 0.6).combined(with: .opacity))
+                    alignedToPet(ChatBubble(text: model.chatLine,
+                                            projectName: pet.splitPet ? model.projectName : nil))
                 }
             }
             PetView(model: model, size: pet.petPoint)
@@ -132,6 +143,13 @@ struct FloatingPetView: View {
                 )
                 .animation(.interpolatingSpring(stiffness: 300, damping: 8), value: model.isPetted)
                 .gesture(petDragOrTap)
+                // Kept under its on-screen spot when the window is pushed back
+                // onto the screen (offset doesn't change the measured size).
+                .offset(x: model.petOffset)
+                // The window jumps instantly, so the counter-shift must too:
+                // animating it (outer spring on sessions.count) slid the pet
+                // out of the window for a few frames.
+                .animation(nil, value: model.petOffset)
         }
         .fixedSize(horizontal: true, vertical: true)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: model.petReactionLine)
@@ -143,6 +161,7 @@ struct FloatingPetView: View {
         .onPreferenceChange(PetContentSizeKey.self) { [key = model.key] size in
             PetWindowController.shared.resizeToContent(size, forKey: key)
         }
+        .onPreferenceChange(BubbleWidthKey.self) { bubbleWidth = $0 }
         .animation(.easeInOut(duration: 0.22), value: model.chatLine)
         .animation(.spring(response: 0.35, dampingFraction: 0.7), value: model.sessions.count)
         .animation(.easeInOut, value: pet.showChat)
@@ -152,6 +171,30 @@ struct FloatingPetView: View {
         // pulse, elapsed tick); it resumes as soon as the window is visible.
         .environment(\.animationsEnabled, pet.animationsEnabled && model.isOnScreen)
         .environment(\.petOnScreen, model.isOnScreen)
+    }
+
+    // Layout width of the bubble incl. padding (unaffected by offset/scale, so
+    // no feedback loop with the shifts below).
+    @State private var bubbleWidth: CGFloat = 0
+
+    /// Horizontal padding around the pet's bubble.
+    private static let bubblePadding: CGFloat = 10
+    /// Min distance from the tail to the bubble's edge (corner radius + half tail).
+    private static let tailClearance: CGFloat = 20
+
+    private func alignedToPet<B: View>(_ bubble: B) -> some View {
+        let layout = PetWindowGeometry.bubbleLayout(
+            petOffset: model.petOffset, windowWidth: model.windowWidth, bubbleWidth: bubbleWidth,
+            bubbleInset: Self.bubblePadding, tailClearance: Self.tailClearance)
+        return bubble
+            .padding(.horizontal, Self.bubblePadding).padding(.vertical, 6)
+            .background(GeometryReader { proxy in
+                Color.clear.preference(key: BubbleWidthKey.self, value: proxy.size.width)
+            })
+            .environment(\.bubbleTailOffset, layout.tailShift)
+            .offset(x: layout.bubbleShift)
+            .animation(nil, value: layout.bubbleShift)
+            .transition(AnyTransition.scale(scale: 0.6).combined(with: .opacity))
     }
 
     /// One gesture drives both interactions so they never fight: a drag past a
@@ -199,6 +242,7 @@ struct AgentBubble: View {
     let sessions: [AgentSession]
     var tailEdge: Edge = .bottom
     @ObservedObject private var settings = BubbleSettings.shared
+    @Environment(\.bubbleTailOffset) private var tailOffset
 
     // attentionPriority is internal to AgentPetCore — use local rank
     private func rank(_ s: AgentState) -> Int {
@@ -299,6 +343,7 @@ struct AgentBubble: View {
                 Triangle()
                     .fill(fill)
                     .frame(width: 12, height: 7)
+                    .offset(x: tailOffset)
             }
         }
         .fixedSize(horizontal: isPetChat, vertical: true)
@@ -1103,6 +1148,7 @@ struct ChatBubble: View {
     let text: String
     var projectName: String? = nil
     @ObservedObject private var settings = BubbleSettings.shared
+    @Environment(\.bubbleTailOffset) private var tailOffset
 
     private var fill: Color {
         switch settings.theme {
@@ -1165,6 +1211,7 @@ struct ChatBubble: View {
             Triangle()
                 .fill(fill)
                 .frame(width: 12, height: 7)
+                .offset(x: tailOffset)
         }
         .fixedSize(horizontal: true, vertical: true)
         .frame(maxWidth: 420)
