@@ -33,6 +33,10 @@ public enum AgentKind: String, Codable, Sendable {
     /// xAI Grok Build CLI (`grok`). Hook payload is camelCase keys + snake_case
     /// event values, via `~/.grok/hooks/agentpet.json`.
     case grok
+    /// jcode (github.com/1jehuang/jcode). Lifecycle hooks in
+    /// `~/.jcode/config.toml` `[hooks]`; the event arrives via `JCODE_HOOK_*`
+    /// env vars (stdin is /dev/null).
+    case jcode
     /// Any CLI agent launched via the `agentpet run` wrapper.
     case cli
     case unknown

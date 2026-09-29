@@ -23,6 +23,9 @@ public enum HookStyle: Sendable {
     /// `~/.pi/agent/extensions/`. Like opencode, the extension hardcodes its own
     /// `pi.on(...)` handlers and reports state through the `agentpet hook` CLI.
     case piExtension
+    /// jcode `~/.jcode/config.toml`: one key per event in the `[hooks]` table,
+    /// value a command string or an array of them.
+    case jcodeToml
 }
 
 /// Where and which lifecycle events to register for an agent.
@@ -128,6 +131,13 @@ public enum AgentHooks {
                 kind: .grok, style: .claudeNested,
                 events: ["SessionStart", "UserPromptSubmit", "PostToolUse", "Notification", "Stop", "SessionEnd"],
                 settingsPath: home + "/.grok/hooks/agentpet.json")
+        case .jcode:
+            // Observers only: jcode spawns them detached, so they never slow a
+            // turn. pre_tool (a blocking gate) is deliberately not used.
+            return AgentHookSpec(
+                kind: .jcode, style: .jcodeToml,
+                events: ["session_start", "turn_start", "post_tool", "turn_end", "session_end"],
+                settingsPath: home + "/.jcode/config.toml")
         case .cli, .unknown:
             return nil
         }

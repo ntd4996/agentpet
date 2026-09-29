@@ -39,5 +39,7 @@ public enum AgentCatalog {
                          note: "Pi (pi.dev) extension; no \"needs input\" alerts (Pi has no approval gate by default)"),
         AgentIntegration(kind: .grok, displayName: "Grok Build", isSupported: true,
                          note: "xAI Grok Build CLI (~/.grok/hooks/agentpet.json)"),
+        AgentIntegration(kind: .jcode, displayName: "jcode", isSupported: true,
+                         note: "jcode lifecycle hooks (~/.jcode/config.toml)"),
     ]
 }

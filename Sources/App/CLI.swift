@@ -10,8 +10,11 @@ enum HookCLI {
         let now = Date()
         let parsed = HookArguments.parse(arguments)
         let kind = parsed.agent.flatMap(AgentKind.init(rawValue:)) ?? .claude
+        // jcode describes the event in JCODE_HOOK_* env vars, not on stdin.
         var event = parsed.makeEvent(now: now)
-            ?? HookPayload.event(forAgent: kind, stdin: FileHandle.standardInput.readDataToEndOfFile(), now: now)
+            ?? (kind == .jcode
+                ? JcodeHookPayload.event(env: ProcessInfo.processInfo.environment, now: now)
+                : HookPayload.event(forAgent: kind, stdin: FileHandle.standardInput.readDataToEndOfFile(), now: now))
 
         // Tag the event with the terminal we're running in, so a click on the
         // session's bubble row can focus that exact window/tab later.

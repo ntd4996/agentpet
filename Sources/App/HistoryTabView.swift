@@ -234,6 +234,7 @@ private func sfSymbol(for kind: AgentKind) -> String {
     case .droid:       return "cpu.fill"
     case .pi:          return "pi"
     case .grok:        return "slash.circle.fill"
+    case .jcode:       return "j.circle.fill"
     case .cli:         return "terminal.fill"
     case .unknown:     return "questionmark.circle"
     }

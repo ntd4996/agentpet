@@ -84,6 +84,15 @@ final class SettingsModel: ObservableObject {
         let expectedCommand = "\"\(currentPath)\" hook"
         for agent in agents where agent.isSupported {
             guard let spec = AgentHooks.spec(for: agent.kind) else { continue }
+            // jcode's config is TOML, not JSON: install is an in-place,
+            // idempotent line rewrite, so just re-run it when installed.
+            if spec.style == .jcodeToml {
+                if HookInstaller.isInstalledOnDisk(path: spec.settingsPath, events: spec.events, style: spec.style) {
+                    try? HookInstaller.installToDisk(command: hookCommand(for: agent.kind),
+                                                     path: spec.settingsPath, events: spec.events, style: spec.style)
+                }
+                continue
+            }
             guard let settings = try? HookInstaller.readSettings(path: spec.settingsPath) else { continue }
             guard HookInstaller.isInstalledOnDisk(path: spec.settingsPath,
                                                   events: spec.events,

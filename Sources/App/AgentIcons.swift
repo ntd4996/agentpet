@@ -53,7 +53,7 @@ enum AgentIcons {
         case .pi:        return piSVG
         case .grok:      return grokSVG
         // Antigravity ships as a PNG (its SVG uses blur filters macOS can't render).
-        case .antigravity, .cli, .unknown: return nil
+        case .antigravity, .jcode, .cli, .unknown: return nil
         }
     }
 
