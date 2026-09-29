@@ -1,8 +1,10 @@
+import AgentPetCore
 import Foundation
 
 /// Reads subscription limits straight from the providers — no helper app
 /// needed. Claude: the OAuth token Claude Code keeps in the Keychain (or
-/// `~/.claude/.credentials.json`) against `api.anthropic.com/api/oauth/usage`.
+/// `~/.claude/.credentials.json`), falling back to jcode's active Claude
+/// account in `~/.jcode/auth.json`, against `api.anthropic.com/api/oauth/usage`.
 /// Codex: `~/.codex/auth.json` against the ChatGPT wham usage endpoint.
 /// Read-only: tokens are never written back or refreshed; a stale token just
 /// means the provider drops out until its CLI runs again.
@@ -49,7 +51,16 @@ final class NativeUsageProbe: ObservableObject {
     // MARK: - Claude (api.anthropic.com/api/oauth/usage)
 
     nonisolated private static func probeClaude() async -> OpenUsageClient.Provider? {
-        guard let token = claudeAccessToken() else { return nil }
+        // Each source is refreshed only by its own CLI, so one can be expired
+        // while the other is live (e.g. someone who mostly runs jcode). Try
+        // every unexpired token in order; a rejected one falls through.
+        for token in claudeAccessTokens(now: Date()) {
+            if let provider = await probeClaude(token: token) { return provider }
+        }
+        return nil
+    }
+
+    nonisolated private static func probeClaude(token: String) async -> OpenUsageClient.Provider? {
         var request = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/usage")!)
         request.timeoutInterval = 8
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -107,29 +118,46 @@ final class NativeUsageProbe: ObservableObject {
         )
     }
 
+    /// Candidate Claude OAuth access tokens, best first: Claude Code (Keychain,
+    /// then the legacy credentials file), then jcode's active account. Tokens
+    /// that carry an expiry in the past are skipped.
+    nonisolated private static func claudeAccessTokens(now: Date) -> [String] {
+        var tokens: [String] = []
+        if let token = claudeCodeAccessToken(now: now) { tokens.append(token) }
+        let jcodePath = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".jcode/auth.json").path
+        if let data = FileManager.default.contents(atPath: jcodePath),
+           let token = JcodeClaudeAuth.accessToken(fromAuthJSON: data, now: now),
+           !tokens.contains(token) {
+            tokens.append(token)
+        }
+        return tokens
+    }
+
     /// Claude Code's OAuth access token: Keychain first (current versions),
     /// then the legacy credentials file.
-    nonisolated private static func claudeAccessToken() -> String? {
+    nonisolated private static func claudeCodeAccessToken(now: Date) -> String? {
         if let text = keychainPassword(service: "Claude Code-credentials"),
-           let token = parseClaudeCredentials(text) {
+           let token = parseClaudeCredentials(text, now: now) {
             return token
         }
         let path = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent(".claude/.credentials.json").path
         if let text = try? String(contentsOfFile: path, encoding: .utf8),
-           let token = parseClaudeCredentials(text) {
+           let token = parseClaudeCredentials(text, now: now) {
             return token
         }
         return nil
     }
 
-    nonisolated private static func parseClaudeCredentials(_ raw: String) -> String? {
+    nonisolated private static func parseClaudeCredentials(_ raw: String, now: Date) -> String? {
         let text = decodeHexIfNeeded(raw.trimmingCharacters(in: .whitespacesAndNewlines))
         guard let data = text.data(using: .utf8),
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let oauth = json["claudeAiOauth"] as? [String: Any],
               let token = oauth["accessToken"] as? String, !token.isEmpty
         else { return nil }
+        if JcodeClaudeAuth.isExpired(oauth["expiresAt"], now: now) { return nil }
         return token
     }
 
