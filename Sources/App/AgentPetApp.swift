@@ -6,8 +6,26 @@ struct AgentPetApp: App {
 
     var body: some Scene {
         // The UI lives in a status-item popover and floating windows managed by
-        // AppDelegate; this empty scene just satisfies the App protocol.
-        Settings { EmptyView() }
+        // AppDelegate; this scene only satisfies the App protocol. It used to be
+        // `Settings { EmptyView() }`, which macOS 26 presents at launch (and on
+        // ⌘,) as a blank "AgentPet Settings" window. A never-inserted
+        // MenuBarExtra owns no window, so nothing blank can appear.
+        // simplify: `.defaultLaunchBehavior(.suppressed)` is the direct fix once
+        // the deployment target reaches macOS 15.
+        MenuBarExtra("AgentPet", isInserted: .constant(false)) { EmptyView() }
+            .commands {
+                // Keep the app menu's "Settings…" (⌘,) and route it to the real
+                // Settings window.
+                CommandGroup(replacing: .appSettings) {
+                    Button {
+                        SettingsWindowController.shared.show()
+                    } label: {
+                        // Reuses the existing "Settings" translation.
+                        Text(NSLocalizedString("Settings", comment: "app menu") + "…")
+                    }
+                    .keyboardShortcut(",", modifiers: .command)
+                }
+            }
     }
 }
 
