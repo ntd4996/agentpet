@@ -333,6 +333,7 @@ final class PetWindowController: ObservableObject {
     /// Sizes the panel hosting `key` to hug the pet + bubble content.
     func resizeToContent(_ size: CGSize, forKey key: String) {
         guard size.width > 0, size.height > 0, let managed = windows[key] else { return }
+        ResizeMetrics.log("content", size)
 
         managed.resizeDebounce?.cancel()
         // Growing content is drawn clipped until the window catches up, so
@@ -420,6 +421,7 @@ final class PetWindowController: ObservableObject {
             managed.panel.contentView?.layoutSubtreeIfNeeded()
         }
         managed.panel.setFrame(NSRect(origin: origin, size: size), display: true, animate: false)
+        ResizeMetrics.log("window", size)
     }
 
     /// After the user drags a pet (window or pet body), re-fit it onto the
