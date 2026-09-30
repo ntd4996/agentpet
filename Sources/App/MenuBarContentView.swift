@@ -89,7 +89,7 @@ struct MenuContentView: View {
                     .font(.system(size: 12, weight: .bold)).foregroundStyle(color)
                     .layoutPriority(1)
                 Spacer(minLength: 6)
-                Text(hungerText)
+                Text(CareFormat.hunger(care.hunger))
                     .font(.system(size: 11)).foregroundStyle(.white.opacity(0.55))
                     .lineLimit(1).layoutPriority(1)
             }
@@ -117,8 +117,7 @@ struct MenuContentView: View {
 
     private var todayLine: String {
         let tokens = care.current.tokensToday
-        let label = tokens >= 1_000_000 ? String(format: "%.1fM", Double(tokens) / 1_000_000)
-            : tokens >= 1_000 ? String(format: "%.0fk", Double(tokens) / 1_000) : "\(tokens)"
+        let label = CareFormat.tokens(tokens)
         if care.current.mealsToday == 1 {
             return String(format: NSLocalizedString("Today %@ tokens · 1 meal", comment: "popover care today line, singular"), label)
         }
@@ -126,16 +125,6 @@ struct MenuContentView: View {
             format: NSLocalizedString("Today %@ tokens · %d meals", comment: "popover care today line"),
             label, care.current.mealsToday
         )
-    }
-
-    private var hungerText: String {
-        switch care.hunger {
-        case .full: return NSLocalizedString("Full", comment: "hunger")
-        case .satisfied: return NSLocalizedString("Satisfied", comment: "hunger")
-        case .peckish: return NSLocalizedString("Peckish", comment: "hunger")
-        case .hungry: return NSLocalizedString("Hungry", comment: "hunger")
-        case .starving: return NSLocalizedString("Starving", comment: "hunger")
-        }
     }
 
     // MARK: Agents

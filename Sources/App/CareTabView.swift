@@ -63,7 +63,7 @@ struct CareTabView: View {
                         Text(xpCaption)
                             .font(.caption).foregroundStyle(.secondary)
                         Text(String(format: NSLocalizedString("≈ %@ tokens to Lv %d", comment: ""),
-                                    Self.tokenString(PetCare.tokensToNextLevel(state: care.current)),
+                                    CareFormat.tokens(PetCare.tokensToNextLevel(state: care.current)),
                                     care.level + 1))
                             .font(.caption).foregroundStyle(stageColor)
                     }
@@ -76,7 +76,7 @@ struct CareTabView: View {
             Section("Hunger") {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text(hungerLabel)
+                        Text(CareFormat.hunger(care.hunger))
                         Spacer()
                         if let last = care.current.lastFedAt {
                             Text(String(format: NSLocalizedString("Last fed %@", comment: ""),
@@ -94,7 +94,7 @@ struct CareTabView: View {
 
             Section("Today") {
                 LabeledContent("Tokens eaten") {
-                    Text(verbatim: Self.plain(care.current.tokensToday))
+                    Text(verbatim: CareFormat.plain(care.current.tokensToday))
                 }
                 LabeledContent("Sessions finished", value: "\(care.current.mealsToday)")
                 LabeledContent("Streak") {
@@ -105,7 +105,7 @@ struct CareTabView: View {
             }
 
             Section("Lifetime") {
-                LabeledContent("Total tokens eaten", value: Self.plain(care.current.totalTokens))
+                LabeledContent("Total tokens eaten", value: CareFormat.plain(care.current.totalTokens))
                 LabeledContent("Total sessions", value: "\(care.current.totalMeals)")
             }
 
@@ -306,7 +306,7 @@ struct CareTabView: View {
             Spacer()
             VStack(alignment: .trailing, spacing: 2) {
                 Text(verbatim: "Lv \(lv)").font(.system(size: 12, weight: .bold))
-                Text(verbatim: "\(Self.plain(s.xp)) XP")
+                Text(verbatim: "\(CareFormat.plain(s.xp)) XP")
                     .font(.caption2).foregroundStyle(.secondary)
             }
         }
@@ -321,7 +321,7 @@ struct CareTabView: View {
     private var xpCaption: String {
         let (inLevel, span) = PetCare.xpWithinLevel(forXP: care.current.xp)
         return String(format: NSLocalizedString("%@ / %@ XP to next level", comment: ""),
-                      Self.plain(inLevel), Self.plain(span))
+                      CareFormat.plain(inLevel), CareFormat.plain(span))
     }
 
     /// Continuous fullness 0…1 from the time since the last feeding (48h → empty).
@@ -329,29 +329,5 @@ struct CareTabView: View {
         guard let last = care.current.lastFedAt else { return 0.5 }
         let hours = now.timeIntervalSince(last) / 3600
         return max(0, min(1, 1 - hours / 48))
-    }
-
-    private var hungerLabel: String {
-        switch care.hunger {
-        case .full: return NSLocalizedString("Full", comment: "hunger")
-        case .satisfied: return NSLocalizedString("Satisfied", comment: "hunger")
-        case .peckish: return NSLocalizedString("Peckish", comment: "hunger")
-        case .hungry: return NSLocalizedString("Hungry", comment: "hunger")
-        case .starving: return NSLocalizedString("Starving", comment: "hunger")
-        }
-    }
-
-    private static func tokenString(_ n: Int) -> String {
-        switch n {
-        case 1_000_000...: return String(format: "%.1fM", Double(n) / 1_000_000)
-        case 1_000...: return String(format: "%.0fk", Double(n) / 1_000)
-        default: return "\(n)"
-        }
-    }
-
-    private static func plain(_ n: Int) -> String {
-        let f = NumberFormatter()
-        f.numberStyle = .decimal
-        return f.string(from: NSNumber(value: n)) ?? "\(n)"
     }
 }

@@ -136,7 +136,7 @@ struct PetStatsView: View {
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 3) {
-                Text(hungerText)
+                Text(CareFormat.hunger(hunger))
                     .font(.system(size: 11, weight: .medium)).foregroundStyle(.white.opacity(0.7))
                 ProgressView(value: fullness)
                     .tint(fullness > 0.5 ? .green : (fullness > 0.25 ? .orange : .red))
@@ -153,14 +153,14 @@ struct PetStatsView: View {
         return VStack(alignment: .leading, spacing: 4) {
             ProgressView(value: levelProgress).tint(stageColor).controlSize(.small)
             HStack {
-                Text(verbatim: "\(Self.plain(inLevel)) / \(Self.plain(span)) XP")
+                Text(verbatim: "\(CareFormat.plain(inLevel)) / \(CareFormat.plain(span)) XP")
                     .font(.system(size: 10)).foregroundStyle(.white.opacity(0.45))
                 Spacer()
                 Text(verbatim: "\(Int((levelProgress * 100).rounded()))%")
                     .font(.system(size: 10, weight: .semibold)).foregroundStyle(stageColor)
             }
             Text(String(format: NSLocalizedString("≈ %@ tokens to Lv %d", comment: ""),
-                        Self.tokenString(PetCare.tokensToNextLevel(state: state)), level + 1))
+                        CareFormat.tokens(PetCare.tokensToNextLevel(state: state)), level + 1))
                 .font(.system(size: 10, weight: .medium)).foregroundStyle(stageColor.opacity(0.9))
         }
     }
@@ -234,11 +234,11 @@ struct PetStatsView: View {
 
     private func statGrid(_ state: PetCareState) -> some View {
         let cells: [(String, String, String)] = [
-            (NSLocalizedString("Today", comment: ""), Self.tokenString(state.tokensToday),
+            (NSLocalizedString("Today", comment: ""), CareFormat.tokens(state.tokensToday),
              mealText(state.mealsToday)),
             (NSLocalizedString("Streak", comment: ""), streakValue(state),
              NSLocalizedString("days fed", comment: "")),
-            (NSLocalizedString("Lifetime", comment: ""), Self.tokenString(state.totalTokens),
+            (NSLocalizedString("Lifetime", comment: ""), CareFormat.tokens(state.totalTokens),
              NSLocalizedString("tokens eaten", comment: "")),
             (NSLocalizedString("Sessions", comment: ""), "\(state.totalMeals)",
              NSLocalizedString("completed", comment: "")),
@@ -272,7 +272,7 @@ struct PetStatsView: View {
                     .font(.system(size: 9, weight: .semibold)).tracking(0.8)
                     .foregroundStyle(.white.opacity(0.35))
                 Spacer()
-                Text(verbatim: Self.tokenString(series.map(\.tokens).reduce(0, +)))
+                Text(verbatim: CareFormat.tokens(series.map(\.tokens).reduce(0, +)))
                     .font(.system(size: 9, weight: .semibold)).foregroundStyle(.white.opacity(0.55))
             }
             HStack(alignment: .bottom, spacing: 5) {
@@ -379,29 +379,5 @@ struct PetStatsView: View {
 
     private func streakValue(_ s: PetCareState) -> String {
         "\(s.streakDays)"
-    }
-
-    private var hungerText: String {
-        switch hunger {
-        case .full: return NSLocalizedString("Full", comment: "hunger")
-        case .satisfied: return NSLocalizedString("Satisfied", comment: "hunger")
-        case .peckish: return NSLocalizedString("Peckish", comment: "hunger")
-        case .hungry: return NSLocalizedString("Hungry", comment: "hunger")
-        case .starving: return NSLocalizedString("Starving", comment: "hunger")
-        }
-    }
-
-    private static func tokenString(_ n: Int) -> String {
-        switch n {
-        case 1_000_000...: return String(format: "%.1fM", Double(n) / 1_000_000)
-        case 1_000...: return String(format: "%.0fk", Double(n) / 1_000)
-        default: return "\(n)"
-        }
-    }
-
-    private static func plain(_ n: Int) -> String {
-        let f = NumberFormatter()
-        f.numberStyle = .decimal
-        return f.string(from: NSNumber(value: n)) ?? "\(n)"
     }
 }

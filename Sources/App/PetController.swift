@@ -195,37 +195,19 @@ final class PetController: ObservableObject {
     /// unlock), then settles back to the aggregate mood. Sets `chatLine`
     /// directly — `setMood` would re-roll it from the message pools.
     func flashCelebrate(line: String, petID: String? = nil) {
-        let resolvedPetID = petID ?? selectedPetID
-        let keys: [String]
-        if let pid = resolvedPetID {
-            keys = PetWindowPlanner.windowKeys(forPetID: pid, split: splitPet,
-                                               mappings: ProjectPetSettings.shared.mappings,
-                                               selectedPetID: selectedPetID)
-        } else {
-            keys = [PetWindowPlanner.defaultKey]
-        }
-        for key in keys {
-            celebratingKeys[key] = CelebrateFlash(line: line, mood: .celebrate)
-            let k = key
-            Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
-                Task { @MainActor [weak self] in
-                    self?.celebratingKeys.removeValue(forKey: k)
-                    self?.syncWindows()
-                }
-            }
-        }
-        StatusBarController.shared.refreshTitle()
-        syncWindows()
+        flash(line: line, mood: .celebrate, petID: petID)
     }
 
     /// Plays a short level-up burst with a custom line, using the dedicated
     /// `.levelup` mood (a distinct clip from the done-celebrate), then settles
-    /// back to the aggregate mood. Sets `chatLine` directly — `setMood` would
-    /// re-roll it from the message pools.
+    /// back to the aggregate mood. Same line handling as `flashCelebrate`.
     func flashLevelUp(line: String, petID: String? = nil) {
-        let resolvedPetID = petID ?? selectedPetID
+        flash(line: line, mood: .levelup, petID: petID)
+    }
+
+    private func flash(line: String, mood: PetMood, petID: String?) {
         let keys: [String]
-        if let pid = resolvedPetID {
+        if let pid = petID ?? selectedPetID {
             keys = PetWindowPlanner.windowKeys(forPetID: pid, split: splitPet,
                                                mappings: ProjectPetSettings.shared.mappings,
                                                selectedPetID: selectedPetID)
@@ -233,11 +215,10 @@ final class PetController: ObservableObject {
             keys = [PetWindowPlanner.defaultKey]
         }
         for key in keys {
-            celebratingKeys[key] = CelebrateFlash(line: line, mood: .levelup)
-            let k = key
+            celebratingKeys[key] = CelebrateFlash(line: line, mood: mood)
             Timer.scheduledTimer(withTimeInterval: Self.celebrateDuration, repeats: false) { _ in
                 Task { @MainActor [weak self] in
-                    self?.celebratingKeys.removeValue(forKey: k)
+                    self?.celebratingKeys.removeValue(forKey: key)
                     self?.syncWindows()
                 }
             }
