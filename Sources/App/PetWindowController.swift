@@ -335,6 +335,16 @@ final class PetWindowController: ObservableObject {
         guard size.width > 0, size.height > 0, let managed = windows[key] else { return }
 
         managed.resizeDebounce?.cancel()
+        // Growing content is drawn clipped until the window catches up, so
+        // widen/heighten right away (never shrinking in this step). The exact
+        // fit, including any shrink, still waits for the debounce so a burst
+        // of intermediate sizes (spring animations) doesn't jitter the window.
+        let current = managed.panel.frame.size
+        let padded = CGSize(width: size.width + 4, height: size.height + 4)
+        if padded.width > current.width + 1 || padded.height > current.height + 1 {
+            applyContentResize(CGSize(width: max(size.width, current.width - 4),
+                                      height: max(size.height, current.height - 4)), to: managed)
+        }
         let work = DispatchWorkItem { [weak self] in
             guard let self, let managed = self.windows[key] else { return }
             self.applyContentResize(size, to: managed)

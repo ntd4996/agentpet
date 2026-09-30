@@ -103,7 +103,11 @@ struct FloatingPetView: View {
     var body: some View {
         VStack(spacing: 2) {
             if pet.showChat && model.petID != nil {
-                if bubbleSettings.multiAgentBubbleEnabled && !model.sessions.isEmpty {
+                // Gate on the sessions the bubble will actually show: if the
+                // state/kind filters hide all of them, drawing AgentBubble
+                // would leave an empty (off-centre, contentless) bubble.
+                if bubbleSettings.multiAgentBubbleEnabled
+                    && !AgentBubble.visible(model.sessions, settings: bubbleSettings).isEmpty {
                     alignedToPet(AgentBubble(sessions: model.sessions))
                 } else if !model.chatLine.isEmpty {
                     alignedToPet(ChatBubble(text: model.chatLine,
@@ -253,11 +257,16 @@ struct AgentBubble: View {
         switch s { case .working: 4; case .waiting: 3; case .done: 2; case .registered: 1; case .idle: 0 }
     }
 
-    private var groupedSessions: [GroupedSession] {
-        // 1. Filter
-        let filtered = sessions
+    /// Sessions the bubble shows under the user's kind/state filters.
+    static func visible(_ sessions: [AgentSession], settings: BubbleSettings) -> [AgentSession] {
+        sessions
             .filter { !settings.hiddenKinds.contains($0.agentKind) }
             .filter { settings.minStateFilter.includes($0.state) }
+    }
+
+    private var groupedSessions: [GroupedSession] {
+        // 1. Filter
+        let filtered = Self.visible(sessions, settings: settings)
 
         // 2. Sort (grouped mode always sorts by kind first)
         var sorted = filtered
