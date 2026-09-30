@@ -27,4 +27,26 @@ final class TerminalInfoTests: XCTestCase {
     func testCaptureFocusURLNilWhenAbsent() {
         XCTAssertNil(TerminalInfo.capture(env: ["TERM_PROGRAM": "Apple_Terminal"]).focusURL)
     }
+
+    /// `procInfo` must agree with `ps`, which it replaced for the ancestor walk.
+    func testProcInfoMatchesPS() throws {
+        let pid = getpid()
+        let info = try XCTUnwrap(TerminalInfo.procInfo(pid: pid))
+        XCTAssertEqual(info.ppid, getppid())
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/ps")
+        process.arguments = ["-o", "tty=", "-p", "\(pid)"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        try process.run()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        process.waitUntilExit()
+        let ps = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertEqual(info.tty, ps == "??" ? nil : "/dev/\(ps)")
+    }
+
+    func testProcInfoNilForMissingProcess() {
+        XCTAssertNil(TerminalInfo.procInfo(pid: 99_999_999))
+    }
 }

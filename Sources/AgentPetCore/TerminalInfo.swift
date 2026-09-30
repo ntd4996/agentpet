@@ -46,32 +46,31 @@ public enum TerminalInfo {
         return String(cString: name)
     }
 
-    /// Walks up the process tree asking `ps` for each ancestor's controlling
-    /// terminal, returning the first real one as a `/dev/ttysNNN` path.
+    /// Walks up the process tree reading each ancestor's controlling terminal,
+    /// returning the first real one as a `/dev/ttysNNN` path.
     private static func ttyViaAncestors() -> String? {
         var pid = getppid()
         for _ in 0..<10 {
-            guard pid > 1 else { break }
-            if let tty = psField("tty", pid: pid),
-               tty != "??", tty != "-", !tty.isEmpty {
-                return tty.hasPrefix("/dev/") ? tty : "/dev/\(tty)"
-            }
-            guard let ppidStr = psField("ppid", pid: pid), let ppid = Int32(ppidStr) else { break }
-            pid = ppid
+            guard pid > 1, let info = procInfo(pid: pid) else { break }
+            if let tty = info.tty { return tty }
+            pid = info.ppid
         }
         return nil
     }
 
-    private static func psField(_ field: String, pid: Int32) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/ps")
-        process.arguments = ["-o", "\(field)=", "-p", "\(pid)"]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        do { try process.run() } catch { return nil }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+    /// Reads `pid`'s parent and controlling terminal via `sysctl`, the same
+    /// source `ps` uses. Spawning `/bin/ps` instead cost ~70 ms per call, which
+    /// made every hook without a tty (e.g. under jcode) take ~0.3 s longer.
+    static func procInfo(pid: Int32) -> (ppid: Int32, tty: String?)? {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
+        guard sysctl(&mib, u_int(mib.count), &info, &size, nil, 0) == 0, size > 0 else { return nil }
+        let dev = info.kp_eproc.e_tdev
+        // NODEV (-1) means no controlling terminal (`ps` shows "??").
+        guard dev != -1, let name = devname(dev, S_IFCHR) else {
+            return (info.kp_eproc.e_ppid, nil)
+        }
+        return (info.kp_eproc.e_ppid, "/dev/" + String(cString: name))
     }
 }
