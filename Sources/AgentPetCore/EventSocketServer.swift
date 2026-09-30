@@ -13,6 +13,10 @@ public enum SocketError: Error, Equatable {
 /// `onEvent` is invoked on a background queue, once per decoded event;
 /// undecodable lines are skipped.
 public final class EventSocketServer: @unchecked Sendable {
+    /// How long a connected client may stay silent before the server moves on.
+    /// Hook clients write at once, so this only trips on a stuck connection.
+    static let clientReadTimeout: TimeInterval = 2
+
     private let path: String
     private var listenFD: Int32 = -1
     private let acceptQueue = DispatchQueue(label: "agentpet.socket.accept")
@@ -119,6 +123,10 @@ public final class EventSocketServer: @unchecked Sendable {
     // Assumes one event per connection: if the first line decodes to an
     // approval request, its fd is handed off to the registry (not closed here).
     private func handleClient(_ fd: Int32, onEvent: (AgentEvent) -> Void) {
+        // Serving one client at a time, a silent connection would block read()
+        // forever and starve every later hook, so give reads a deadline.
+        _ = EventSender.setReceiveTimeout(fd, Self.clientReadTimeout)
+
         var buffer = Data()
         var chunk = [UInt8](repeating: 0, count: 4096)
         while buffer.firstIndex(of: 0x0A) == nil {
@@ -132,8 +140,10 @@ public final class EventSocketServer: @unchecked Sendable {
                 onEvent(event)
                 return
             }
+            // Only drain after a full line: otherwise the loop above already hit
+            // EOF or the timeout, and waiting again would double the stall.
+            while Self.readMore(fd: fd, into: &buffer, chunk: &chunk) {}
         }
-        while Self.readMore(fd: fd, into: &buffer, chunk: &chunk) {}
         close(fd)
         Self.decodeLines(buffer, onEvent: onEvent)
     }
