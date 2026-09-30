@@ -112,16 +112,14 @@ public enum JcodeHookConfig {
             }
         }
         let value = tomlString(command)
-        var insertAt = body.header + 1
+        // Rewrite existing keys in place, then insert the missing ones in one
+        // block right under the header (indices stay valid: no inserts above).
+        var missing: [String] = []
         for event in events {
             let entry = "\(event) = \(value)"
-            if let i = keyLine(event, in: lines, body: hooksBody(lines)!) {
-                lines[i] = entry
-            } else {
-                lines.insert(entry, at: insertAt)
-                insertAt += 1
-            }
+            if let i = keyLine(event, in: lines, body: body) { lines[i] = entry } else { missing.append(entry) }
         }
+        lines.insert(contentsOf: missing, at: body.header + 1)
         return lines.joined(separator: "\n")
     }
 

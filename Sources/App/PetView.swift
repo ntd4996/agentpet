@@ -1397,7 +1397,13 @@ final class StateDotNSView: NSView {
     /// pre-rendered glyph images via a discrete keyframe animation.
     private func buildClaude(on host: CALayer, nsColor: NSColor) {
         let scale = currentScale
-        let cacheKey = "\(nsColor.usingColorSpace(.sRGB)?.description ?? nsColor.description)@\(scale)"
+        // Key on the sRGB components, not `description` (its text format is
+        // not a stable identity and can differ for equal colors).
+        let rgba = nsColor.usingColorSpace(.sRGB).map {
+            [$0.redComponent, $0.greenComponent, $0.blueComponent, $0.alphaComponent]
+                .map { String(format: "%.4f", $0) }.joined(separator: ",")
+        } ?? nsColor.description
+        let cacheKey = "\(rgba)@\(scale)"
         let images: [CGImage]
         if let cached = Self.glyphCache[cacheKey] {
             images = cached

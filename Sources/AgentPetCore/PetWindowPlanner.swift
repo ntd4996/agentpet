@@ -10,10 +10,8 @@ public enum PetWindowGeometry {
     public static func clampOrigin(_ origin: CGPoint, size: CGSize, into visible: CGRect) -> CGPoint {
         let maxX = max(visible.minX, visible.maxX - size.width)
         let maxY = max(visible.minY, visible.maxY - size.height)
-        return CGPoint(
-            x: min(max(origin.x, visible.minX), maxX),
-            y: min(max(origin.y, visible.minY), maxY)
-        )
+        return CGPoint(x: origin.x.clamped(visible.minX, maxX),
+                       y: origin.y.clamped(visible.minY, maxY))
     }
 
     /// Horizontal placement for a pet window of `width` whose pet (`petWidth`

@@ -125,7 +125,11 @@ final class JcodeHookTests: XCTestCase {
     }
 
     func testCommandWithApostropheUsesBasicString() {
-        XCTAssertEqual(JcodeHookConfig.tomlString("\"/a b's/agentpet\" hook"), "\"\\\"/a b's/agentpet\\\" hook\"")
+        // A single quote can't live in a TOML literal string, so it falls back
+        // to a basic string with the inner double quotes escaped.
+        XCTAssertEqual(JcodeHookConfig.tomlString(#""/a b's/agentpet" hook"#),
+                       #""\"/a b's/agentpet\" hook""#)
+        XCTAssertEqual(JcodeHookConfig.tomlString(#""/x/agentpet" hook"#), #"'"/x/agentpet" hook'"#)
     }
 
     func testDiskRoundTrip() throws {
