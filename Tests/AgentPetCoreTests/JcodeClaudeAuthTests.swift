@@ -42,11 +42,11 @@ final class JcodeClaudeAuthTests: XCTestCase {
 
     func testExpiryUnits() {
         let t = now.timeIntervalSince1970
-        XCTAssertTrue(JcodeClaudeAuth.isExpired(NSNumber(value: (t - 1) * 1000), now: now), "ms, past")
-        XCTAssertFalse(JcodeClaudeAuth.isExpired(NSNumber(value: (t + 60) * 1000), now: now), "ms, future")
-        XCTAssertTrue(JcodeClaudeAuth.isExpired(NSNumber(value: t - 1), now: now), "seconds, past")
-        XCTAssertFalse(JcodeClaudeAuth.isExpired(NSNumber(value: t + 60), now: now), "seconds, future")
-        XCTAssertFalse(JcodeClaudeAuth.isExpired(nil, now: now), "unknown expiry: let the API decide")
-        XCTAssertFalse(JcodeClaudeAuth.isExpired("soon", now: now))
+        XCTAssertTrue(OAuthExpiry.isExpired(NSNumber(value: (t - 1) * 1000), now: now), "ms, past")
+        XCTAssertFalse(OAuthExpiry.isExpired(NSNumber(value: (t + 60) * 1000), now: now), "ms, future")
+        XCTAssertTrue(OAuthExpiry.isExpired(NSNumber(value: t - 1), now: now), "seconds, past")
+        XCTAssertFalse(OAuthExpiry.isExpired(NSNumber(value: t + 60), now: now), "seconds, future")
+        XCTAssertFalse(OAuthExpiry.isExpired(nil, now: now), "unknown expiry: let the API decide")
+        XCTAssertFalse(OAuthExpiry.isExpired("soon", now: now))
     }
 }

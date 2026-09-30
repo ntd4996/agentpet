@@ -66,12 +66,18 @@ final class SettingsModel: ObservableObject {
         guard !UserDefaults.standard.bool(forKey: key) else { return }
         UserDefaults.standard.set(true, forKey: key)
         for agent in agents where agent.isSupported {
-            guard let spec = AgentHooks.spec(for: agent.kind),
-                  HookInstaller.isInstalledOnDisk(path: spec.settingsPath, events: spec.events, style: spec.style)
-            else { continue }
-            try? HookInstaller.installToDisk(command: hookCommand(for: agent.kind),
-                                             path: spec.settingsPath, events: spec.events, style: spec.style)
+            reinstallIfInstalled(agent.kind)
         }
+    }
+
+    /// Re-runs the (idempotent) install for `kind` when its hook is already on
+    /// disk. Never installs for an agent the user hasn't enabled.
+    private func reinstallIfInstalled(_ kind: AgentKind) {
+        guard let spec = AgentHooks.spec(for: kind),
+              HookInstaller.isInstalledOnDisk(path: spec.settingsPath, events: spec.events, style: spec.style)
+        else { return }
+        try? HookInstaller.installToDisk(command: hookCommand(for: kind),
+                                         path: spec.settingsPath, events: spec.events, style: spec.style)
     }
 
     /// Repairs hook entries whose embedded binary path no longer matches the
@@ -84,13 +90,10 @@ final class SettingsModel: ObservableObject {
         let expectedCommand = "\"\(currentPath)\" hook"
         for agent in agents where agent.isSupported {
             guard let spec = AgentHooks.spec(for: agent.kind) else { continue }
-            // jcode's config is TOML, not JSON: install is an in-place,
-            // idempotent line rewrite, so just re-run it when installed.
+            // jcode's config is TOML, not JSON, so there is no JSON entry to
+            // inspect; its install is an idempotent in-place rewrite.
             if spec.style == .jcodeToml {
-                if HookInstaller.isInstalledOnDisk(path: spec.settingsPath, events: spec.events, style: spec.style) {
-                    try? HookInstaller.installToDisk(command: hookCommand(for: agent.kind),
-                                                     path: spec.settingsPath, events: spec.events, style: spec.style)
-                }
+                reinstallIfInstalled(agent.kind)
                 continue
             }
             guard let settings = try? HookInstaller.readSettings(path: spec.settingsPath) else { continue }

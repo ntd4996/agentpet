@@ -36,6 +36,10 @@ private let DOT_CYCLE_INTERVAL: TimeInterval = 0.400
 /// of the bubble, so animating every change kept the app (and WindowServer)
 /// busy continuously. The typewriter still plays for "calm" transitions.
 private let SNAP_WINDOW: TimeInterval = 3.0
+/// Elapsed-time labels show seconds below this many seconds, then whole
+/// minutes. Shared by the label (`AgentRow.elapsedString`) and its tick
+/// schedule (`ElapsedSchedule`) so the two can't drift apart.
+private let ELAPSED_SECONDS_LIMIT = 60
 
 /// The pet sprite alone (imported pack, reacting to mood). Shows a paw
 /// placeholder if no pet is selected yet. The pet id and mood come from the
@@ -732,13 +736,18 @@ private struct AnimatedStatusText: View {
     /// Shows `newMessage` immediately in its stable phase (no erase/retype).
     private func snap(to newMessage: String) {
         cancelAll()
+        setTarget(newMessage)
+        typeIndex = typeTarget.count
+        displayed = String(typeTarget)
+        enterStablePhase()
+    }
+
+    /// Splits off the trailing ellipsis and sets what the typewriter will type.
+    private func setTarget(_ newMessage: String) {
         let stripped = Self.stripEllipsis(newMessage)
         baseText = stripped.text
         hasEllipsis = stripped.hasEllipsis
         typeTarget = Array(hasEllipsis ? stripped.text : newMessage)
-        typeIndex = typeTarget.count
-        displayed = String(typeTarget)
-        enterStablePhase()
     }
 
     private func startErasing(to newMessage: String) {
@@ -759,10 +768,7 @@ private struct AnimatedStatusText: View {
     }
 
     private func startTyping(_ newMessage: String) {
-        let stripped = Self.stripEllipsis(newMessage)
-        baseText = stripped.text
-        hasEllipsis = stripped.hasEllipsis
-        typeTarget = Array(hasEllipsis ? stripped.text : newMessage)
+        setTarget(newMessage)
         typeIndex = 0
         displayed = ""
         typeTimer = Timer.scheduledTimer(withTimeInterval: TYPE_INTERVAL, repeats: true) { _ in
@@ -1031,7 +1037,7 @@ private struct AgentRow: View {
 
     private func elapsedString(since date: Date, now: Date = Date()) -> String {
         let s = max(0, Int(now.timeIntervalSince(date)))
-        if s < 60  { return "\(s)s" }
+        if s < ELAPSED_SECONDS_LIMIT { return "\(s)s" }
         let m = s / 60
         if m < 60  { return "\(m)m" }
         return "\(m / 60)h \(m % 60)m"
@@ -1528,7 +1534,7 @@ private struct ElapsedSchedule: TimelineSchedule {
         return AnyIterator {
             let current = next
             let elapsed = max(0, current.timeIntervalSince(since))
-            if elapsed < 59 {
+            if elapsed < Double(ELAPSED_SECONDS_LIMIT - 1) {
                 next = current.addingTimeInterval(1)
             } else {
                 let intoMinute = elapsed.truncatingRemainder(dividingBy: 60)

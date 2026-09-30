@@ -157,7 +157,7 @@ final class NativeUsageProbe: ObservableObject {
               let oauth = json["claudeAiOauth"] as? [String: Any],
               let token = oauth["accessToken"] as? String, !token.isEmpty
         else { return nil }
-        if JcodeClaudeAuth.isExpired(oauth["expiresAt"], now: now) { return nil }
+        if OAuthExpiry.isExpired(oauth["expiresAt"], now: now) { return nil }
         return token
     }
 

@@ -18,10 +18,14 @@ public enum JcodeClaudeAuth {
         let active = json["active_anthropic_account"] as? String
         let account = accounts.first { ($0["label"] as? String) == active } ?? accounts[0]
         guard let token = account["access"] as? String, !token.isEmpty,
-              !isExpired(account["expires"], now: now) else { return nil }
+              !OAuthExpiry.isExpired(account["expires"], now: now) else { return nil }
         return token
     }
+}
 
+/// Expiry check shared by every OAuth token file we read (Claude Code's
+/// Keychain entry and jcode's `auth.json` store it differently).
+public enum OAuthExpiry {
     /// True only when `expiry` is a number (epoch seconds or milliseconds) in
     /// the past. A missing/unknown expiry is not treated as expired: the API
     /// call is the real check.
