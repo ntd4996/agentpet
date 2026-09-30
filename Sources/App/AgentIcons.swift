@@ -60,7 +60,11 @@ enum AgentIcons {
     /// Some logos can't be embedded as SVG (macOS' SVG renderer ignores filters
     /// and masks), so they ship as a base64 PNG decoded straight into an NSImage.
     private static func pngBase64(for kind: AgentKind) -> String? {
-        kind == .antigravity ? antigravityPNG : nil
+        switch kind {
+        case .antigravity: return antigravityPNG
+        case .jcode:       return jcodePNG
+        default:           return nil
+        }
     }
 
     // MARK: - Custom (unknown-kind) agents, keyed by raw name
@@ -266,7 +270,7 @@ extension AgentKind: Identifiable {
 
 extension AgentIcons {
     /// All AgentKind cases that have embedded SVG brand logos.
-    static let brandKinds: [AgentKind] = [.claude, .cursor, .codex, .gemini, .windsurf, .opencode, .antigravity, .copilot, .kiroCLI, .droid, .pi]
+    static let brandKinds: [AgentKind] = [.claude, .cursor, .codex, .gemini, .windsurf, .opencode, .antigravity, .copilot, .kiroCLI, .droid, .pi, .jcode]
 
     /// 28 curated SF Symbol names shown in the icon picker.
     static let curatedSymbols: [String] = [
