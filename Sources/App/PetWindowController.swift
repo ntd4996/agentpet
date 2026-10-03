@@ -323,7 +323,14 @@ final class PetWindowController: ObservableObject {
         let popover = NSPopover()
         popover.behavior = .transient
         popover.animates = true
-        popover.contentViewController = NSHostingController(rootView: PetStatsView(petID: petID))
+        let host = NSHostingController(rootView: PetStatsView(petID: petID))
+        // Size the popover to the card before showing it. Otherwise AppKit
+        // places it for the hosting view's provisional size and, in binaries
+        // linked against an older SDK, does not move it back on screen when the
+        // card grows, so a pet near a screen edge gets a clipped card.
+        let fitting = host.view.fittingSize
+        if fitting.width > 0, fitting.height > 0 { popover.contentSize = fitting }
+        popover.contentViewController = host
         statsPopover = popover
         // Prefer above the pet; AppKit flips to below only if there's no room.
         // In a flipped content view "above" is the minY edge.
