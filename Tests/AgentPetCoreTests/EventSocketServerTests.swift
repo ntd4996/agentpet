@@ -47,6 +47,36 @@ final class EventSocketServerTests: XCTestCase {
         XCTAssertFalse(FileManager.default.fileExists(atPath: file), "queue file removed after drain")
     }
 
+    /// A client that connects and never sends (a suspended hook, a stray probe)
+    /// used to hold the single accept loop in a blocking read forever, so every
+    /// later event fell into the offline queue, which is only drained at launch.
+    func testSilentClientDoesNotBlockLaterEvents() throws {
+        let path = "/tmp/agentpet-\(UUID().uuidString).sock"
+        let server = EventSocketServer(path: path)
+        defer { server.stop() }
+
+        let exp = expectation(description: "event delivered despite a silent client")
+        let box = Box()
+        try server.start { event in
+            box.value = event
+            exp.fulfill()
+        }
+
+        let silent = try connectToUnixSocket(path: path)
+        defer { close(silent) }
+
+        let event = AgentEvent(
+            sessionId: "s3", agentKind: .claude, eventName: "Stop",
+            project: "/p", message: "done", timestamp: Date(timeIntervalSince1970: 7)
+        )
+        var data = try EventCoding.encoder.encode(event)
+        data.append(0x0A)
+        try sendToUnixSocket(path: path, data: data)
+
+        wait(for: [exp], timeout: 5)
+        XCTAssertEqual(box.value, event)
+    }
+
     // MARK: - Helpers
 
     private final class Box: @unchecked Sendable {
@@ -54,9 +84,18 @@ final class EventSocketServerTests: XCTestCase {
     }
 
     private func sendToUnixSocket(path: String, data: Data) throws {
+        let fd = try connectToUnixSocket(path: path)
+        defer { close(fd) }
+        data.withUnsafeBytes { raw in
+            let written = write(fd, raw.baseAddress, raw.count)
+            XCTAssertEqual(written, raw.count)
+        }
+    }
+
+    /// Opens a connected client socket; the caller closes it.
+    private func connectToUnixSocket(path: String) throws -> Int32 {
         let fd = socket(AF_UNIX, SOCK_STREAM, 0)
         XCTAssertGreaterThanOrEqual(fd, 0)
-        defer { close(fd) }
 
         var addr = sockaddr_un()
         addr.sun_family = sa_family_t(AF_UNIX)
@@ -73,9 +112,6 @@ final class EventSocketServerTests: XCTestCase {
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, size) }
         }
         XCTAssertEqual(connected, 0, "connect failed errno=\(errno)")
-        data.withUnsafeBytes { raw in
-            let written = write(fd, raw.baseAddress, raw.count)
-            XCTAssertEqual(written, raw.count)
-        }
+        return fd
     }
 }

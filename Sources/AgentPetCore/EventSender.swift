@@ -47,12 +47,7 @@ public enum EventSender {
         // close before we get here, and on macOS setsockopt on a socket whose
         // peer has shut down fails with EINVAL, which used to turn a valid
         // reply already in the buffer into `.ask`.
-        var tv = timeval(
-            tv_sec: Int(timeout), tv_usec: Int32(timeout.truncatingRemainder(dividingBy: 1) * 1_000_000)
-        )
-        guard setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size)) == 0 else {
-            return .ask
-        }
+        guard setReceiveTimeout(fd, timeout) else { return .ask }
         guard writeAll(line, fd: fd) else { return .ask }
 
         let deadline = Date().addingTimeInterval(timeout)
@@ -94,6 +89,15 @@ public enum EventSender {
         var on: Int32 = 1
         _ = setsockopt(fd, SOL_SOCKET, SO_NOSIGPIPE, &on, socklen_t(MemoryLayout<Int32>.size))
         return fd
+    }
+
+    /// Makes blocking reads on `fd` fail after `timeout` seconds of silence.
+    /// Returns `false` if the OS rejects it (macOS does once the peer has closed).
+    static func setReceiveTimeout(_ fd: Int32, _ timeout: TimeInterval) -> Bool {
+        var tv = timeval(
+            tv_sec: Int(timeout), tv_usec: Int32(timeout.truncatingRemainder(dividingBy: 1) * 1_000_000)
+        )
+        return setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, socklen_t(MemoryLayout<timeval>.size)) == 0
     }
 
     static func writeAll(_ data: Data, fd: Int32) -> Bool {
