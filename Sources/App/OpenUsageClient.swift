@@ -74,7 +74,7 @@ final class OpenUsageClient: ObservableObject {
         task.resume()
     }
 
-    nonisolated private static func provider(from json: [String: Any]) -> Provider? {
+    nonisolated static func provider(from json: [String: Any]) -> Provider? {
         guard let id = json["providerId"] as? String else { return nil }
         let lines = json["lines"] as? [[String: Any]] ?? []
 
@@ -93,9 +93,7 @@ final class OpenUsageClient: ObservableObject {
                 if left < tightest {
                     tightest = left
                     windowLabel = line["label"] as? String
-                    if let iso = line["resetsAt"] as? String {
-                        resetsAt = ISO8601DateFormatter().date(from: iso)
-                    }
+                    resetsAt = resetDate(line["resetsAt"])
                 }
             case "text":
                 if todayLabel == nil { todayLabel = line["value"] as? String }
@@ -122,5 +120,16 @@ final class OpenUsageClient: ObservableObject {
         case let n as NSNumber: return n.doubleValue
         default: return nil
         }
+    }
+
+    /// A reset timestamp as providers send it: epoch seconds, or ISO 8601
+    /// with or without fractional seconds ("…:59.536032+00:00", "….000Z").
+    /// The default `ISO8601DateFormatter` rejects fractional seconds.
+    nonisolated static func resetDate(_ any: Any?) -> Date? {
+        if let secs = doubleValue(any) { return Date(timeIntervalSince1970: secs) }
+        guard let text = any as? String else { return nil }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: text) ?? ISO8601DateFormatter().date(from: text)
     }
 }

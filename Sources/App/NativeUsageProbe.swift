@@ -84,7 +84,11 @@ final class NativeUsageProbe: ObservableObject {
         }
         guard let data, let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
+        return claudeProvider(from: json)
+    }
 
+    /// Parses an `/api/oauth/usage` body.
+    nonisolated static func claudeProvider(from json: [String: Any]) -> OpenUsageClient.Provider? {
         // Windows are {"utilization": <percent used>, "resets_at": …}.
         var fractions: [Double] = []
         var tightest = 2.0
@@ -98,11 +102,7 @@ final class NativeUsageProbe: ObservableObject {
                 if left < tightest {
                     tightest = left
                     windowLabel = label
-                    if let resets = window["resets_at"] as? Double {
-                        resetsAt = Date(timeIntervalSince1970: resets)
-                    } else if let iso = window["resets_at"] as? String {
-                        resetsAt = ISO8601DateFormatter().date(from: iso)
-                    }
+                    resetsAt = OpenUsageClient.resetDate(window["resets_at"])
                 }
             }
         }
@@ -189,23 +189,28 @@ final class NativeUsageProbe: ObservableObject {
             return nil
         }
         guard let data, let http = httpResponse else { return nil }
+        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        return codexProvider(from: json, now: Date()) { http.value(forHTTPHeaderField: $0) }
+    }
 
+    /// Parses a `wham/usage` body plus its `x-codex-*` response headers.
+    nonisolated static func codexProvider(
+        from json: [String: Any]?, now: Date, header: (String) -> String?
+    ) -> OpenUsageClient.Provider? {
         // used-percent comes in response headers; the body's rate_limit
         // windows carry the same plus reset timing.
-        let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         let rateLimit = json?["rate_limit"] as? [String: Any]
-        let now = Date()
 
         var fractions: [Double] = []
         var tightest = 2.0
         var resetsAt: Date?
         var windowLabel: String?
-        for (header, bodyKey, label) in [
+        for (headerName, bodyKey, label) in [
             ("x-codex-primary-used-percent", "primary_window", "Session"),
             ("x-codex-secondary-used-percent", "secondary_window", "Weekly"),
         ] {
             var used: Double?
-            if let raw = http.value(forHTTPHeaderField: header) { used = Double(raw) }
+            if let raw = header(headerName) { used = Double(raw) }
             let window = rateLimit?[bodyKey] as? [String: Any]
             if used == nil { used = window?["used_percent"] as? Double }
             guard let usedPct = used else { continue }
@@ -214,7 +219,11 @@ final class NativeUsageProbe: ObservableObject {
             if left < tightest {
                 tightest = left
                 windowLabel = label
-                if let secs = window?["resets_in_seconds"] as? Double {
+                // The API sends an absolute `reset_at` (epoch) and a relative
+                // `reset_after_seconds`; `resets_in_seconds` is kept as a fallback.
+                if let at = OpenUsageClient.resetDate(window?["reset_at"]) {
+                    resetsAt = at
+                } else if let secs = (window?["reset_after_seconds"] ?? window?["resets_in_seconds"]) as? Double {
                     resetsAt = now.addingTimeInterval(secs)
                 }
             }
