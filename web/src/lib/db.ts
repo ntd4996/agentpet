@@ -75,13 +75,31 @@ export async function addNotification(
   } catch {}
 }
 
+// Per-isolate cache for read-mostly tables that the gallery pages load in full
+// (pet_meta, pet_numbers, collections). Without it every page view scanned ~20k
+// rows and pushed the account past D1's 5M rows/day free-tier read limit. These
+// only change via the seed scripts or admin collection edits, so a short TTL is
+// enough; admin edits also invalidate the collections entry directly.
+const CACHE_TTL_MS = 10 * 60 * 1000;
+const readCache = new Map<string, { at: number; value: unknown }>();
+
+async function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const hit = readCache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL_MS) return hit.value as T;
+  const value = await load();
+  readCache.set(key, { at: Date.now(), value });
+  return value;
+}
+
 // Analyzed dominant colour per pet (slug -> colour name), from the seed pipeline.
 export async function getColors(db: any): Promise<Record<string, string>> {
   if (!db) return {};
-  const r: any = await db.prepare("SELECT slug, color FROM pet_meta").all();
-  const m: Record<string, string> = {};
-  for (const row of r?.results ?? []) m[row.slug] = row.color;
-  return m;
+  return cached("colors", async () => {
+    const r: any = await db.prepare("SELECT slug, color FROM pet_meta").all();
+    const m: Record<string, string> = {};
+    for (const row of r?.results ?? []) m[row.slug] = row.color;
+    return m;
+  });
 }
 
 export async function getColor(db: any, slug: string): Promise<string> {
@@ -93,10 +111,12 @@ export async function getColor(db: any, slug: string): Promise<string> {
 // Stable dex numbers (slug -> NNNNN), assigned by the data seed. Map for bulk views.
 export async function getNumbers(db: any): Promise<Record<string, number>> {
   if (!db) return {};
-  const r: any = await db.prepare("SELECT slug, num FROM pet_numbers").all();
-  const m: Record<string, number> = {};
-  for (const row of r?.results ?? []) m[row.slug] = row.num;
-  return m;
+  return cached("numbers", async () => {
+    const r: any = await db.prepare("SELECT slug, num FROM pet_numbers").all();
+    const m: Record<string, number> = {};
+    for (const row of r?.results ?? []) m[row.slug] = row.num;
+    return m;
+  });
 }
 
 export async function getNumber(db: any, slug: string): Promise<number | null> {
@@ -155,13 +175,15 @@ export async function deleteRequest(db: any, id: string): Promise<void> {
 export interface Collection { id: string; title: string; slug: string; description: string | null; created_at: number; }
 
 export async function listCollections(db: any): Promise<(Collection & { count: number; samples: string[] })[]> {
-  const c: any = await db.prepare("SELECT * FROM collections ORDER BY created_at DESC, slug ASC").all();
-  const cols: Collection[] = c?.results ?? [];
-  if (!cols.length) return [];
-  const m: any = await db.prepare("SELECT collection_id, slug FROM collection_pets ORDER BY added_at ASC").all();
-  const byCol: Record<string, string[]> = {};
-  for (const r of m?.results ?? []) (byCol[r.collection_id] ||= []).push(r.slug);
-  return cols.map((col) => ({ ...col, count: (byCol[col.id] || []).length, samples: (byCol[col.id] || []).slice(0, 5) }));
+  return cached("collections", async () => {
+    const c: any = await db.prepare("SELECT * FROM collections ORDER BY created_at DESC, slug ASC").all();
+    const cols: Collection[] = c?.results ?? [];
+    if (!cols.length) return [];
+    const m: any = await db.prepare("SELECT collection_id, slug FROM collection_pets ORDER BY added_at ASC").all();
+    const byCol: Record<string, string[]> = {};
+    for (const r of m?.results ?? []) (byCol[r.collection_id] ||= []).push(r.slug);
+    return cols.map((col) => ({ ...col, count: (byCol[col.id] || []).length, samples: (byCol[col.id] || []).slice(0, 5) }));
+  });
 }
 
 export async function getCollection(db: any, slug: string): Promise<Collection | null> {
@@ -183,6 +205,7 @@ export async function collectionsForPet(db: any, slug: string): Promise<{ title:
 
 export async function createCollection(db: any, id: string, title: string, slug: string, description: string | null): Promise<void> {
   await db.prepare("INSERT INTO collections (id, title, slug, description, created_at) VALUES (?, ?, ?, ?, ?)").bind(id, title, slug, description, Date.now()).run();
+  readCache.delete("collections");
 }
 
 export async function deleteCollection(db: any, id: string): Promise<void> {
@@ -190,14 +213,17 @@ export async function deleteCollection(db: any, id: string): Promise<void> {
     db.prepare("DELETE FROM collection_pets WHERE collection_id=?").bind(id),
     db.prepare("DELETE FROM collections WHERE id=?").bind(id),
   ]);
+  readCache.delete("collections");
 }
 
 export async function addPetToCollection(db: any, id: string, slug: string): Promise<void> {
   await db.prepare("INSERT OR IGNORE INTO collection_pets (collection_id, slug, added_at) VALUES (?, ?, ?)").bind(id, slug, Date.now()).run();
+  readCache.delete("collections");
 }
 
 export async function removePetFromCollection(db: any, id: string, slug: string): Promise<void> {
   await db.prepare("DELETE FROM collection_pets WHERE collection_id=? AND slug=?").bind(id, slug).run();
+  readCache.delete("collections");
 }
 
 // ---- community submissions ----
