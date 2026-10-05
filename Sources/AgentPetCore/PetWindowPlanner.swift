@@ -14,6 +14,17 @@ public enum PetWindowGeometry {
                        y: origin.y.clamped(visible.minY, maxY))
     }
 
+    /// Index of the rect closest to `point` (0 when the point is inside it),
+    /// for a pet dropped outside every screen. Nil only when `rects` is empty.
+    public static func nearestRectIndex(to point: CGPoint, in rects: [CGRect]) -> Int? {
+        func distance(_ r: CGRect) -> CGFloat {
+            let dx = max(r.minX - point.x, 0, point.x - r.maxX)
+            let dy = max(r.minY - point.y, 0, point.y - r.maxY)
+            return dx * dx + dy * dy
+        }
+        return rects.indices.min { distance(rects[$0]) < distance(rects[$1]) }
+    }
+
     /// Horizontal placement for a pet window of `width` whose pet (`petWidth`
     /// wide) should stay centred at `anchorX`. The window is kept inside
     /// `[visibleMinX, visibleMaxX]` so a wide bubble never spills onto another
