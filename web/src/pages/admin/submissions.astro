@@ -40,6 +40,7 @@ const user = await adminUser(Astro.cookies);
     </div>
 
     <script>
+      import { dominantColor } from "../../lib/pet-color";
       const esc = (s: string) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
       const listEl = document.getElementById("list")!;
       const countEl = document.getElementById("count")!;
@@ -185,9 +186,26 @@ const user = await adminUser(Astro.cookies);
         emptyEl.classList.toggle("hidden", n > 0);
       }
 
+      // Dominant colour of the sprite, measured the same way as scripts/analyze-pets.mjs
+      // (sheet scaled to 240px wide). Best effort: approval still works without it.
+      async function spriteColor(id: string): Promise<string | null> {
+        try {
+          const img = new Image();
+          img.src = "/api/admin/submission-sprite/" + id;
+          await img.decode();
+          const w = 240, h = Math.max(1, Math.round((img.naturalHeight * w) / img.naturalWidth));
+          const canvas = document.createElement("canvas");
+          canvas.width = w; canvas.height = h;
+          const ctx = canvas.getContext("2d")!;
+          ctx.drawImage(img, 0, 0, w, h);
+          return dominantColor(ctx.getImageData(0, 0, w, h).data, w, h);
+        } catch { return null; }
+      }
+
       async function doAction(id: string, action: string, btn?: HTMLButtonElement) {
         if (btn) btn.disabled = true;
-        const r = await fetch("/api/admin/submission", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, action }) }).then((x) => x.json()).catch(() => null);
+        const color = action === "approve" ? await spriteColor(id) : null;
+        const r = await fetch("/api/admin/submission", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id, action, color }) }).then((x) => x.json()).catch(() => null);
         if (r?.ok) {
           document.querySelector(`[data-row="${id}"]`)?.remove();
           delete subsById[id];

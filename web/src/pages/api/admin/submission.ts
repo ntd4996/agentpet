@@ -1,7 +1,7 @@
 import type { APIRoute } from "astro";
 import { env } from "cloudflare:workers";
 import { adminUser } from "../../../lib/admin";
-import { getDB, ensureSchema, getSubmission, setSubmissionStatus, addNotification } from "../../../lib/db";
+import { getDB, ensureSchema, getSubmission, setSubmissionStatus, addNotification, assignCommunityMeta, removeCommunityMeta } from "../../../lib/db";
 
 export const prerender = false;
 
@@ -36,6 +36,7 @@ export const POST: APIRoute = async ({ cookies, request }) => {
 
   if (action === "reject") {
     await setSubmissionStatus(db, id, "rejected");
+    try { await removeCommunityMeta(db, sub.slug); } catch {}
     // If it was previously approved, pull the published files from the gallery.
     try { await bucket.delete(`${dir}/spritesheet.${sub.sheet_ext}`); } catch {}
     try { await bucket.delete(`${dir}/pet.json`); } catch {}
@@ -60,6 +61,9 @@ export const POST: APIRoute = async ({ cookies, request }) => {
   }), { httpMetadata: { contentType: "application/json", cacheControl: "public, max-age=31536000, immutable" } });
 
   await setSubmissionStatus(db, id, "approved");
+  // Dex number + colour + auto collections, same rules as the seed scripts. The
+  // colour is measured from the sprite in the admin's browser (body.color).
+  try { await assignCommunityMeta(db, sub.slug, sub.name, sub.kind, typeof body.color === "string" ? body.color : null); } catch {}
   // Un-hide if it had been hidden before (e.g. previously deleted by the owner).
   try { await db.prepare("UPDATE pet_overrides SET hidden=0 WHERE slug=?").bind(sub.slug).run(); } catch {}
   // Keep the pending upload so a later re-reject + re-approve still works.
