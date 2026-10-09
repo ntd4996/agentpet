@@ -33,9 +33,17 @@ final class NativeUsageProbe: ObservableObject {
     /// Native probes first; OpenUsage (when running) fills in the providers we
     /// don't probe ourselves.
     static func combined() -> [OpenUsageClient.Provider] {
-        let native = shared.providers
+        combine(native: shared.providers, openUsage: OpenUsageClient.shared.providers)
+    }
+
+    /// Providers for the Limits rows. One without any limit line (OpenUsage can
+    /// send only text, e.g. an OpenRouter balance) is left out: there is no bar
+    /// to draw, and a nil `fractionLeft` would render as "100% used".
+    static func combine(native: [OpenUsageClient.Provider],
+                        openUsage: [OpenUsageClient.Provider]) -> [OpenUsageClient.Provider] {
         let nativeIDs = Set(native.map(\.id))
-        return native + OpenUsageClient.shared.providers.filter { !nativeIDs.contains($0.id) }
+        return (native + openUsage.filter { !nativeIDs.contains($0.id) })
+            .filter { $0.fractionLeft != nil }
     }
 
     func poll() {
