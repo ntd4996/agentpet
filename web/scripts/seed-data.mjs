@@ -5,7 +5,7 @@
 // Auto rows use fixed ids ("auto-*" collections) so re-running is safe and never
 // touches admin-made collections. Original author info (submittedBy) is preserved.
 
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync } from "node:fs";
 
 const MANIFEST = "https://pets.thenightwatcher.online/manifest.json";
 const TS = Date.now();
@@ -91,4 +91,15 @@ for (const r of RULES) {
 }
 
 writeFileSync(new URL("./seed.sql", import.meta.url), sql);
+
+// Also write the same data as JSON bundled into the worker (src/data). The site
+// reads these instead of scanning D1 on every page view; redeploy after re-seeding.
+const dataDir = new URL("../src/data/", import.meta.url);
+writeFileSync(new URL("pet-numbers.json", dataDir), JSON.stringify(Object.fromEntries(ordered.map((p, i) => [p.slug, i + 1]))));
+const autoFile = new URL("auto-collection-pets.json", dataDir);
+let autoMembers = {};
+try { autoMembers = JSON.parse(readFileSync(autoFile, "utf8")); } catch {}
+for (const id of Object.keys(autoMembers)) if (!id.startsWith("auto-color-")) delete autoMembers[id];
+for (const r of RULES) if (members[r.id].length) autoMembers[r.id] = members[r.id];
+writeFileSync(autoFile, JSON.stringify(autoMembers));
 console.error(`\nwrote seed.sql | ${numRows.length} numbers, ${RULES.length} collections, ${total} memberships`);

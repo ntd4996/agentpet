@@ -1,4 +1,10 @@
 import { env } from "cloudflare:workers";
+// Seed-generated data (see scripts/seed-data.mjs, scripts/analyze-pets.mjs). It only
+// changes when those scripts run, so it ships inside the worker bundle instead of
+// being scanned from D1 on every request. Re-seed, then redeploy to refresh.
+import PET_NUMBERS from "../data/pet-numbers.json";
+import PET_COLORS from "../data/pet-colors.json";
+import AUTO_COLLECTION_PETS from "../data/auto-collection-pets.json";
 
 // D1 access. Binding `DB` comes from wrangler.jsonc (local in dev via platformProxy,
 // real database in prod). Returns null if the binding isn't available.
@@ -75,11 +81,8 @@ export async function addNotification(
   } catch {}
 }
 
-// Per-isolate cache for read-mostly tables that the gallery pages load in full
-// (pet_meta, pet_numbers, collections). Without it every page view scanned ~20k
-// rows and pushed the account past D1's 5M rows/day free-tier read limit. These
-// only change via the seed scripts or admin collection edits, so a short TTL is
-// enough; admin edits also invalidate the collections entry directly.
+// Per-isolate cache for the collections list (collections + hand-made members).
+// Admin collection edits invalidate it directly; otherwise it refreshes after the TTL.
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const readCache = new Map<string, { at: number; value: unknown }>();
 
@@ -92,37 +95,21 @@ async function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
 }
 
 // Analyzed dominant colour per pet (slug -> colour name), from the seed pipeline.
-export async function getColors(db: any): Promise<Record<string, string>> {
-  if (!db) return {};
-  return cached("colors", async () => {
-    const r: any = await db.prepare("SELECT slug, color FROM pet_meta").all();
-    const m: Record<string, string> = {};
-    for (const row of r?.results ?? []) m[row.slug] = row.color;
-    return m;
-  });
+export async function getColors(_db: any): Promise<Record<string, string>> {
+  return PET_COLORS as Record<string, string>;
 }
 
-export async function getColor(db: any, slug: string): Promise<string> {
-  if (!db) return "";
-  const r: any = await db.prepare("SELECT color FROM pet_meta WHERE slug=?").bind(slug).first();
-  return r?.color ?? "";
+export async function getColor(_db: any, slug: string): Promise<string> {
+  return (PET_COLORS as Record<string, string>)[slug] ?? "";
 }
 
 // Stable dex numbers (slug -> NNNNN), assigned by the data seed. Map for bulk views.
-export async function getNumbers(db: any): Promise<Record<string, number>> {
-  if (!db) return {};
-  return cached("numbers", async () => {
-    const r: any = await db.prepare("SELECT slug, num FROM pet_numbers").all();
-    const m: Record<string, number> = {};
-    for (const row of r?.results ?? []) m[row.slug] = row.num;
-    return m;
-  });
+export async function getNumbers(_db: any): Promise<Record<string, number>> {
+  return PET_NUMBERS as Record<string, number>;
 }
 
-export async function getNumber(db: any, slug: string): Promise<number | null> {
-  if (!db) return null;
-  const r: any = await db.prepare("SELECT num FROM pet_numbers WHERE slug=?").bind(slug).first();
-  return r?.num ?? null;
+export async function getNumber(_db: any, slug: string): Promise<number | null> {
+  return (PET_NUMBERS as Record<string, number>)[slug] ?? null;
 }
 
 // ---- pet requests (community wishlist) ----
@@ -179,9 +166,16 @@ export async function listCollections(db: any): Promise<(Collection & { count: n
     const c: any = await db.prepare("SELECT * FROM collections ORDER BY created_at DESC, slug ASC").all();
     const cols: Collection[] = c?.results ?? [];
     if (!cols.length) return [];
-    const m: any = await db.prepare("SELECT collection_id, slug FROM collection_pets ORDER BY added_at ASC").all();
-    const byCol: Record<string, string[]> = {};
-    for (const r of m?.results ?? []) (byCol[r.collection_id] ||= []).push(r.slug);
+    // Auto collections come from the bundled seed JSON; only hand-made ones hit D1.
+    const byCol: Record<string, string[]> = { ...(AUTO_COLLECTION_PETS as Record<string, string[]>) };
+    const manual = cols.filter((col) => !col.id.startsWith("auto-")).map((col) => col.id);
+    if (manual.length) {
+      const m: any = await db
+        .prepare(`SELECT collection_id, slug FROM collection_pets WHERE collection_id IN (${manual.map(() => "?").join(",")}) ORDER BY added_at ASC`)
+        .bind(...manual)
+        .all();
+      for (const r of m?.results ?? []) (byCol[r.collection_id] ||= []).push(r.slug);
+    }
     return cols.map((col) => ({ ...col, count: (byCol[col.id] || []).length, samples: (byCol[col.id] || []).slice(0, 5) }));
   });
 }
@@ -191,6 +185,8 @@ export async function getCollection(db: any, slug: string): Promise<Collection |
 }
 
 export async function collectionSlugs(db: any, collectionId: string): Promise<string[]> {
+  const bundled = (AUTO_COLLECTION_PETS as Record<string, string[]>)[collectionId];
+  if (bundled) return bundled;
   const r: any = await db.prepare("SELECT slug FROM collection_pets WHERE collection_id=? ORDER BY added_at ASC").bind(collectionId).all();
   return (r?.results ?? []).map((x: any) => x.slug);
 }

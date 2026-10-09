@@ -4,7 +4,7 @@
 // (downloads every sprite); run in background, then apply with:
 //   npx wrangler d1 execute agentpet-web --remote --file=scripts/seed-colors.sql
 import sharp from "sharp";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync } from "node:fs";
 
 const MANIFEST = "https://pets.thenightwatcher.online/manifest.json";
 const ORIGIN = "https://pets.thenightwatcher.online";
@@ -117,4 +117,17 @@ for (const c of COLORS) {
 }
 writeFileSync(new URL("./seed-colors.sql", import.meta.url), sql);
 writeFileSync(new URL("./colors.json", import.meta.url), JSON.stringify(result));
+
+// Bundled copies for the site (src/data); redeploy after re-running this script.
+const dataDir = new URL("../src/data/", import.meta.url);
+writeFileSync(new URL("pet-colors.json", dataDir), JSON.stringify(result));
+const autoFile = new URL("auto-collection-pets.json", dataDir);
+let autoMembers = {};
+try { autoMembers = JSON.parse(readFileSync(autoFile, "utf8")); } catch {}
+for (const id of Object.keys(autoMembers)) if (id.startsWith("auto-color-")) delete autoMembers[id];
+for (const c of COLORS) {
+  const slugs = Object.entries(result).filter(([, col]) => col === c.name.toLowerCase()).map(([s]) => s);
+  if (slugs.length) autoMembers[c.id] = slugs;
+}
+writeFileSync(autoFile, JSON.stringify(autoMembers));
 console.error(`wrote seed-colors.sql (${metaRows.length} meta, ${COLORS.length} colour collections)`);
