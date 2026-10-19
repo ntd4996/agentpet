@@ -1,6 +1,5 @@
 import { listen, emit } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { Pet } from "./pet";
 import { SessionStore, aggregateMood, basename, type AgentEventPayload } from "./state";
 import { BubbleRenderer } from "./bubble";
@@ -13,6 +12,7 @@ import * as usage from "./usage";
 import * as history from "./history";
 import * as reactive from "./reactive";
 import * as projectpets from "./projectpets";
+import * as limits from "./limits";
 
 // Which project THIS pet window represents. `null` = the main window (the
 // default single pet). Split-pet spawns extra windows with `?project=<id>`.
@@ -192,6 +192,8 @@ function pickMoodLine(mood: string) {
   // simple-bubble mode (multi-agent off) always has something to say.
   let pool = bubbleLines(null, mood);
   if (!pool.length) pool = PET_CHAT[mood] ?? [];
+  // A nearly spent subscription makes the idle pet anxious (mac CareChat.idlePool).
+  if (mood === "idle" && limits.limitLow(limits.cached())) pool = [...pool, ...limits.ANXIOUS.map(t)];
   moodLine = pool.length ? pool[Math.floor(Math.random() * pool.length)] : "";
 }
 
@@ -261,6 +263,15 @@ setInterval(() => {
   const slug = myPetSlug();
   if (slug) flashReactive(reactive.evaluate("hunger", care.hunger(care.stateFor(slug))));
 }, 60_000);
+// Subscription limits: only the main window calls the provider (every 5 min,
+// like mac NativeUsageProbe); project windows read the shared cache. Each
+// window comments on the tightest visible window via the rateLimit metric.
+async function pollLimits() {
+  const found = IS_MAIN ? await limits.refresh() : limits.cached();
+  flashReactive(reactive.evaluate("rateLimit", limits.lowestFractionLeft(found)));
+}
+setTimeout(() => { void pollLimits(); }, IS_MAIN ? 5_000 : 15_000);
+setInterval(() => { void pollLimits(); }, limits.POLL_MS);
 // Carousel advance / fold clicks request a prompt repaint.
 setInterval(() => { if (bubble.dirty) { bubble.dirty = false; render(); } }, 120);
 // Live elapsed clocks tick every second.
@@ -427,29 +438,24 @@ listen("check-updates", async () => {
 });
 
 // --- interactions ------------------------------------------------------------
-// Drag works only when grabbing the PET SPRITE itself or the bubble , clicks
-// on the transparent area beside the pet fall through (like the macOS panel,
-// where transparent pixels never catch the mouse).
-canvas.addEventListener("mousedown", async (e) => {
+// Rust makes the window click-through outside the pet's hit rect (sprite box
+// + bubble), so any left press that reaches this document is on the pet.
+// Listen on the whole document: the hit rect also covers the gap between the
+// bubble and the sprite and the empty sides of the bubble row, which are
+// body/#pet-root, not the canvas. Pressing there used to be swallowed (not
+// passed to the window below) yet did nothing, so the pet felt stuck.
+document.addEventListener("mousedown", async (e) => {
   if (e.button !== 0) return;
-  // While the sheet is still loading there is no sprite rect yet , allow the
-  // drag anyway so the pet is never untouchable.
-  if (pet.spriteRect && !pet.hitTest(e.offsetX, e.offsetY)) return;
+  // Bubble controls (fold, carousel dots, dismiss, Warp-focus rows) keep their clicks.
+  if ((e.target as HTMLElement).closest("button, a, input, .car-dot, .focusable, [data-nodrag]")) return;
   emit("popover-close", null);
-  await getCurrentWindow().startDragging();
+  await invoke("drag_pet");
 });
-bubbleEl.addEventListener("mousedown", async (e) => {
-  if (e.button !== 0) return;
-  emit("popover-close", null);
-  await getCurrentWindow().startDragging();
-});
-canvas.addEventListener("contextmenu", (e) => {
+// Right-click opens the pet's stats card (macOS PetStatsView); the tray icon
+// opens the quick popover.
+document.addEventListener("contextmenu", (e) => {
   e.preventDefault();
-  if (pet.hitTest(e.offsetX, e.offsetY)) invoke("open_popover").catch(() => {});
-});
-bubbleEl.addEventListener("contextmenu", (e) => {
-  e.preventDefault();
-  invoke("open_popover").catch(() => {});
+  invoke("open_stats", { pet: myPetSlug() }).catch(() => {});
 });
 
 // Report the interactive region (physical px) for Windows click-through: the
