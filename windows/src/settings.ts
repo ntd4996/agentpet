@@ -14,6 +14,8 @@ import * as usage from "./usage";
 import * as projectpets from "./projectpets";
 import * as sync from "./sync";
 import * as history from "./history";
+import * as limits from "./limits";
+import { agentLabel } from "./state";
 
 // ------------------------------------------------------------- segmented ----
 // macOS-style segmented controls: <span class="seg" data-key data-default>.
@@ -43,7 +45,7 @@ function initTabs() {
       document.querySelectorAll<HTMLElement>(".page").forEach((p) => {
         p.classList.toggle("sel", p.dataset.page === b.dataset.tab);
       });
-      if (b.dataset.tab === "care") { renderCare(); renderSync(); }
+      if (b.dataset.tab === "care") { renderCare(); renderSync(); void refreshLimits(); }
       if (b.dataset.tab === "history") renderHistory();
     };
   });
@@ -123,6 +125,13 @@ function renderCare() {
   setTxt("care-today-sub", `${s.mealsToday} ${t("sessions")}`);
   const money = (v: number) => `$${v.toFixed(2)}`;
   setTxt("care-cost", `${t("Today")} ${money(usage.todayCostUSD())} · ${t("Month")} ${money(usage.monthlyCostUSD())}`);
+  const agentsEl = document.getElementById("care-agents");
+  if (agentsEl) {
+    const rows = usage.byAgent();
+    agentsEl.innerHTML = rows.length
+      ? rows.map((a) => `<div class="care-charthead"><span>${esc(agentLabel(a.agent))}</span><span class="dim">${fmtNum(a.today)} · ${fmtNum(a.month)}</span></div>`).join("")
+      : `<div class="care-charthead"><span class="dim">—</span></div>`;
+  }
   setTxt("care-streak", String(s.streakDays));
   setTxt("care-lifetime", fmtNum(s.totalTokens));
   setTxt("care-sessions", String(s.totalMeals));
@@ -167,9 +176,41 @@ function setupRename() {
 }
 setupRename();
 
+// ---- subscription limits (mac CareTabView "Subscription limits") ----
+function renderLimits(providers: limits.LimitProvider[]) {
+  const list = document.getElementById("limits-list");
+  const sub = document.getElementById("limits-sub");
+  if (!list) return;
+  if (sub) sub.textContent = t(providers.length
+    ? "Read directly from your Claude Code / jcode sign-in."
+    : "Read directly from your Claude Code / jcode sign-in. None found yet.");
+  const escH = (s: string) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]!));
+  list.innerHTML = providers.map((p) => {
+    const on = limits.isVisible(p.id);
+    const rows = on ? limits.windowRowsHtml(p, false) : "";
+    return `<div class="limit-prov">
+      <label class="row tight"><span>${escH(t("Show %@ in Limits").replace("%@", p.display_name))}</span>
+        <input type="checkbox" data-limit="${escH(p.id)}" ${on ? "checked" : ""} /></label>
+      ${rows}
+    </div>`;
+  }).join("");
+  list.querySelectorAll<HTMLInputElement>("input[data-limit]").forEach((box) => {
+    box.onchange = () => {
+      limits.setVisible(box.dataset.limit!, box.checked);
+      renderLimits(limits.cached());
+    };
+  });
+}
+async function refreshLimits() {
+  renderLimits(limits.cached());
+  renderLimits(await limits.refreshIfStale());
+}
+
 // Refresh when the pet window feeds the pet, and periodically for the hunger clock.
 listen("care-updated", () => { if (document.querySelector('.page[data-page="care"].sel')) renderCare(); });
-setInterval(() => { if (document.querySelector('.page[data-page="care"].sel')) renderCare(); }, 30_000);
+setInterval(() => {
+  if (document.querySelector('.page[data-page="care"].sel')) { renderCare(); renderLimits(limits.cached()); }
+}, 30_000);
 
 // ---- web profile / leaderboard sign-in ----
 function renderSync() {
@@ -1177,6 +1218,10 @@ function applyStatic() {
   set("tab-pet", "Pet");
   set("tab-bubble", "Bubble");
   set("tab-about", "About");
+  set("t-care-agents", "By agent");
+  set("t-care-agents-sub", "Today · Month");
+  set("t-limits-head", "Subscription limits");
+  set("t-limits-help", "Hidden providers stay out of the stats card and don't make your pet anxious.");
   // general
   set("t-lang", "Language");
   set("t-lang2", "Language");

@@ -11,6 +11,7 @@ import { SessionStore, basename, type AgentEventPayload, type Session } from "./
 import { agentIconUrl } from "./icons";
 import { elapsedString } from "./bubble";
 import { t } from "./i18n";
+import * as limits from "./limits";
 
 const store = new SessionStore();
 const list = document.getElementById("pop-list")!;
@@ -25,6 +26,7 @@ function esc(s: string): string {
 function applyStatic() {
   const set = (id: string, key: string) => { const el = document.getElementById(id); if (el) el.textContent = t(key); };
   set("t-pop-agents", "AGENTS");
+  set("t-pop-limits", "LIMITS");
   set("pop-clear", "Clear all");
   set("pop-empty", "Nothing running right now.");
   set("t-pop-showpet", "Show pet");
@@ -75,6 +77,19 @@ function paint() {
     row.appendChild(x);
     list.appendChild(row);
   }
+  paintLimits();
+}
+
+/// Subscription limits from the pet window's cache (no extra API call), only
+/// the providers left visible in Settings > Care, like the mac stats card.
+function paintLimits() {
+  const wrap = document.getElementById("pop-limits")!;
+  const host = document.getElementById("pop-limits-list")!;
+  const shown = limits.visible(limits.cached());
+  wrap.style.display = shown.length ? "" : "none";
+  const html = shown.map((p) =>
+    `<div class="pop-limit"><div class="pop-limit-name">${esc(p.display_name)}</div>${limits.windowRowsHtml(p, true)}</div>`).join("");
+  if (host.innerHTML !== html) host.innerHTML = html;
 }
 
 function cap(s: string): string {

@@ -313,3 +313,43 @@ fn enable_codex_hooks() {
     if let Some(dir) = path.parent() { let _ = std::fs::create_dir_all(dir); }
     let _ = std::fs::write(&path, updated);
 }
+
+/// The home directory jcode uses, as a path this process can open, plus
+/// whether it is inside WSL. Prefers the default WSL distro's home when it has
+/// a `.jcode` folder (reached as `\\wsl.localhost\<distro>\<home>`), else the
+/// native home. Resolved once: `wsl.exe` costs ~200 ms and the answer doesn't
+/// change while the app runs. Used by `limits` to find jcode's sign-in.
+pub fn jcode_home() -> Option<(PathBuf, bool)> {
+    static HOME: std::sync::OnceLock<Option<(PathBuf, bool)>> = std::sync::OnceLock::new();
+    HOME.get_or_init(|| {
+        #[cfg(windows)]
+        {
+            if let Some((distro, home)) = wsl_default_home() {
+                let unc = PathBuf::from(format!(r"\\wsl.localhost\{}{}", distro, home.replace('/', r"\")));
+                if unc.join(".jcode").is_dir() {
+                    return Some((unc, true));
+                }
+            }
+        }
+        dirs::home_dir().map(|h| (h, false))
+    })
+    .clone()
+}
+
+/// (distro, $HOME) of the default WSL distro, via `wsl.exe`. None without WSL.
+#[cfg(windows)]
+fn wsl_default_home() -> Option<(String, String)> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let out = std::process::Command::new("wsl.exe")
+        .args(["-e", "sh", "-c", "printf '%s\\n%s' \"$WSL_DISTRO_NAME\" \"$HOME\""])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .ok()?;
+    if !out.status.success() { return None; }
+    let text = String::from_utf8_lossy(&out.stdout).replace('\r', "");
+    let mut it = text.lines();
+    let distro = it.next()?.trim().to_string();
+    let home = it.next()?.trim().to_string();
+    (!distro.is_empty() && home.starts_with('/')).then_some((distro, home))
+}

@@ -210,10 +210,20 @@
               <div class="care-stat"><div class="cs-label" id="t-care-sessions">Sessions</div><div class="cs-val" id="care-sessions">0</div><div class="cs-sub" id="t-care-sessions-sub">completed</div></div>
             </div>
             <div class="care-charthead"><span id="t-care-cost">Est. cost (Claude)</span><span id="care-cost" class="dim"></span></div>
+            <div class="care-charthead"><span id="t-care-agents">By agent</span><span class="dim" id="t-care-agents-sub">Today · Month</span></div>
+            <div id="care-agents"></div>
             <div class="care-charthead"><span id="t-care-burn">Burn, last 7 days</span><span id="care-burntotal" class="dim"></span></div>
             <div class="care-chart" id="care-chart"></div>
           </div>
           <div class="ghelp" id="t-care-help">Your pet eats the real tokens your agents burn and the sessions they finish. Feeding earns XP; it levels up through five stages.</div>
+        </div>
+        <div class="group">
+          <div class="ghead" id="t-limits-head">Subscription limits</div>
+          <div class="gcard pad">
+            <div class="row"><span class="dim" id="limits-sub"></span></div>
+            <div id="limits-list"></div>
+          </div>
+          <div class="ghelp" id="t-limits-help">Hidden providers stay out of the stats card and don't make your pet anxious.</div>
         </div>
         <div class="group">
           <div class="ghead" id="t-webprofile">Web profile</div>

@@ -281,5 +281,24 @@ fn handle_event(app: &AppHandle, body: &str) {
         });
     }
 
+    // Antigravity (agy): its hook payload has no token counts but carries
+    // `transcriptPath`; read the usage appended to that transcript since the last
+    // event (see antigravity_usage.rs). Off the listener thread.
+    if agent_kind == "antigravity" && !transcript.is_empty() {
+        let app2 = app.clone();
+        let sess = tok_session.clone();
+        let proj = tok_project.clone();
+        let path = transcript.clone();
+        std::thread::spawn(move || {
+            if let Some(tokens) = crate::antigravity_usage::new_usage_tokens(&path) {
+                if tokens > 0 {
+                    let _ = app2.emit("agent-tokens", serde_json::json!({
+                        "agent": "antigravity", "session": sess, "project": proj, "tokens": tokens,
+                    }));
+                }
+            }
+        });
+    }
+
     emit_payload(app, state, None);
 }

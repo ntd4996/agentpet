@@ -75,9 +75,12 @@ function loadDirty(): Set<string> {
 }
 function saveDirty(d: Set<string>) { localStorage.setItem(DIRTY_KEY, JSON.stringify([...d])); }
 
+/// Shown for usage from agents whose hook carries no workspace (Antigravity IDE).
+export const NO_PROJECT = "(no project)";
+
 function record(project: string, agent: string, tokens: number, sessions: number, cost = 0, bd: Breakdown = {}) {
-  if (!project || !agent || (tokens <= 0 && sessions <= 0)) return;
-  const { id, name } = projectIdentity(project);
+  if (!agent || (tokens <= 0 && sessions <= 0)) return;
+  const { id, name } = projectIdentity(project || NO_PROJECT);
   const day = today();
   const key = `${id}|${agent}|${day}`;
   const store = load();
@@ -119,11 +122,31 @@ export function monthlyCostUSD(): number {
   return Object.values(load()).reduce((s, r) => (r.day.startsWith(p) ? s + (r.costUSD || 0) : s), 0);
 }
 
+export interface AgentTotal { agent: string; today: number; month: number; sessions: number }
+
+/// Tokens and finished sessions per agent: today and this calendar month, most
+/// tokens this month first. Agents with nothing this month are left out.
+export function byAgent(): AgentTotal[] {
+  const t = today();
+  const p = monthPrefix();
+  const m = new Map<string, AgentTotal>();
+  for (const r of Object.values(load())) {
+    if (!r.day.startsWith(p)) continue;
+    const cur = m.get(r.agent) || { agent: r.agent, today: 0, month: 0, sessions: 0 };
+    cur.month += r.tokens;
+    cur.sessions += r.sessions;
+    if (r.day === t) cur.today += r.tokens;
+    m.set(r.agent, cur);
+  }
+  return [...m.values()].filter((a) => a.month > 0 || a.sessions > 0).sort((a, b) => b.month - a.month);
+}
+
 /// Projects seen in usage history (for the split-pet assignment UI), most tokens
 /// first. Deduped by projectId.
 export function knownProjects(): { id: string; name: string }[] {
   const byId = new Map<string, { id: string; name: string; tokens: number }>();
   for (const r of Object.values(load())) {
+    if (r.projectName === NO_PROJECT) continue; // not a real project: nothing to assign a pet to
     const cur = byId.get(r.projectId);
     if (cur) cur.tokens += r.tokens;
     else byId.set(r.projectId, { id: r.projectId, name: r.projectName, tokens: r.tokens });
