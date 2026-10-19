@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emit, listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
-import { exit } from "@tauri-apps/plugin-process";
+import { exit, relaunch } from "@tauri-apps/plugin-process";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
 import { loadCatalog, savedSlug, saveSlug, getLibrary, addToLibrary, removeFromLibrary, petDisplayName, renamePet, type Pet, type LibPet } from "./catalog";
 import { t, getLang, setLang, type Lang } from "./i18n";
@@ -12,6 +12,7 @@ import { slice, type Rect } from "./pet";
 import * as care from "./care";
 import * as usage from "./usage";
 import * as projectpets from "./projectpets";
+import * as backup from "./backup";
 import * as sync from "./sync";
 import * as history from "./history";
 
@@ -1311,6 +1312,11 @@ function applyStatic() {
   set("t-ob-pet", "Choose a pet");
   set("t-ob-go", "Get started");
   set("t-author", "Author");
+  set("t-backup", "Backup");
+  set("t-backup-export", "Export data");
+  set("t-backup-export-sub", "Save your pet level, pets and settings to a file.");
+  set("t-backup-import", "Import data");
+  set("t-backup-import-sub", "Restore from a file. This replaces your current data.");
   set("t-version2", "Version");
   // bottom bar + demo panel
   set("t-lp", "Live preview");
@@ -1331,6 +1337,61 @@ function applyStatic() {
   set("t-fontsize", "Font size");
   search.placeholder = t("Search your pets");
   (document.getElementById("bw-search") as HTMLInputElement).placeholder = t("Search pets");
+}
+
+// ------------------------------------------------------- backup / restore ----
+function initBackup() {
+  const status = document.getElementById("backup-status") as HTMLElement;
+  const say = (msg: string, bad = false) => {
+    status.style.display = "";
+    status.textContent = msg;
+    status.style.color = bad ? "#ff6b6b" : "";
+  };
+
+  (document.getElementById("backup-export") as HTMLButtonElement).onclick = async () => {
+    try {
+      const ver = await getVersion().catch(() => undefined);
+      const file = backup.buildBackup(ver);
+      const blob = new Blob([JSON.stringify(file)], { type: "application/json" });
+      const a = document.createElement("a");
+      const day = new Date().toISOString().slice(0, 10);
+      a.href = URL.createObjectURL(blob);
+      a.download = `agentpet-backup-${day}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
+      say(`${t("Exported")}: ${Object.keys(file.data).length} ${t("items")} (${(blob.size / 1024).toFixed(0)} KB)`);
+    } catch (e) {
+      say(`${t("Export failed")}: ${(e as Error).message}`, true);
+    }
+  };
+
+  const pick = document.createElement("input");
+  pick.type = "file";
+  pick.accept = "application/json,.json";
+  pick.style.display = "none";
+  document.body.appendChild(pick);
+  (document.getElementById("backup-import") as HTMLButtonElement).onclick = () => pick.click();
+  pick.onchange = async () => {
+    const f = pick.files?.[0];
+    pick.value = "";
+    if (!f) return;
+    try {
+      const parsed = backup.parseBackup(await f.text());
+      const when = parsed.exportedAt ? parsed.exportedAt.slice(0, 16).replace("T", " ") : "?";
+      const ok = confirm(
+        `${t("Restore this backup?")}\n${f.name}\n${when} · ${Object.keys(parsed.data).length} ${t("items")}\n\n` +
+        t("Your current data will be replaced. Export first if you want to keep it."));
+      if (!ok) return;
+      const n = backup.applyBackup(parsed);
+      say(`${t("Restored")}: ${n} ${t("items")}. ${t("Restarting…")}`);
+      // Every window caches state in memory: relaunch so they all reload it.
+      setTimeout(() => { void relaunch(); }, 800);
+    } catch (e) {
+      say(`${t("Import failed")}: ${t((e as Error).message)}`, true);
+    }
+  };
 }
 
 // ------------------------------------------------- version / quit / links ----
@@ -1399,6 +1460,7 @@ initAutostart();
 initSliders();
 initSegs();
 initMisc();
+initBackup();
 initDemo();
 initOnboarding();
 
