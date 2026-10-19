@@ -13,6 +13,8 @@ name = "agentpet"
 version = "0.1.12"
 dependencies = [
  "dirs 5.0.1",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "tauri",
@@ -23,6 +25,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "tiny_http",
+ "tokio",
 ]
 
 [[package]]

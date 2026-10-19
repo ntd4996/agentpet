@@ -13,6 +13,7 @@ import * as usage from "./usage";
 import * as history from "./history";
 import * as reactive from "./reactive";
 import * as projectpets from "./projectpets";
+import * as limits from "./limits";
 
 // Which project THIS pet window represents. `null` = the main window (the
 // default single pet). Split-pet spawns extra windows with `?project=<id>`.
@@ -192,6 +193,8 @@ function pickMoodLine(mood: string) {
   // simple-bubble mode (multi-agent off) always has something to say.
   let pool = bubbleLines(null, mood);
   if (!pool.length) pool = PET_CHAT[mood] ?? [];
+  // A nearly spent subscription makes the idle pet anxious (mac CareChat.idlePool).
+  if (mood === "idle" && limits.limitLow(limits.cached())) pool = [...pool, ...limits.ANXIOUS.map(t)];
   moodLine = pool.length ? pool[Math.floor(Math.random() * pool.length)] : "";
 }
 
@@ -261,6 +264,15 @@ setInterval(() => {
   const slug = myPetSlug();
   if (slug) flashReactive(reactive.evaluate("hunger", care.hunger(care.stateFor(slug))));
 }, 60_000);
+// Subscription limits: only the main window calls the provider (every 5 min,
+// like mac NativeUsageProbe); project windows read the shared cache. Each
+// window comments on the tightest visible window via the rateLimit metric.
+async function pollLimits() {
+  const found = IS_MAIN ? await limits.refresh() : limits.cached();
+  flashReactive(reactive.evaluate("rateLimit", limits.lowestFractionLeft(found)));
+}
+setTimeout(() => { void pollLimits(); }, IS_MAIN ? 5_000 : 15_000);
+setInterval(() => { void pollLimits(); }, limits.POLL_MS);
 // Carousel advance / fold clicks request a prompt repaint.
 setInterval(() => { if (bubble.dirty) { bubble.dirty = false; render(); } }, 120);
 // Live elapsed clocks tick every second.
