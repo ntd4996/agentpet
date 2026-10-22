@@ -79,4 +79,69 @@ final class TranscriptUsageTests: XCTestCase {
     func testUnreadableFileReturnsNil() {
         XCTAssertNil(TranscriptReader.newUsageTokens(at: "/nonexistent/nope.jsonl"))
     }
+
+    // MARK: - Each reply counts once
+
+    private func reply(id: String, at stamp: String? = nil, input: Int, output: Int, block: String = "text") -> String {
+        let time = stamp.map { #","timestamp":"\#($0)""# } ?? ""
+        return #"{"type":"assistant"\#(time),"message":{"id":"\#(id)","usage":{"input_tokens":\#(input),"output_tokens":\#(output)},"content":[{"type":"\#(block)"}]}}"#
+    }
+
+    /// Claude Code writes one line per content block of a reply (thinking,
+    /// text, tool_use), and every one of them repeats the reply's usage.
+    func testReplyWrittenAsSeveralBlocksCountsOnce() {
+        append([
+            reply(id: "msg_1", input: 10, output: 500, block: "thinking"),
+            reply(id: "msg_1", input: 10, output: 500, block: "text"),
+            reply(id: "msg_1", input: 10, output: 500, block: "tool_use"),
+        ])
+        XCTAssertEqual(TranscriptReader.newUsageTokens(at: path), 510)
+    }
+
+    func testReplyBlocksSplitAcrossReadsCountOnce() {
+        append([reply(id: "msg_1", input: 10, output: 500)])
+        XCTAssertEqual(TranscriptReader.newUsageTokens(at: path), 510)
+        append([
+            reply(id: "msg_1", input: 10, output: 500, block: "tool_use"),
+            reply(id: "msg_2", input: 5, output: 20),
+        ])
+        XCTAssertEqual(TranscriptReader.newUsageTokens(at: path), 25)
+    }
+
+    /// Resuming a session copies its replies into a new transcript file.
+    func testReplyCopiedIntoAnotherTranscriptCountsOnce() throws {
+        let other = NSTemporaryDirectory() + "agentpet-usage-\(UUID().uuidString).jsonl"
+        defer { try? FileManager.default.removeItem(atPath: other) }
+        append([reply(id: "msg_1", input: 0, output: 300)])
+        XCTAssertEqual(TranscriptReader.newUsageTokens(at: path), 300)
+        try (reply(id: "msg_1", input: 0, output: 300) + "\n" + reply(id: "msg_2", input: 0, output: 7) + "\n")
+            .write(toFile: other, atomically: true, encoding: .utf8)
+        XCTAssertEqual(TranscriptReader.newUsageTokens(at: other), 7)
+    }
+
+    func testCostCountsTheReplyOnceToo() {
+        append([
+            reply(id: "msg_1", input: 1_000_000, output: 0, block: "thinking"),
+            reply(id: "msg_1", input: 1_000_000, output: 0, block: "text"),
+        ])
+        let delta = TranscriptReader.newUsageDelta(at: path)
+        XCTAssertEqual(delta?.tokens, 1_000_000)
+        let once = ModelPricing.costUSD(model: nil, inputTokens: 1_000_000, outputTokens: 0,
+                                        cacheCreateTokens: 0, cacheReadTokens: 0)
+        XCTAssertEqual(delta?.costUSD ?? 0, once, accuracy: 1e-9)
+    }
+
+    /// After a relaunch every transcript is read from the start again, and a
+    /// resumed session copies earlier replies into its new file: usage written
+    /// before counting started must not be eaten (again).
+    func testUsageWrittenBeforeCountingStartedIsSkipped() {
+        TranscriptReader.countUsageSince = ISO8601DateFormatter().date(from: "2026-10-22T12:00:00Z")
+        defer { TranscriptReader.countUsageSince = nil }
+        append([
+            reply(id: "msg_old", at: "2026-10-21T09:00:00.000Z", input: 0, output: 9_000),
+            reply(id: "msg_new", at: "2026-10-22T12:30:00.000Z", input: 0, output: 40),
+            assistantLine(input: 1, output: 1),   // no timestamp: still counted
+        ])
+        XCTAssertEqual(TranscriptReader.newUsageTokens(at: path), 42)
+    }
 }
