@@ -20,11 +20,12 @@ const STATE_ROW: Record<string, number> = {
   celebrate: 4,  // jumping , the 3s burst when all work completes
 };
 
-// Frame rate varies by mood (faster while working), like the macOS app.
+// Frame rate varies by mood (faster while working), like the macOS app. Slowed
+// from 8/8/4 so an 8-frame row no longer loops in about one second.
 const STATE_FPS: Record<string, number> = {
-  working: 8,
-  celebrate: 8,
-  waiting: 4,
+  working: 5,
+  celebrate: 5,
+  waiting: 3,
   done: 3,
   idle: 3,
   registered: 3,
@@ -88,7 +89,6 @@ export class Pet {
   private clips: Rect[][] = [];
   private frame = 0;
   private row = 0;
-  private lastTick = 0;
   private fps = 3;
   /// Unused space above the sprite, as a fraction of canvas height. The bubble
   /// uses it to sit right above the pet's head instead of the canvas top.
@@ -117,7 +117,7 @@ export class Pet {
     if (!c) throw new Error("no 2d context");
     this.ctx = c;
     this.ctx.imageSmoothingEnabled = false;
-    requestAnimationFrame((t) => this.loop(t));
+    this.loop();
   }
 
   /// Widest frame of each clip , scale is computed per CLIP (not per frame)
@@ -135,6 +135,7 @@ export class Pet {
       this.clipMaxW = this.clips.map((clip) => Math.max(...clip.map((r) => r.w)));
       this.frame = 0;
       this.loaded = true;
+      this.draw();
     };
     // A pre-CORS cached copy makes the crossOrigin load fail , retry plain
     // (displayable, but slicing falls back to the fixed grid).
@@ -150,6 +151,7 @@ export class Pet {
         this.clips = [];
         this.frame = 0;
         this.loaded = true;
+        this.draw();
       };
       plain.src = spritesheetUrl;
     };
@@ -167,6 +169,10 @@ export class Pet {
     const bound = parseInt(localStorage.getItem(`ap_bind_${state}`) ?? "", 10);
     const row = Number.isFinite(bound) && bound >= 0 ? bound : (STATE_ROW[state] ?? 0);
     if (row !== this.row) { this.row = row; this.frame = 0; }
+    // Per-row override (`ap_fps_row_<row>`, 1-30 fps) so one clip can run slower
+    // than its mood's default without changing every other pet or mood.
+    const rowFps = parseFloat(localStorage.getItem(`ap_fps_row_${row}`) ?? "");
+    if (Number.isFinite(rowFps) && rowFps >= 1 && rowFps <= 30) this.fps = rowFps;
   }
 
   /// The frames of the current row (clamped to what the sheet actually has).
@@ -175,13 +181,14 @@ export class Pet {
     return this.clips[Math.min(this.row, this.clips.length - 1)];
   }
 
-  private loop(t: number) {
-    if (this.loaded && t - this.lastTick > 1000 / this.fps) {
-      this.lastTick = t;
+  // Paced by the clip's fps (3-5) instead of a 60Hz requestAnimationFrame that
+  // woke the renderer ~12x more often than it drew. Skips while hidden.
+  private loop() {
+    if (this.loaded && !document.hidden) {
       this.frame++;
       this.draw();
     }
-    requestAnimationFrame((n) => this.loop(n));
+    window.setTimeout(() => this.loop(), 1000 / this.fps);
   }
 
   private draw() {
