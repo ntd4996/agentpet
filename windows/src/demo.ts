@@ -4,6 +4,7 @@
 // "Add webhook" column. The Settings window widens while the panel is open,
 // like the macOS window growing from 640 → 1380 pt.
 
+import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { Pet } from "./pet";
 import { BubbleRenderer } from "./bubble";
@@ -84,6 +85,7 @@ export function initDemo() {
   function playSound(ev: "done" | "waiting") {
     const data = localStorage.getItem(`ap_sound_${ev}_data`);
     if (data) { try { void new Audio(data).play(); return; } catch {} }
+    if (navigator.userAgent.includes("Windows")) { invoke("play_sound", { event: ev }).catch(() => {}); return; }
     try {
       const ctx = new AudioContext();
       const o = ctx.createOscillator(); const g = ctx.createGain();

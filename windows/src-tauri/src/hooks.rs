@@ -79,6 +79,7 @@ pub fn catalog() -> Vec<AgentInfo> {
         ("droid", "Factory Droid", Some("Factory Droid CLI (~/.factory/hooks.json)")),
         ("pi", "Pi", Some("Pi extension (~/.pi/agent/extensions). No \"needs input\" alerts")),
         ("grok", "Grok Build", Some("xAI Grok Build CLI (~/.grok/hooks/agentpet.json)")),
+        ("jcode", "jcode", Some("jcode lifecycle hooks (~/.jcode/config.toml, in WSL when present)")),
     ];
     entries.iter().map(|(kind, name, note)| AgentInfo {
         kind: kind.to_string(),
@@ -154,6 +155,11 @@ fn make_entry(style: Style, event: &str, cmd: &str) -> Value {
 
 // ----- public API ----------------------------------------------------------
 pub fn is_installed(kind: &str) -> bool {
+    if kind == "jcode" {
+        return jcode_target()
+            .map(|t| crate::jcode::is_installed(&std::fs::read_to_string(&t.config).unwrap_or_default(), crate::jcode::EVENTS))
+            .unwrap_or(false);
+    }
     let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else { return false };
     if s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
         return std::fs::read_to_string(&path).map(|c| is_ours(&c)).unwrap_or(false);
@@ -178,6 +184,7 @@ pub fn toggle(kind: &str) -> Result<bool, String> {
 }
 
 fn install(kind: &str) -> std::io::Result<()> {
+    if kind == "jcode" { return jcode_install(); }
     let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else {
         return Err(std::io::Error::new(std::io::ErrorKind::Other, "unknown agent"));
     };
@@ -219,6 +226,7 @@ fn install(kind: &str) -> std::io::Result<()> {
 }
 
 fn uninstall(kind: &str) -> std::io::Result<()> {
+    if kind == "jcode" { return jcode_uninstall(); }
     let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else { return Ok(()) };
     // Files we own outright: just delete.
     if kind == "copilot" || s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
@@ -312,4 +320,118 @@ fn enable_codex_hooks() {
     };
     if let Some(dir) = path.parent() { let _ = std::fs::create_dir_all(dir); }
     let _ = std::fs::write(&path, updated);
+}
+
+// ----- jcode (TOML [hooks], usually inside WSL) -----------------------------
+
+/// Where jcode's config lives and what hook command jcode should run.
+struct JcodeTarget {
+    config: PathBuf,
+    command: String,
+}
+
+/// Prefer the default WSL distro's `~/.jcode` (jcode is a Linux/macOS CLI and on
+/// Windows it typically runs under WSL), else a native `%USERPROFILE%\.jcode`.
+/// simplify: default distro only; a per-distro picker is the upgrade path.
+fn jcode_target() -> Option<JcodeTarget> {
+    let exe = std::env::current_exe().ok()?;
+    let (home, via_wsl) = jcode_home()?;
+    let config = home.join(".jcode").join("config.toml");
+    let command = if via_wsl {
+        crate::jcode::hook_command(&windows_to_wsl_path(&exe.to_string_lossy()), true)
+    } else {
+        crate::jcode::hook_command(&exe.to_string_lossy(), false)
+    };
+    Some(JcodeTarget { config, command })
+}
+
+/// The home directory jcode uses, as a path this process can open, plus
+/// whether it is inside WSL. Prefers the default WSL distro's home when it has
+/// a `.jcode` folder (reached as `\\wsl.localhost\<distro>\<home>`), else the
+/// native home. Resolved once: `wsl.exe` costs ~200 ms and the answer doesn't
+/// change while the app runs.
+pub fn jcode_home() -> Option<(PathBuf, bool)> {
+    static HOME: std::sync::OnceLock<Option<(PathBuf, bool)>> = std::sync::OnceLock::new();
+    HOME.get_or_init(|| {
+        #[cfg(windows)]
+        {
+            if let Some((distro, home)) = wsl_default_home() {
+                let unc = PathBuf::from(format!(r"\\wsl.localhost\{}{}", distro, home.replace('/', r"\")));
+                if unc.join(".jcode").is_dir() {
+                    return Some((unc, true));
+                }
+            }
+        }
+        dirs::home_dir().map(|h| (h, false))
+    })
+    .clone()
+}
+
+/// (distro, $HOME) of the default WSL distro, via `wsl.exe`. None without WSL.
+#[cfg(windows)]
+fn wsl_default_home() -> Option<(String, String)> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let out = std::process::Command::new("wsl.exe")
+        .args(["-e", "sh", "-c", "printf '%s\\n%s' \"$WSL_DISTRO_NAME\" \"$HOME\""])
+        .creation_flags(CREATE_NO_WINDOW)
+        .output()
+        .ok()?;
+    if !out.status.success() { return None; }
+    let text = String::from_utf8_lossy(&out.stdout).replace('\r', "");
+    let mut it = text.lines();
+    let distro = it.next()?.trim().to_string();
+    let home = it.next()?.trim().to_string();
+    (!distro.is_empty() && home.starts_with('/')).then_some((distro, home))
+}
+
+/// `C:\Users\A\x.exe` -> `/mnt/c/Users/A/x.exe` (WSL's default automount root).
+/// simplify: assumes automount root /mnt; a custom root in /etc/wsl.conf would
+/// need `wslpath -u` instead.
+pub fn windows_to_wsl_path(p: &str) -> String {
+    let p = p.trim_start_matches(r"\\?\");
+    let mut chars = p.chars();
+    match (chars.next(), chars.next()) {
+        (Some(d), Some(':')) if d.is_ascii_alphabetic() => {
+            format!("/mnt/{}{}", d.to_ascii_lowercase(), p[2..].replace('\\', "/"))
+        }
+        _ => p.replace('\\', "/"),
+    }
+}
+
+fn jcode_write(path: &PathBuf, text: &str) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() { std::fs::create_dir_all(dir)?; }
+    // Write-then-rename: jcode re-reads config.toml on change, never a partial one.
+    let tmp = path.with_extension("toml.agentpet-tmp");
+    std::fs::write(&tmp, text)?;
+    std::fs::rename(&tmp, path)
+}
+
+fn jcode_install() -> std::io::Result<()> {
+    let t = jcode_target().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "jcode config not found"))?;
+    let existing = std::fs::read_to_string(&t.config).unwrap_or_default();
+    let updated = crate::jcode::install(&existing, &t.command, crate::jcode::EVENTS)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    if updated != existing { jcode_write(&t.config, &updated)?; }
+    Ok(())
+}
+
+fn jcode_uninstall() -> std::io::Result<()> {
+    let Some(t) = jcode_target() else { return Ok(()) };
+    let existing = std::fs::read_to_string(&t.config).unwrap_or_default();
+    let updated = crate::jcode::uninstall(&existing, crate::jcode::EVENTS);
+    if updated != existing { jcode_write(&t.config, &updated)?; }
+    Ok(())
+}
+
+#[cfg(test)]
+mod jcode_path_tests {
+    use super::windows_to_wsl_path;
+
+    #[test]
+    fn converts_drive_paths() {
+        assert_eq!(windows_to_wsl_path(r"C:\Users\HocSys\AppData\Local\AgentPet\agentpet.exe"),
+                   "/mnt/c/Users/HocSys/AppData/Local/AgentPet/agentpet.exe");
+        assert_eq!(windows_to_wsl_path(r"\\?\D:\A B\x.exe"), "/mnt/d/A B/x.exe");
+    }
 }
