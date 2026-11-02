@@ -80,7 +80,12 @@ fn write_pos(x: i32, y: i32) {
 /// Report the pet's opaque rectangle (physical px, window-relative) so empty
 /// transparent areas of the overlay let clicks pass through to apps below.
 #[tauri::command]
-fn set_hit_rect(app: tauri::AppHandle, x: f64, y: f64, w: f64, h: f64) {
+fn set_hit_rect(app: tauri::AppHandle, window: tauri::WebviewWindow, x: f64, y: f64, w: f64, h: f64) {
+    // Split `pet-<projectId>` windows run the same frontend: only the main pet's
+    // rect feeds the click-through loop and the off-screen clamp.
+    if window.label() != "pet" {
+        return;
+    }
     if let Some(state) = app.try_state::<Mutex<HitRect>>() {
         if let Ok(mut r) = state.lock() {
             *r = HitRect { x, y, w, h };
