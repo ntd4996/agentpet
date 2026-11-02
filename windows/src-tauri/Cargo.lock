@@ -10,9 +10,11 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "agentpet"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "dirs 5.0.1",
+ "reqwest",
+ "rustls",
  "serde",
  "serde_json",
  "tauri",
@@ -23,6 +25,7 @@ dependencies = [
  "tauri-plugin-single-instance",
  "tauri-plugin-updater",
  "tiny_http",
+ "tokio",
 ]
 
 [[package]]

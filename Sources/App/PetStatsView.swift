@@ -45,7 +45,7 @@ struct PetStatsView: View {
             statGrid(state)
             trendBlock(state)
             costBlock
-            AgentUsageRows(limit: 6)
+            AgentUsageRows(limit: 3)
             usageBlock
             if let last = state.lastFedAt {
                 HStack {
@@ -314,6 +314,10 @@ struct PetStatsView: View {
 
     @ObservedObject private var probe = NativeUsageProbe.shared
     @ObservedObject private var visibility = UsageVisibility.shared
+    @State private var limitsExpanded = false
+    /// Providers shown before "Show more": each has one bar per window, so the
+    /// card gets tall quickly on a small screen.
+    private static let collapsedProviders = 2
 
     @ViewBuilder private var usageBlock: some View {
         let providers = visibility.visible(NativeUsageProbe.combined())
@@ -322,8 +326,12 @@ struct PetStatsView: View {
                 Text("Limits")
                     .font(.system(size: 9, weight: .semibold)).tracking(0.8)
                     .foregroundStyle(.white.opacity(0.35))
-                ForEach(providers) { p in
+                let shown = limitsExpanded ? providers : Array(providers.prefix(Self.collapsedProviders))
+                ForEach(shown) { p in
                     LimitWindowsView(provider: p, tint: stageColor)
+                }
+                if providers.count > Self.collapsedProviders {
+                    ShowMoreButton(expanded: $limitsExpanded, hidden: providers.count - shown.count)
                 }
             }
         }

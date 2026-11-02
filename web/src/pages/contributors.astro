@@ -1,43 +1,9 @@
 ---
 import Base from "../layouts/Base.astro";
 import Icon from "../components/Icon.astro";
+import { REPO, FOUNDERS, FOUNDER_LOGINS, KNOWN, toPerson } from "../lib/contributors";
 
 export const prerender = false;
-
-const REPO = "ntd4996/agentpet";
-
-// Founders are listed first; everyone is shown with the same card.
-const FOUNDERS = [
-  { login: "ntd4996", name: "Nguyễn Thành Đạt", role: "Founder & maintainer", avatar_url: "https://avatars.githubusercontent.com/u/46896275?v=4", html_url: "https://github.com/ntd4996" },
-  { login: "hoangphison", name: "Sơn Hoàng", role: "Cofounder", avatar_url: "https://avatars.githubusercontent.com/u/9270621?v=4", html_url: "https://github.com/hoangphison" },
-];
-const FOUNDER_LOGINS = new Set(FOUNDERS.map((f) => f.login));
-
-// Always-include set: merged contributors that GitHub's cached contributor
-// API can lag behind by hours, so we union them in to show credit right away.
-const KNOWN = [
-  { login: "3xhvy", avatar_url: "https://avatars.githubusercontent.com/u/127609002?v=4", html_url: "https://github.com/3xhvy" },
-  { login: "aiexkwan", avatar_url: "https://avatars.githubusercontent.com/u/203569546?v=4", html_url: "https://github.com/aiexkwan" },
-  { login: "23092003e", avatar_url: "https://avatars.githubusercontent.com/u/114332653?v=4", html_url: "https://github.com/23092003e" },
-  { login: "tranhuuhuy297", avatar_url: "https://avatars.githubusercontent.com/u/46334604?v=4", html_url: "https://github.com/tranhuuhuy297" },
-  { login: "heo001997", avatar_url: "https://avatars.githubusercontent.com/u/20258751?v=4", html_url: "https://github.com/heo001997" },
-  { login: "minhat-dg", avatar_url: "https://avatars.githubusercontent.com/u/70907443?v=4", html_url: "https://github.com/minhat-dg" },
-  { login: "hhoangg", avatar_url: "https://avatars.githubusercontent.com/u/19337273?v=4", html_url: "https://github.com/hhoangg" },
-  { login: "hoangdq08", avatar_url: "https://avatars.githubusercontent.com/u/224021259?v=4", html_url: "https://github.com/hoangdq08" },
-  { login: "hocdo278", avatar_url: "https://avatars.githubusercontent.com/u/236560667?v=4", html_url: "https://github.com/hocdo278" },
-  { login: "htdangkhoa", avatar_url: "https://avatars.githubusercontent.com/u/15341301?v=4", html_url: "https://github.com/htdangkhoa" },
-];
-
-const NAMES: Record<string, string> = { "3xhvy": "Hồ Hoàng Huy", "23092003e": "Mạnh Hoàng", "hoangdq08": "Đỗ Quốc Hoàng", "htdangkhoa": "Huỳnh Trần Đăng Khoa" };
-const ROLES: Record<string, string> = {
-  "3xhvy": "Multi-agent bubble",
-  "aiexkwan": "Achievements, reactive bubbles & perf",
-  "23092003e": "Windows hooks",
-  "hhoangg": "Per-project pets, break reminder & CPU perf",
-  "hoangdq08": "jcode, usage limits, project names & stats card",
-  "hocdo278": "Usage dashboard & Windows parity",
-  "htdangkhoa": "Multi-device streak sync",
-};
 
 let rest: any[] = [...KNOWN];
 try {
@@ -61,16 +27,7 @@ try {
 rest = rest.filter((c) => !FOUNDER_LOGINS.has(c.login));
 
 // Everyone in one honour roll, founders first, all rendered the same way.
-const people = [
-  ...FOUNDERS,
-  ...rest.map((c: any) => ({
-    login: c.login,
-    name: NAMES[c.login] || c.login,
-    role: ROLES[c.login] || "Contributor",
-    avatar_url: c.avatar_url,
-    html_url: c.html_url,
-  })),
-];
+const people = [...FOUNDERS, ...rest.map(toPerson)];
 ---
 <Base title="Contributors · AgentPet" description="The team and community behind AgentPet." active="contributors">
   <!-- Honour-roll header (extra top room so the floating nav never overlaps it) -->
@@ -107,7 +64,7 @@ const people = [
       ))}
     </div>
     <p class="mx-auto mt-12 max-w-2xl text-center text-muted">
-      {people.length} people and counting. Want your face here? AgentPet is open source , send a pull request on
+      {people.length} people and counting. Want your face here? AgentPet is open source, send a pull request on
       <a class="font-semibold text-brand-700 hover:underline" href="https://github.com/ntd4996/agentpet">GitHub</a>.
     </p>
   </section>

@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 import AgentPetCore
 
 /// Custom display names for projects (issue: several sessions in one folder,
@@ -33,8 +34,6 @@ final class ProjectNameStore: ObservableObject {
     }
 }
 
-import SwiftUI
-
 /// Settings > Bubble > Project names: one text field per project AgentPet has
 /// seen. Empty means the folder name.
 struct ProjectNamesSection: View {
@@ -56,7 +55,15 @@ struct ProjectNamesSection: View {
             Text("Projects used in the last 7 days. Show a friendlier name instead of the folder name in the bubble and notifications. Leave empty to use the folder name.")
         }
         .onAppear {
-            projects = ProjectUsageStore.shared.knownProjects(alwaysInclude: Set(names.names.keys))
+            var list = ProjectUsageStore.shared.knownProjects(alwaysInclude: Set(names.names.keys))
+            // A named project whose usage rows aged out of the store has no folder
+            // to show, so list it by its custom name; otherwise it could never be
+            // cleared from here.
+            let listed = Set(list.map(\.id))
+            for (id, name) in names.names.sorted(by: { $0.value < $1.value }) where !listed.contains(id) {
+                list.append((id: id, folder: name))
+            }
+            projects = list
         }
     }
 }

@@ -124,24 +124,37 @@ export function slice(img: HTMLImageElement): Rect[][] {
   return clips;
 }
 
-/// Groups the per-row extents into bands about BAND_PX tall (canvas px) and returns one
-/// rect per band spanning the widest row in it. Empty rows are skipped.
+/// Hit bands of a whole clip: the union of the visible rows of EVERY frame, each
+/// drawn centred and bottom-anchored like draw() does, merged per canvas row and
+/// grouped into bands about BAND_PX tall. Only depends on the clip and the scale,
+/// so it stays still while the animation plays (no flicker at the pet's edge).
 const BAND_PX = 4;
-function bandsOf(rows: Int16Array, dx: number, dy: number, s: number): { x: number; y: number; w: number; h: number }[] {
-  const n = rows.length / 2;
-  const step = Math.max(1, Math.round(BAND_PX / s));
-  const out: { x: number; y: number; w: number; h: number }[] = [];
-  for (let y0 = 0; y0 < n; y0 += step) {
-    const y1 = Math.min(n, y0 + step);
-    let lo = Infinity, hi = -1;
-    for (let y = y0; y < y1; y++) {
-      const a = rows[y * 2], b = rows[y * 2 + 1];
+/// CSS px of slack around the hit region so grabbing right at the edge still works.
+export const HIT_PAD = 4;
+function clipBands(clip: Rect[], s: number, W: number, H: number): { x: number; y: number; w: number; h: number }[] {
+  const lo = new Float64Array(H).fill(Infinity);
+  const hi = new Float64Array(H).fill(-Infinity);
+  for (const f of clip) {
+    if (!f.rows) return [];
+    const ox = Math.round((W - f.w * s) / 2), oy = Math.round(H - f.h * s);
+    const n = f.rows.length / 2;
+    for (let ry = 0; ry < n; ry++) {
+      const a = f.rows[ry * 2], b = f.rows[ry * 2 + 1];
       if (a < 0) continue;
-      if (a < lo) lo = a;
-      if (b > hi) hi = b;
+      const y0 = Math.max(0, Math.floor(oy + ry * s));
+      const y1 = Math.min(H, Math.ceil(oy + (ry + 1) * s));
+      for (let y = y0; y < y1; y++) {
+        lo[y] = Math.min(lo[y], ox + a * s);
+        hi[y] = Math.max(hi[y], ox + (b + 1) * s);
+      }
     }
-    if (hi < 0) continue;
-    out.push({ x: dx + lo * s, y: dy + y0 * s, w: (hi - lo + 1) * s, h: (y1 - y0) * s });
+  }
+  const out: { x: number; y: number; w: number; h: number }[] = [];
+  for (let y0 = 0; y0 < H; y0 += BAND_PX) {
+    const y1 = Math.min(H, y0 + BAND_PX);
+    let l = Infinity, r = -Infinity;
+    for (let y = y0; y < y1; y++) { if (lo[y] < l) l = lo[y]; if (hi[y] > r) r = hi[y]; }
+    if (r > l) out.push({ x: l, y: y0, w: r - l, h: y1 - y0 });
   }
   return out;
 }
@@ -153,7 +166,6 @@ export class Pet {
   private clips: Rect[][] = [];
   private frame = 0;
   private row = 0;
-  private lastTick = 0;
   private fps = 3;
   /// Unused space above the sprite, as a fraction of canvas height. The bubble
   /// uses it to sit right above the pet's head instead of the canvas top.
@@ -164,8 +176,10 @@ export class Pet {
   /// CURRENT frame, each as wide as the visible pixels in it. Gaps inside a band (between the
   /// legs, between arm and body) count as hit, so the pet is still easy to grab.
   silhouette: { x: number; y: number; w: number; h: number }[] = [];
-  /// Called after every draw, so the hit region can follow the animation.
+  /// Called when the hit region changed (clip, state or size), not on every frame.
   onFrame: (() => void) | null = null;
+  private bandCache = new Map<string, { x: number; y: number; w: number; h: number }[]>();
+  private lastBandKey = "";
 
   /// True when a CSS-pixel point inside the canvas hits the SPRITE (alpha
   /// test), so clicks on the empty area around the pet don't drag the window.
@@ -176,6 +190,12 @@ export class Pet {
     const ky = this.canvas.height / (this.canvas.clientHeight || 1);
     const x = cssX * kx, y = cssY * ky;
     if (x < r.x || x > r.x + r.w || y < r.y || y > r.y + r.h) return false;
+    if (this.silhouette.length) {
+      // Same bands (and slack) the click-through region uses, so gaps inside the
+      // outline (between the legs, arm and body) still grab the pet.
+      const padX = HIT_PAD * kx, padY = HIT_PAD * ky;
+      return this.silhouette.some((b) => x >= b.x - padX && x <= b.x + b.w + padX && y >= b.y - padY && y <= b.y + b.h + padY);
+    }
     try {
       return this.ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data[3] > 16;
     } catch {
@@ -188,7 +208,7 @@ export class Pet {
     if (!c) throw new Error("no 2d context");
     this.ctx = c;
     this.ctx.imageSmoothingEnabled = false;
-    requestAnimationFrame((t) => this.loop(t));
+    this.loop();
   }
 
   /// Widest frame of each clip , scale is computed per CLIP (not per frame)
@@ -204,8 +224,11 @@ export class Pet {
       this.img = img;
       this.clips = slice(img);
       this.clipMaxW = this.clips.map((clip) => Math.max(...clip.map((r) => r.w)));
+      this.bandCache.clear();
+      this.lastBandKey = "";
       this.frame = 0;
       this.loaded = true;
+      this.draw();
     };
     // A pre-CORS cached copy makes the crossOrigin load fail , retry plain
     // (displayable, but slicing falls back to the fixed grid).
@@ -221,6 +244,7 @@ export class Pet {
         this.clips = [];
         this.frame = 0;
         this.loaded = true;
+        this.draw();
       };
       plain.src = spritesheetUrl;
     };
@@ -246,13 +270,14 @@ export class Pet {
     return this.clips[Math.min(this.row, this.clips.length - 1)];
   }
 
-  private loop(t: number) {
-    if (this.loaded && t - this.lastTick > 1000 / this.fps) {
-      this.lastTick = t;
+  // Paced by the clip's fps (3-8) instead of a 60Hz requestAnimationFrame that
+  // woke the renderer ~8-20x more often than it drew. Skips while hidden.
+  private loop() {
+    if (this.loaded && !document.hidden) {
       this.frame++;
       this.draw();
     }
-    requestAnimationFrame((n) => this.loop(n));
+    window.setTimeout(() => this.loop(), 1000 / this.fps);
   }
 
   /// Union of the frames' visible boxes in canvas pixels, at scale `s`.
@@ -307,7 +332,18 @@ export class Pet {
     const dx = Math.round((W - dw) / 2), dy = Math.round(H - dh);
     this.spriteRect = clip ? this.clipInkRect(clip, s, W, H) : { x: dx, y: dy, w: dw, h: dh };
     this.ctx.drawImage(this.img, r.x, r.y, r.w, r.h, dx, dy, dw, dh);
-    this.silhouette = r.rows ? bandsOf(r.rows, dx, dy, s) : [{ x: dx, y: dy, w: dw, h: dh }];
-    this.onFrame?.();
+    // Recomputed only when the clip, scale or canvas size changes.
+    const key = `${clip ? this.row : "grid"}|${s}|${W}|${H}`;
+    if (key !== this.lastBandKey) {
+      this.lastBandKey = key;
+      let bands = this.bandCache.get(key);
+      if (!bands) {
+        bands = clip ? clipBands(clip, s, W, H) : [];
+        if (!bands.length) bands = [{ x: this.spriteRect.x, y: this.spriteRect.y, w: this.spriteRect.w, h: this.spriteRect.h }];
+        this.bandCache.set(key, bands);
+      }
+      this.silhouette = bands;
+      this.onFrame?.();
+    }
   }
 }

@@ -79,6 +79,7 @@ pub fn catalog() -> Vec<AgentInfo> {
         ("droid", "Factory Droid", Some("Factory Droid CLI (~/.factory/hooks.json)")),
         ("pi", "Pi", Some("Pi extension (~/.pi/agent/extensions). No \"needs input\" alerts")),
         ("grok", "Grok Build", Some("xAI Grok Build CLI (~/.grok/hooks/agentpet.json)")),
+        ("jcode", "jcode", Some("jcode lifecycle hooks (~/.jcode/config.toml, in WSL when present)")),
     ];
     entries.iter().map(|(kind, name, note)| AgentInfo {
         kind: kind.to_string(),
@@ -154,6 +155,12 @@ fn make_entry(style: Style, event: &str, cmd: &str) -> Value {
 
 // ----- public API ----------------------------------------------------------
 pub fn is_installed(kind: &str) -> bool {
+    if kind == "jcode" {
+        return jcode_target()
+            // A read error here only means "not detected": nothing is written.
+            .map(|t| crate::jcode::is_installed(&std::fs::read_to_string(&t.config).unwrap_or_default(), crate::jcode::EVENTS))
+            .unwrap_or(false);
+    }
     let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else { return false };
     if s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
         return std::fs::read_to_string(&path).map(|c| is_ours(&c)).unwrap_or(false);
@@ -178,6 +185,7 @@ pub fn toggle(kind: &str) -> Result<bool, String> {
 }
 
 fn install(kind: &str) -> std::io::Result<()> {
+    if kind == "jcode" { return jcode_install(); }
     let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else {
         return Err(std::io::Error::new(std::io::ErrorKind::Other, "unknown agent"));
     };
@@ -219,6 +227,7 @@ fn install(kind: &str) -> std::io::Result<()> {
 }
 
 fn uninstall(kind: &str) -> std::io::Result<()> {
+    if kind == "jcode" { return jcode_uninstall(); }
     let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else { return Ok(()) };
     // Files we own outright: just delete.
     if kind == "copilot" || s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
@@ -312,4 +321,264 @@ fn enable_codex_hooks() {
     };
     if let Some(dir) = path.parent() { let _ = std::fs::create_dir_all(dir); }
     let _ = std::fs::write(&path, updated);
+}
+
+// ----- jcode (TOML [hooks], usually inside WSL) -----------------------------
+
+/// Where jcode's config lives and what hook command jcode should run.
+struct JcodeTarget {
+    config: PathBuf,
+    command: String,
+}
+
+/// Prefer the default WSL distro's `~/.jcode` (jcode is a Linux/macOS CLI and on
+/// Windows it typically runs under WSL), else a native `%USERPROFILE%\.jcode`.
+/// simplify: default distro only; a per-distro picker is the upgrade path.
+fn jcode_target() -> Option<JcodeTarget> {
+    let exe = std::env::current_exe().ok()?;
+    let (home, via_wsl) = jcode_home()?;
+    let config = home.join(".jcode").join("config.toml");
+    let command = if via_wsl {
+        crate::jcode::hook_command(&windows_to_wsl_path(&exe.to_string_lossy()), true)
+    } else {
+        crate::jcode::hook_command(&exe.to_string_lossy(), false)
+    };
+    Some(JcodeTarget { config, command })
+}
+
+/// `C:\Users\A\x.exe` -> `/mnt/c/Users/A/x.exe` (WSL's default automount root).
+/// simplify: assumes automount root /mnt; a custom root in /etc/wsl.conf would
+/// need `wslpath -u` instead.
+pub fn windows_to_wsl_path(p: &str) -> String {
+    let p = p.trim_start_matches(r"\\?\");
+    let mut chars = p.chars();
+    match (chars.next(), chars.next()) {
+        (Some(d), Some(':')) if d.is_ascii_alphabetic() => {
+            format!("/mnt/{}{}", d.to_ascii_lowercase(), p[2..].replace('\\', "/"))
+        }
+        _ => p.replace('\\', "/"),
+    }
+}
+
+fn jcode_write(path: &PathBuf, text: &str) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() { std::fs::create_dir_all(dir)?; }
+    // Write-then-rename: jcode re-reads config.toml on change, never a partial one.
+    let tmp = path.with_extension("toml.agentpet-tmp");
+    std::fs::write(&tmp, text)?;
+    std::fs::rename(&tmp, path)
+}
+
+/// Reads config.toml. A missing file is an empty config (first install); ANY
+/// other error (a `\\wsl.localhost` hiccup while the VM starts, a permission
+/// error, non-UTF-8 content) is returned so the caller aborts. Treating those as
+/// "empty" would make install rewrite the file with only the `[hooks]` block and
+/// wipe the user's jcode config.
+fn read_config(path: &PathBuf) -> std::io::Result<String> {
+    match std::fs::read_to_string(path) {
+        Ok(s) => Ok(s),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(e) => Err(e),
+    }
+}
+
+fn jcode_install() -> std::io::Result<()> {
+    // Enabling jcode is the one moment we look for it inside WSL (see the note on
+    // jcode_home): opt-in, with a timeout, and we are already off the UI thread.
+    probe_jcode_wsl();
+    let t = jcode_target().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "jcode config not found"))?;
+    let existing = read_config(&t.config)?;
+    let updated = crate::jcode::install(&existing, &t.command, crate::jcode::EVENTS)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    if updated != existing { jcode_write(&t.config, &updated)?; }
+    Ok(())
+}
+
+fn jcode_uninstall() -> std::io::Result<()> {
+    // No probe here: uninstall edits the config where install put it (the cached
+    // WSL home). If WSL is down the read fails and we abort instead of editing
+    // the native config and leaving the WSL hooks behind.
+    let Some(t) = jcode_target() else { return Ok(()) };
+    let existing = read_config(&t.config)?;
+    let updated = crate::jcode::uninstall(&existing, crate::jcode::EVENTS);
+    if updated != existing { jcode_write(&t.config, &updated)?; }
+    Ok(())
+}
+
+#[cfg(test)]
+mod jcode_path_tests {
+    use super::windows_to_wsl_path;
+
+    #[test]
+    fn converts_drive_paths() {
+        assert_eq!(windows_to_wsl_path(r"C:\Users\HocSys\AppData\Local\AgentPet\agentpet.exe"),
+                   "/mnt/c/Users/HocSys/AppData/Local/AgentPet/agentpet.exe");
+        assert_eq!(windows_to_wsl_path(r"\\?\D:\A B\x.exe"), "/mnt/d/A B/x.exe");
+    }
+}
+
+// ----- jcode home (shared by limits and the jcode hooks) --------------------
+//
+// jcode usually runs inside WSL, so its home is `\\wsl.localhost\<distro>\<home>`.
+// Finding it needs `wsl.exe`, which boots the WSL VM (vmmem) when it is off. So:
+//   * `jcode_home()` NEVER spawns anything: it answers from a cache (memory,
+//     seeded from a small marker file) and falls back to the native home.
+//   * `probe_jcode_wsl()` is the only place that spawns `wsl.exe`. It has a
+//     timeout and is meant to run only once jcode is known to be in use (the
+//     user enables jcode in Settings > Agents), always off the UI thread. A hung
+//     `wsl.exe` (broken distro, first-run prompt) can therefore never block a
+//     caller of `jcode_home()`.
+// Claude-only users, with or without WSL, never trigger a probe.
+
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+/// How long `wsl.exe` gets before it is killed. Booting a cold VM takes a few seconds.
+#[cfg_attr(not(windows), allow(dead_code))]
+const WSL_PROBE_TIMEOUT: Duration = Duration::from_secs(8);
+
+/// `%APPDATA%\AgentPet\jcode_wsl_home`: one line, the UNC home of the WSL distro
+/// where jcode lives. Written by a successful probe so later launches know
+/// without spawning `wsl.exe`. Delete the file to forget it.
+fn wsl_marker() -> Option<PathBuf> {
+    dirs::config_dir().map(|d| d.join("AgentPet").join("jcode_wsl_home"))
+}
+
+fn wsl_cache() -> &'static Mutex<Option<PathBuf>> {
+    static C: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
+    C.get_or_init(|| {
+        let saved = wsl_marker()
+            .and_then(|p| std::fs::read_to_string(p).ok())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .map(PathBuf::from);
+        Mutex::new(saved)
+    })
+}
+
+/// The home directory jcode uses, as a path this process can open, plus whether
+/// it is inside WSL. Cache lookup only (see the block comment above): the WSL
+/// home is known after `probe_jcode_wsl` found one, else the native home.
+pub fn jcode_home() -> Option<(PathBuf, bool)> {
+    if let Some(wsl) = wsl_cache().lock().unwrap_or_else(|e| e.into_inner()).clone() {
+        return Some((wsl, true));
+    }
+    dirs::home_dir().map(|h| (h, false))
+}
+
+/// Looks for jcode in the default WSL distro and remembers the answer (also
+/// forgets a stale one). BLOCKS up to `WSL_PROBE_TIMEOUT` plus a UNC lookup, so
+/// call it from a worker (`spawn_blocking` / a thread), never from the UI thread.
+pub fn probe_jcode_wsl() {
+    #[cfg(windows)]
+    {
+        let found = wsl_default_home().and_then(|(distro, home)| {
+            let unc = PathBuf::from(format!(r"\\wsl.localhost\{}{}", distro, home.replace('/', r"\")));
+            unc.join(".jcode").is_dir().then_some(unc)
+        });
+        *wsl_cache().lock().unwrap_or_else(|e| e.into_inner()) = found.clone();
+        if let Some(m) = wsl_marker() {
+            match found {
+                Some(unc) => {
+                    if let Some(dir) = m.parent() { let _ = std::fs::create_dir_all(dir); }
+                    let _ = std::fs::write(m, unc.to_string_lossy().as_bytes());
+                }
+                None => { let _ = std::fs::remove_file(m); }
+            }
+        }
+    }
+}
+
+/// Runs `cmd` with stdout captured and kills it after `timeout`. `None` on a
+/// spawn error, a timeout, or a non-zero exit. Std only, so it is unit-tested.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn run_with_timeout(mut cmd: std::process::Command, timeout: Duration) -> Option<Vec<u8>> {
+    use std::io::Read;
+    use std::process::Stdio;
+    let mut child = cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().ok()?;
+    let mut stdout = child.stdout.take()?;
+    // Read on a thread so a full pipe can't stall the child while we poll it.
+    let reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stdout.read_to_end(&mut buf);
+        buf
+    });
+    let deadline = Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(st)) => break st,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(40)),
+            // Timed out (or wait failed): kill it. The reader thread ends by
+            // itself once the pipe closes, so it is not joined here.
+            _ => { let _ = child.kill(); let _ = child.wait(); return None; }
+        }
+    };
+    if !status.success() { return None; }
+    reader.join().ok()
+}
+
+/// (distro, $HOME) of the default WSL distro, via `wsl.exe`. None without WSL
+/// or when it does not answer in time.
+#[cfg(windows)]
+fn wsl_default_home() -> Option<(String, String)> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let mut cmd = std::process::Command::new("wsl.exe");
+    cmd.args(["-e", "sh", "-c", "printf '%s\\n%s' \"$WSL_DISTRO_NAME\" \"$HOME\""])
+        .creation_flags(CREATE_NO_WINDOW);
+    let out = run_with_timeout(cmd, WSL_PROBE_TIMEOUT)?;
+    let text = String::from_utf8_lossy(&out).replace('\r', "");
+    let mut it = text.lines();
+    let distro = it.next()?.trim().to_string();
+    let home = it.next()?.trim().to_string();
+    (!distro.is_empty() && home.starts_with('/')).then_some((distro, home))
+}
+
+#[cfg(test)]
+mod read_config_tests {
+    use super::*;
+
+    #[test]
+    fn missing_file_is_empty_but_other_errors_abort() {
+        let dir = std::env::temp_dir().join(format!("ap-readcfg-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(read_config(&dir.join("nope.toml")).unwrap(), "");
+        // Non-UTF-8 content must be an error, never silently "empty".
+        let bad = dir.join("bad.toml");
+        std::fs::write(&bad, [0xff, 0xfe, 0x00]).unwrap();
+        assert!(read_config(&bad).is_err());
+        // A directory where a file is expected is not NotFound either.
+        assert!(read_config(&dir).is_err());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+}
+
+#[cfg(test)]
+mod timeout_tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn returns_output_of_a_quick_command() {
+        let mut c = std::process::Command::new("sh");
+        c.args(["-c", "printf hi"]);
+        assert_eq!(run_with_timeout(c, Duration::from_secs(5)).as_deref(), Some(&b"hi"[..]));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kills_a_hung_command() {
+        let mut c = std::process::Command::new("sh");
+        c.args(["-c", "sleep 30"]);
+        let t = Instant::now();
+        assert!(run_with_timeout(c, Duration::from_millis(300)).is_none());
+        assert!(t.elapsed() < Duration::from_secs(5), "must not wait for the child");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_zero_exit_is_none() {
+        let mut c = std::process::Command::new("sh");
+        c.args(["-c", "exit 3"]);
+        assert!(run_with_timeout(c, Duration::from_secs(5)).is_none());
+    }
 }
