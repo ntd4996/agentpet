@@ -521,3 +521,5 @@
 "Projects used in the last 7 days. Show a friendlier name instead of the folder name in the bubble and notifications. Leave empty to use the folder name." = "Projects used in the last 7 days. Show a friendlier name instead of the folder name in the bubble and notifications. Leave empty to use the folder name.";
 "By agent" = "By agent";
 "Today · Month" = "Today · Month";
+"1 session" = "1 session";
+"%d sessions" = "%d sessions";

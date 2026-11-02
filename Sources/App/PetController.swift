@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import AgentPetCore
 
 /// Resolves the aggregate session mood, plays a short `celebrate` burst when
@@ -97,7 +98,20 @@ final class PetController: ObservableObject {
             guard let self else { return }
             self.update(sessions: self.latestSessions)
         }
+        // A rename shows in the bubble rows by itself (they observe the store),
+        // but chatLine is a string built on the last agent event, so rebuild it
+        // here or the menu bar pill keeps the old name until the next event.
+        projectNamesObserver = ProjectNameStore.shared.$names
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self, self.mood == .working || self.mood == .waiting,
+                      BubbleSettings.shared.multiAgentBubbleEnabled else { return }
+                self.buildAgentChatLine(sessions: self.latestSessions)
+            }
     }
+
+    private var projectNamesObserver: AnyCancellable?
 
     /// Returns the effective sprite fps for a given mood, honouring the slider.
     /// Idle and sleepy are capped at 2 fps regardless of the slider value (calm CPU win).

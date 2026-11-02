@@ -522,3 +522,5 @@
 "Projects used in the last 7 days. Show a friendlier name instead of the folder name in the bubble and notifications. Leave empty to use the folder name." = "Các project dùng trong 7 ngày qua. Hiện tên dễ nhớ thay cho tên thư mục trong bubble và thông báo. Để trống để dùng tên thư mục.";
 "By agent" = "Theo agent";
 "Today · Month" = "Hôm nay · Tháng";
+"1 session" = "1 phiên";
+"%d sessions" = "%d phiên";

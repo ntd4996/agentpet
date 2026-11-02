@@ -9,9 +9,6 @@ struct AgentUsageRows: View {
     @ObservedObject private var store = ProjectUsageStore.shared
 
     var body: some View {
-        // todayCostUSD is @Published and changes on every write, so reading the
-        // totals here refreshes with the store.
-        let _ = store.todayCostUSD
         let rows = store.byAgent()
         let shown = limit.map { Array(rows.prefix($0)) } ?? rows
         if !shown.isEmpty {
@@ -29,7 +26,7 @@ struct AgentUsageRows: View {
                         Text(verbatim: AgentUsage.label(for: a.agent))
                             .font(.system(size: 10)).foregroundStyle(.white.opacity(0.7))
                         Spacer()
-                        Text(verbatim: "\(CareFormat.tokens(a.today)) · \(CareFormat.tokens(a.month))")
+                        Text(verbatim: CareFormat.agentUsage(a))
                             .font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.55))
                     }
                 }
@@ -43,13 +40,12 @@ struct AgentUsageSection: View {
     @ObservedObject private var store = ProjectUsageStore.shared
 
     var body: some View {
-        let _ = store.todayCostUSD
         let rows = store.byAgent()
         if !rows.isEmpty {
             Section {
                 ForEach(rows, id: \.agent) { a in
                     LabeledContent(AgentUsage.label(for: a.agent)) {
-                        Text(verbatim: "\(CareFormat.tokens(a.today)) · \(CareFormat.tokens(a.month))")
+                        Text(verbatim: CareFormat.agentUsage(a))
                     }
                 }
             } header: {

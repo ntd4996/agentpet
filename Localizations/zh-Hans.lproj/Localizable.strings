@@ -521,3 +521,5 @@
 "Projects used in the last 7 days. Show a friendlier name instead of the folder name in the bubble and notifications. Leave empty to use the folder name." = "最近 7 天使用过的项目。在气泡和通知中显示更易读的名称，代替文件夹名。留空则使用文件夹名。";
 "By agent" = "按 Agent";
 "Today · Month" = "今天 · 本月";
+"1 session" = "1 个会话";
+"%d sessions" = "%d 个会话";
