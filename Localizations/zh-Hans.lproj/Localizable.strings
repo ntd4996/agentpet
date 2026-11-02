@@ -523,3 +523,6 @@
 "Today · Month" = "今天 · 本月";
 "1 session" = "1 个会话";
 "%d sessions" = "%d 个会话";
+"Show less" = "收起";
+"Show %d more" = "再显示 %d 项";
+"Limit" = "额度";

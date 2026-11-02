@@ -7,10 +7,12 @@ struct AgentUsageRows: View {
     /// The stats card is tight, so it shows the top few; the Care tab shows all.
     var limit: Int? = nil
     @ObservedObject private var store = ProjectUsageStore.shared
+    @State private var expanded = false
 
     var body: some View {
         let rows = store.byAgent()
-        let shown = limit.map { Array(rows.prefix($0)) } ?? rows
+        let shown = (limit.map { expanded ? rows : Array(rows.prefix($0)) }) ?? rows
+        let hidden = rows.count - shown.count
         if !shown.isEmpty {
             VStack(alignment: .leading, spacing: 4) {
                 HStack {
@@ -30,8 +32,29 @@ struct AgentUsageRows: View {
                             .font(.system(size: 10, weight: .semibold)).foregroundStyle(.white.opacity(0.55))
                     }
                 }
+                if let limit, rows.count > limit {
+                    ShowMoreButton(expanded: $expanded, hidden: hidden)
+                }
             }
         }
+    }
+}
+
+/// "Show N more" / "Show less" for the tight stats card.
+struct ShowMoreButton: View {
+    @Binding var expanded: Bool
+    let hidden: Int
+
+    var body: some View {
+        Button {
+            expanded.toggle()
+        } label: {
+            Text(verbatim: expanded
+                 ? NSLocalizedString("Show less", comment: "collapse a list on the stats card")
+                 : String(format: NSLocalizedString("Show %d more", comment: "expand a list on the stats card"), hidden))
+                .font(.system(size: 9)).foregroundStyle(.white.opacity(0.5))
+        }
+        .buttonStyle(.plain)
     }
 }
 

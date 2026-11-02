@@ -523,3 +523,6 @@
 "Today · Month" = "今天 · 本月";
 "1 session" = "1 個工作階段";
 "%d sessions" = "%d 個工作階段";
+"Show less" = "收合";
+"Show %d more" = "再顯示 %d 項";
+"Limit" = "額度";

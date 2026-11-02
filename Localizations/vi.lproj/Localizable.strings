@@ -524,3 +524,6 @@
 "Today · Month" = "Hôm nay · Tháng";
 "1 session" = "1 phiên";
 "%d sessions" = "%d phiên";
+"Show less" = "Thu gọn";
+"Show %d more" = "Xem thêm %d";
+"Limit" = "Hạn mức";

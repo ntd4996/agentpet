@@ -5,6 +5,7 @@ enum LimitFormat {
     /// "5h" / "7d" / "30d" from the window length, else the provider's label.
     static func shortLabel(_ w: OpenUsageClient.Window) -> String {
         guard let p = w.period, p > 0 else { return w.label }
+        if p < 3600 { return "\(max(1, Int((p / 60).rounded())))m" }
         let hours = Int((p / 3600).rounded())
         if hours < 24 { return "\(hours)h" }
         return "\(Int((p / 86400).rounded()))d"
@@ -13,7 +14,9 @@ enum LimitFormat {
     /// "Session" + "5h" -> "Session · 5h"; drops the length when it adds nothing.
     static func title(_ w: OpenUsageClient.Window) -> String {
         let short = shortLabel(w)
-        if w.label.isEmpty { return short }
+        if w.label.isEmpty {
+            return short.isEmpty ? NSLocalizedString("Limit", comment: "limit window with no label and no length") : short
+        }
         if short == w.label { return w.label }
         return "\(w.label) · \(short)"
     }
@@ -32,19 +35,36 @@ enum LimitFormat {
     /// "Nov 1" further out.
     static func clock(_ date: Date, now: Date = Date(), calendar: Calendar = .current,
                       locale: Locale = .current) -> String {
+        let secs = date.timeIntervalSince(now)
+        let template: String
+        if calendar.isDate(date, inSameDayAs: now) {
+            template = "jmm"
+        } else if secs < 6 * 86400 {
+            template = "EEEjmm"
+        } else {
+            template = "MMMd"
+        }
+        return formatter(template: template, calendar: calendar, locale: locale).string(from: date)
+    }
+
+    /// One DateFormatter per template and locale/calendar/zone: building one is
+    /// slow and this runs for every limit row on every render.
+    // Guarded by formattersLock.
+    nonisolated(unsafe) private static var formatters: [String: DateFormatter] = [:]
+    private static let formattersLock = NSLock()
+
+    static func formatter(template: String, calendar: Calendar, locale: Locale) -> DateFormatter {
+        let key = [template, locale.identifier, "\(calendar.identifier)", calendar.timeZone.identifier].joined(separator: "|")
+        formattersLock.lock()
+        defer { formattersLock.unlock() }
+        if let cached = formatters[key] { return cached }
         let f = DateFormatter()
         f.locale = locale
         f.calendar = calendar
         f.timeZone = calendar.timeZone
-        let secs = date.timeIntervalSince(now)
-        if calendar.isDate(date, inSameDayAs: now) {
-            f.setLocalizedDateFormatFromTemplate("jmm")
-        } else if secs < 6 * 86400 {
-            f.setLocalizedDateFormatFromTemplate("EEEjmm")
-        } else {
-            f.setLocalizedDateFormatFromTemplate("MMMd")
-        }
-        return f.string(from: date)
+        f.setLocalizedDateFormatFromTemplate(template)
+        formatters[key] = f
+        return f
     }
 
     /// "resets in 3h · 14:30". Nil when the time is unknown or already past.
