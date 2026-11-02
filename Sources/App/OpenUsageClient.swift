@@ -45,8 +45,15 @@ final class OpenUsageClient: ObservableObject {
     /// purpose: someone who never installed (or removed) OpenUsage is not nagged.
     @Published private(set) var lost = false
     private var everReached = false
+    private var missedPolls = 0
 
-    nonisolated static func isLost(reached: Bool, everSeen: Bool) -> Bool { everSeen && !reached }
+    /// One slow answer (the request times out after 2s) must not raise the
+    /// warning for a whole poll interval, so it takes two misses in a row.
+    nonisolated static let missesBeforeLost = 2
+
+    nonisolated static func isLost(missedPolls: Int, everSeen: Bool) -> Bool {
+        everSeen && missedPolls >= missesBeforeLost
+    }
 
     private var timer: Timer?
     private static let endpoint = URL(string: "http://127.0.0.1:6736/v1/usage")!
@@ -87,11 +94,13 @@ final class OpenUsageClient: ObservableObject {
                     self.providers = parsed
                     self.available = true
                     self.everReached = true
+                    self.missedPolls = 0
                 } else {
                     self.providers = []
                     self.available = false
+                    self.missedPolls += 1
                 }
-                self.lost = Self.isLost(reached: parsed != nil, everSeen: self.everReached)
+                self.lost = Self.isLost(missedPolls: self.missedPolls, everSeen: self.everReached)
             }
         }
         task.resume()

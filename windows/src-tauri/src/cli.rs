@@ -16,6 +16,27 @@ pub fn run_hook(args: &[String]) {
     let agent = flag(args, "--agent").unwrap_or_else(|| "unknown".into());
     let (terminal_program, terminal_focus_url) = terminal_env();
 
+    // jcode describes the event in JCODE_HOOK_* env vars, not on stdin (stdin
+    // is /dev/null). From WSL these arrive through WSLENV (see jcode.rs).
+    if agent == "jcode" {
+        let Some((event, session, project, tool, message)) =
+            crate::jcode::event_from_env(|k| std::env::var(k).ok())
+        else {
+            std::process::exit(0);
+        };
+        post_and_exit(Payload {
+            agent,
+            event,
+            session,
+            project,
+            message,
+            tool,
+            terminal_program,
+            terminal_focus_url,
+            ..Payload::default()
+        });
+    }
+
     // Explicit flags win (opencode plugin + the run wrapper). `--event` carries a
     // normalised state directly there.
     if let Some(event) = flag(args, "--event") {

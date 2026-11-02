@@ -19,6 +19,8 @@ import { projectLabel } from "./projectnames";
 // default single pet). Split-pet spawns extra windows with `?project=<id>`.
 const MY_PROJECT = new URLSearchParams(location.search).get("project");
 const IS_MAIN = MY_PROJECT === null;
+// WebView2 (Windows) vs WebKitGTK (Linux): picks the native sound path below.
+const IS_WINDOWS = navigator.userAgent.includes("Windows");
 
 // A project window sets this the moment its project is un-split, so it stops
 // feeding during the brief async gap before Rust closes it (else the main window
@@ -105,8 +107,9 @@ function applyPet() {
 }
 applyPet();
 
-// Simple synthesized chimes (no audio assets needed). Per-event enable, like
-// the macOS SoundSettings (done = high glass-ish, waiting = lower submarine).
+// Per-event enable + custom file, like the macOS SoundSettings. The default
+// sound is a real system sound on Windows (Rust `play_sound`, the macOS
+// Glass/Submarine equivalent); the synthesized chime is only the Linux fallback.
 let audioCtx: AudioContext | null = null;
 function chime(event: "done" | "waiting") {
   const key = event === "done" ? "ap_sound_done" : "ap_sound_waiting";
@@ -118,6 +121,7 @@ function chime(event: "done" | "waiting") {
   if (data) {
     try { void new Audio(data).play(); return; } catch {}
   }
+  if (IS_WINDOWS) { invoke("play_sound", { event }).catch(() => {}); return; }
   try {
     audioCtx = audioCtx || new AudioContext();
     const o = audioCtx.createOscillator();
@@ -331,8 +335,14 @@ function maybeNotify(e: AgentEventPayload) {
   const proj = projectLabel(e.project || "") || e.agent;
   // Same copy as the macOS notifications.
   const title = e.state === "done" ? `${proj} ${t("finished")}` : `${proj} ${t("needs input")}`;
+  // jcode only: its hooks carry the agent's opening line (what this turn did),
+  // with the session title as a fallback (it goes stale, one per session). Other
+  // agents keep the generic text, like macOS.
+  const doneBody = e.agent === "jcode"
+    ? ((e.message ?? "").trim() || (store.snapshot().find((s) => s.agent === e.agent && s.session === e.session)?.title ?? "").trim()).slice(0, 200)
+    : "";
   const body = e.state === "done"
-    ? t("Agent completed its turn")
+    ? (doneBody || t("Agent completed its turn"))
     : (e.message || t("Waiting for you"));
   try { sendNotification({ title, body }); } catch {}
 }
@@ -353,6 +363,10 @@ listen<{ id: string; session: string; tool: string; summary: string }>("agent-ap
 });
 listen<{ id: string; session: string }>("agent-approval-resolved", (e) => {
   store.clearApproval(e.payload.session);
+  render();
+});
+listen<{ agent: string; session: string; title: string }>("agent-title", (e) => {
+  store.setTitle(e.payload.agent, e.payload.session, e.payload.title);
   render();
 });
 listen<string>("agent-end", (e) => {

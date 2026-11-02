@@ -79,6 +79,7 @@ pub fn catalog() -> Vec<AgentInfo> {
         ("droid", "Factory Droid", Some("Factory Droid CLI (~/.factory/hooks.json)")),
         ("pi", "Pi", Some("Pi extension (~/.pi/agent/extensions). No \"needs input\" alerts")),
         ("grok", "Grok Build", Some("xAI Grok Build CLI (~/.grok/hooks/agentpet.json)")),
+        ("jcode", "jcode", Some("jcode lifecycle hooks (~/.jcode/config.toml, in WSL when present)")),
     ];
     entries.iter().map(|(kind, name, note)| AgentInfo {
         kind: kind.to_string(),
@@ -154,6 +155,12 @@ fn make_entry(style: Style, event: &str, cmd: &str) -> Value {
 
 // ----- public API ----------------------------------------------------------
 pub fn is_installed(kind: &str) -> bool {
+    if kind == "jcode" {
+        return jcode_target()
+            // A read error here only means "not detected": nothing is written.
+            .map(|t| crate::jcode::is_installed(&std::fs::read_to_string(&t.config).unwrap_or_default(), crate::jcode::EVENTS))
+            .unwrap_or(false);
+    }
     let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else { return false };
     if s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
         return std::fs::read_to_string(&path).map(|c| is_ours(&c)).unwrap_or(false);
@@ -178,6 +185,7 @@ pub fn toggle(kind: &str) -> Result<bool, String> {
 }
 
 fn install(kind: &str) -> std::io::Result<()> {
+    if kind == "jcode" { return jcode_install(); }
     let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else {
         return Err(std::io::Error::new(std::io::ErrorKind::Other, "unknown agent"));
     };
@@ -219,6 +227,7 @@ fn install(kind: &str) -> std::io::Result<()> {
 }
 
 fn uninstall(kind: &str) -> std::io::Result<()> {
+    if kind == "jcode" { return jcode_uninstall(); }
     let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else { return Ok(()) };
     // Files we own outright: just delete.
     if kind == "copilot" || s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
@@ -312,6 +321,99 @@ fn enable_codex_hooks() {
     };
     if let Some(dir) = path.parent() { let _ = std::fs::create_dir_all(dir); }
     let _ = std::fs::write(&path, updated);
+}
+
+// ----- jcode (TOML [hooks], usually inside WSL) -----------------------------
+
+/// Where jcode's config lives and what hook command jcode should run.
+struct JcodeTarget {
+    config: PathBuf,
+    command: String,
+}
+
+/// Prefer the default WSL distro's `~/.jcode` (jcode is a Linux/macOS CLI and on
+/// Windows it typically runs under WSL), else a native `%USERPROFILE%\.jcode`.
+/// simplify: default distro only; a per-distro picker is the upgrade path.
+fn jcode_target() -> Option<JcodeTarget> {
+    let exe = std::env::current_exe().ok()?;
+    let (home, via_wsl) = jcode_home()?;
+    let config = home.join(".jcode").join("config.toml");
+    let command = if via_wsl {
+        crate::jcode::hook_command(&windows_to_wsl_path(&exe.to_string_lossy()), true)
+    } else {
+        crate::jcode::hook_command(&exe.to_string_lossy(), false)
+    };
+    Some(JcodeTarget { config, command })
+}
+
+/// `C:\Users\A\x.exe` -> `/mnt/c/Users/A/x.exe` (WSL's default automount root).
+/// simplify: assumes automount root /mnt; a custom root in /etc/wsl.conf would
+/// need `wslpath -u` instead.
+pub fn windows_to_wsl_path(p: &str) -> String {
+    let p = p.trim_start_matches(r"\\?\");
+    let mut chars = p.chars();
+    match (chars.next(), chars.next()) {
+        (Some(d), Some(':')) if d.is_ascii_alphabetic() => {
+            format!("/mnt/{}{}", d.to_ascii_lowercase(), p[2..].replace('\\', "/"))
+        }
+        _ => p.replace('\\', "/"),
+    }
+}
+
+fn jcode_write(path: &PathBuf, text: &str) -> std::io::Result<()> {
+    if let Some(dir) = path.parent() { std::fs::create_dir_all(dir)?; }
+    // Write-then-rename: jcode re-reads config.toml on change, never a partial one.
+    let tmp = path.with_extension("toml.agentpet-tmp");
+    std::fs::write(&tmp, text)?;
+    std::fs::rename(&tmp, path)
+}
+
+/// Reads config.toml. A missing file is an empty config (first install); ANY
+/// other error (a `\\wsl.localhost` hiccup while the VM starts, a permission
+/// error, non-UTF-8 content) is returned so the caller aborts. Treating those as
+/// "empty" would make install rewrite the file with only the `[hooks]` block and
+/// wipe the user's jcode config.
+fn read_config(path: &PathBuf) -> std::io::Result<String> {
+    match std::fs::read_to_string(path) {
+        Ok(s) => Ok(s),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(String::new()),
+        Err(e) => Err(e),
+    }
+}
+
+fn jcode_install() -> std::io::Result<()> {
+    // Enabling jcode is the one moment we look for it inside WSL (see the note on
+    // jcode_home): opt-in, with a timeout, and we are already off the UI thread.
+    probe_jcode_wsl();
+    let t = jcode_target().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "jcode config not found"))?;
+    let existing = read_config(&t.config)?;
+    let updated = crate::jcode::install(&existing, &t.command, crate::jcode::EVENTS)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+    if updated != existing { jcode_write(&t.config, &updated)?; }
+    Ok(())
+}
+
+fn jcode_uninstall() -> std::io::Result<()> {
+    // No probe here: uninstall edits the config where install put it (the cached
+    // WSL home). If WSL is down the read fails and we abort instead of editing
+    // the native config and leaving the WSL hooks behind.
+    let Some(t) = jcode_target() else { return Ok(()) };
+    let existing = read_config(&t.config)?;
+    let updated = crate::jcode::uninstall(&existing, crate::jcode::EVENTS);
+    if updated != existing { jcode_write(&t.config, &updated)?; }
+    Ok(())
+}
+
+#[cfg(test)]
+mod jcode_path_tests {
+    use super::windows_to_wsl_path;
+
+    #[test]
+    fn converts_drive_paths() {
+        assert_eq!(windows_to_wsl_path(r"C:\Users\HocSys\AppData\Local\AgentPet\agentpet.exe"),
+                   "/mnt/c/Users/HocSys/AppData/Local/AgentPet/agentpet.exe");
+        assert_eq!(windows_to_wsl_path(r"\\?\D:\A B\x.exe"), "/mnt/d/A B/x.exe");
+    }
 }
 
 // ----- jcode home (shared by limits and the jcode hooks) --------------------
@@ -429,6 +531,25 @@ fn wsl_default_home() -> Option<(String, String)> {
     let distro = it.next()?.trim().to_string();
     let home = it.next()?.trim().to_string();
     (!distro.is_empty() && home.starts_with('/')).then_some((distro, home))
+}
+
+#[cfg(test)]
+mod read_config_tests {
+    use super::*;
+
+    #[test]
+    fn missing_file_is_empty_but_other_errors_abort() {
+        let dir = std::env::temp_dir().join(format!("ap-readcfg-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        assert_eq!(read_config(&dir.join("nope.toml")).unwrap(), "");
+        // Non-UTF-8 content must be an error, never silently "empty".
+        let bad = dir.join("bad.toml");
+        std::fs::write(&bad, [0xff, 0xfe, 0x00]).unwrap();
+        assert!(read_config(&bad).is_err());
+        // A directory where a file is expected is not NotFound either.
+        assert!(read_config(&dir).is_err());
+        std::fs::remove_dir_all(&dir).ok();
+    }
 }
 
 #[cfg(test)]

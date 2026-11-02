@@ -44,6 +44,15 @@ public enum AgentUsage {
             .sorted { $0.month != $1.month ? $0.month > $1.month : $0.agent < $1.agent }
     }
 
+    /// The id a session's usage is stored under: the kind for a known agent, the
+    /// raw name for a custom (`.unknown`) one so two custom agents don't merge
+    /// into one "Unknown" row.
+    public static func key(kind: AgentKind, agentName: String?) -> String {
+        guard kind == .unknown else { return kind.rawValue }
+        let name = agentName?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? kind.rawValue : name
+    }
+
     /// Display name for a stored agent id: the catalog label for a known kind,
     /// else the id with its first letter capitalised (custom agents).
     public static func label(for agent: String) -> String {
@@ -51,6 +60,13 @@ public enum AgentUsage {
             return TickerFormatter.agentLabel(for: kind)
         }
         if agent == "cli" { return "Agent" }
+        if agent == AgentKind.unknown.rawValue { return "Other" }
         return agent.prefix(1).uppercased() + agent.dropFirst()
+    }
+
+    /// What to show next to an agent: tokens when it has any, else its finished
+    /// sessions, so an agent whose hook carries no token counts isn't "0 · 0".
+    public static func isSessionOnly(_ total: AgentUsageTotal) -> Bool {
+        total.month == 0 && total.sessions > 0
     }
 }

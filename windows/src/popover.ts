@@ -165,6 +165,10 @@ window.addEventListener("keydown", (e) => {
 
 listen<AgentEventPayload>("agent-event", (e) => { store.update(e.payload); paintAndFit(); });
 listen<string>("agent-end", (e) => { store.remove(e.payload); paintAndFit(); });
+listen<{ agent: string; session: string; title: string }>("agent-title", (e) => {
+  store.setTitle(e.payload.agent, e.payload.session, e.payload.title);
+  paintAndFit();
+});
 listen<Session>("session-snapshot", (e) => { store.seed(e.payload); paintAndFit(); });
 // Re-sync + refresh whenever the popover is shown again.
 listen("popover-shown", () => {

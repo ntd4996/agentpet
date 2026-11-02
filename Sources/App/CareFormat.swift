@@ -29,3 +29,16 @@ enum CareFormat {
         return f.string(from: NSNumber(value: n)) ?? "\(n)"
     }
 }
+
+extension CareFormat {
+    /// The value cell of a "By agent" row: `today · month` tokens, or the number
+    /// of finished sessions for an agent whose hook carries no token counts.
+    static func agentUsage(_ total: AgentUsageTotal) -> String {
+        guard AgentUsage.isSessionOnly(total) else {
+            return "\(tokens(total.today)) · \(tokens(total.month))"
+        }
+        return total.sessions == 1
+            ? NSLocalizedString("1 session", comment: "By agent row, no token counts")
+            : String(format: NSLocalizedString("%d sessions", comment: "By agent row, no token counts"), total.sessions)
+    }
+}

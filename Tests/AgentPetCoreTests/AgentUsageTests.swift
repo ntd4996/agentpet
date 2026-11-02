@@ -52,4 +52,36 @@ final class AgentUsageTests: XCTestCase {
         XCTAssertEqual(AgentUsage.label(for: "cli"), "Agent")
         XCTAssertEqual(AgentUsage.label(for: "mybot"), "Mybot")
     }
+
+    // MARK: - Storage key (custom agents must not merge into one row)
+
+    func testKeyIsTheKindForKnownAgents() {
+        XCTAssertEqual(AgentUsage.key(kind: .claude, agentName: nil), "claude")
+        XCTAssertEqual(AgentUsage.key(kind: .jcode, agentName: "ignored"), "jcode")
+    }
+
+    func testKeyIsTheRawNameForCustomAgents() {
+        XCTAssertEqual(AgentUsage.key(kind: .unknown, agentName: "mybot"), "mybot")
+        XCTAssertEqual(AgentUsage.key(kind: .unknown, agentName: "  mybot \n"), "mybot")
+        XCTAssertNotEqual(AgentUsage.key(kind: .unknown, agentName: "a"),
+                          AgentUsage.key(kind: .unknown, agentName: "b"))
+    }
+
+    func testKeyFallsBackToUnknownWithoutAName() {
+        XCTAssertEqual(AgentUsage.key(kind: .unknown, agentName: nil), "unknown")
+        XCTAssertEqual(AgentUsage.key(kind: .unknown, agentName: "   "), "unknown")
+    }
+
+    func testUnnamedCustomAgentIsLabelledOther() {
+        XCTAssertEqual(AgentUsage.label(for: "unknown"), "Other")
+        XCTAssertEqual(AgentUsage.label(for: AgentUsage.key(kind: .unknown, agentName: "mybot")), "Mybot")
+    }
+
+    // MARK: - Session-only rows
+
+    func testSessionOnlyMeansNoTokensButSessions() {
+        XCTAssertTrue(AgentUsage.isSessionOnly(AgentUsageTotal(agent: "grok", today: 0, month: 0, sessions: 3)))
+        XCTAssertFalse(AgentUsage.isSessionOnly(AgentUsageTotal(agent: "grok", today: 0, month: 5, sessions: 3)))
+        XCTAssertFalse(AgentUsage.isSessionOnly(AgentUsageTotal(agent: "grok", today: 0, month: 0, sessions: 0)))
+    }
 }

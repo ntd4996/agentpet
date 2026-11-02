@@ -87,20 +87,38 @@ public enum JcodeUsage {
 /// fed in one go. A total that shrinks (jcode compacting history) also just
 /// moves the baseline.
 public struct JcodeUsageTracker {
-    private var seen: [String: Int] = [:]
+    private struct Entry { var total: Int; var touched: Int }
+    private var seen: [String: Entry] = [:]
+    private var tick = 0
+
+    /// A session that never sends session_end (jcode killed, machine slept)
+    /// would stay here forever, so the least recently touched go once there are
+    /// more than this. A dropped session only loses its baseline: the next turn
+    /// re-baselines instead of feeding anything.
+    public static let maxSessions = 200
 
     public init() {}
+
+    private mutating func touch(_ total: Int, for sessionId: String) {
+        tick += 1
+        seen[sessionId] = Entry(total: total, touched: tick)
+        guard seen.count > Self.maxSessions else { return }
+        let drop = seen.sorted { $0.value.touched < $1.value.touched }
+            .prefix(seen.count - Self.maxSessions)
+        for (key, _) in drop { seen.removeValue(forKey: key) }
+    }
 
     /// Records `total` as the baseline if the session is new. Returns nothing:
     /// called at the start of a turn, before the turn's tokens exist.
     public mutating func baseline(sessionId: String, total: Int) {
-        if seen[sessionId] == nil { seen[sessionId] = total }
+        if seen[sessionId] == nil { touch(total, for: sessionId) }
     }
 
     /// Tokens added since the last call for this session (0 the first time).
     public mutating func delta(sessionId: String, total: Int) -> Int {
-        defer { seen[sessionId] = total }
-        guard let last = seen[sessionId], total > last else { return 0 }
+        let last = seen[sessionId]?.total
+        touch(total, for: sessionId)
+        guard let last, total > last else { return 0 }
         return total - last
     }
 
@@ -109,4 +127,6 @@ public struct JcodeUsageTracker {
     }
 
     public func isTracking(_ sessionId: String) -> Bool { seen[sessionId] != nil }
+
+    public var count: Int { seen.count }
 }
