@@ -106,6 +106,23 @@ fn handle_approval(app: AppHandle, body: String, req: tiny_http::Request) {
 }
 
 pub fn start(app: AppHandle) {
+    // jcode token usage worker: must exist before the queue replay below so
+    // replayed jcode turns are measured too.
+    {
+        let app = app.clone();
+        let tx = crate::jcode_usage::spawn_worker(
+            |session| {
+                let (home, _) = crate::hooks::jcode_home()?;
+                crate::jcode_usage::session_path(session, &home)
+            },
+            move |session, project, tokens| {
+                let _ = app.emit("agent-tokens", serde_json::json!({
+                    "agent": "jcode", "session": session, "project": project, "tokens": tokens,
+                }));
+            },
+        );
+        let _ = jcode_jobs().set(Mutex::new(tx));
+    }
     // Replay events queued while the app was closed (name order = time order).
     if let Some(dir) = crate::cli::queue_dir() {
         if let Ok(entries) = std::fs::read_dir(&dir) {
@@ -148,6 +165,29 @@ fn str_of<'a>(v: &'a Value, key: &str) -> &'a str {
     v.get(key).and_then(|x| x.as_str()).unwrap_or("")
 }
 
+/// The jcode usage worker (see jcode_usage.rs), started with the listener.
+fn jcode_jobs() -> &'static OnceLock<Mutex<Sender<crate::jcode_usage::Job>>> {
+    static J: OnceLock<Mutex<Sender<crate::jcode_usage::Job>>> = OnceLock::new();
+    &J
+}
+
+/// jcode's hooks carry no token counts: measure the session files at turn
+/// start (baseline) and turn end (delta) and feed the pet like Claude/Codex.
+fn track_jcode_usage(event: &str, session: &str, project: &str) {
+    if event == "session_end" {
+        crate::jcode_usage::forget(session);
+        return;
+    }
+    let Some(is_end) = crate::jcode_usage::usage_action(event) else { return };
+    if let Some(tx) = jcode_jobs().get() {
+        let _ = tx.lock().unwrap_or_else(|e| e.into_inner()).send(crate::jcode_usage::Job {
+            session: session.to_string(),
+            project: project.to_string(),
+            is_end,
+        });
+    }
+}
+
 fn handle_event(app: &AppHandle, body: &str) {
     let Ok(v) = serde_json::from_str::<Value>(body) else { return };
     let agent = str_of(&v, "agent").to_string();
@@ -162,6 +202,10 @@ fn handle_event(app: &AppHandle, body: &str) {
     let terminal_program = str_of(&v, "terminalProgram").to_string();
     let terminal_focus_url = str_of(&v, "terminalFocusUrl").to_string();
     let ts = v.get("ts").and_then(|x| x.as_u64()).unwrap_or(0);
+
+    if agent == "jcode" {
+        track_jcode_usage(&event, &session, &project);
+    }
 
     if crate::statemap::is_session_end(&agent, &event) {
         let _ = app.emit("agent-end", session);
@@ -215,6 +259,11 @@ fn handle_event(app: &AppHandle, body: &str) {
         None
     };
     let is_stop_done = event == "Stop" && state == "done";
+    // jcode title lookup only on sparse lifecycle events (post_tool fires per tool
+    // call). The state event itself is always emitted inline, in order; only the
+    // title arrives later, as its own `agent-title` event (see below).
+    let jcode_title_lookup = agent == "jcode"
+        && matches!(event.as_str(), "session_start" | "turn_start" | "turn_end" | "waiting");
     // Kept for the token events, since `emit_payload` moves session/project/agent.
     let agent_kind = agent.clone();
     let tok_session = session.clone();
@@ -304,5 +353,27 @@ fn handle_event(app: &AppHandle, body: &str) {
         });
     }
 
+    // The state event goes out inline for every agent, so lifecycle events keep
+    // their order (a late `turn_end` can no longer overtake `agent-end` and bring
+    // a finished session back as a ghost).
     emit_payload(app, state, None);
+
+    // jcode's hooks carry no title: read it from the session snapshot's head so
+    // the bubble and the "finished" notification can name the job. The snapshot
+    // lives on the WSL UNC share, so this runs off the listener thread and is
+    // sent as a separate `agent-title` event. That event only updates a session
+    // that still exists (SessionStore.setTitle), so it can never resurrect one.
+    if jcode_title_lookup {
+        let app2 = app.clone();
+        std::thread::spawn(move || {
+            let title = crate::hooks::jcode_home()
+                .and_then(|(home, _)| crate::jcode_usage::session_path(&tok_session, &home))
+                .and_then(|p| crate::jcode_usage::title_at(&p));
+            if let Some(title) = title {
+                let _ = app2.emit("agent-title", serde_json::json!({
+                    "agent": "jcode", "session": tok_session, "title": title,
+                }));
+            }
+        });
+    }
 }

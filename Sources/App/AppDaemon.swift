@@ -21,6 +21,10 @@ final class AppDaemon: ObservableObject {
     private var pruneTimer: Timer?
 
     func start() {
+        // Feed the pet only what is spent from now on: transcripts are read from
+        // the start again on every launch, and a resumed session copies earlier
+        // replies into its new file.
+        TranscriptReader.countUsageSince = Date()
         // The approval reply can race the CLI closing its socket — a stray
         // write must return EPIPE, not SIGPIPE-kill the whole app.
         signal(SIGPIPE, SIG_IGN)
@@ -80,7 +84,10 @@ final class AppDaemon: ObservableObject {
         guard let updated = store.apply(event, now: Date()) else {
             feedSubagentTokens(for: event)
             if event.agentKind == .jcode, event.eventName == "session_end" {
-                jcodeUsage.forget(sessionId: event.sessionId)
+                // Behind this session's pending reads: forgetting first would let
+                // a read still in flight put the entry back.
+                let sid = event.sessionId
+                jcodeQueue.enqueue(sid) { AppDaemon.shared.jcodeUsage.forget(sessionId: sid) }
             }
             refresh()
             return
@@ -151,6 +158,13 @@ final class AppDaemon: ObservableObject {
     /// jcode keeps token usage only in its session files. Read the total at the
     /// start of a turn (baseline) and at its end, and feed the difference.
     private var jcodeUsage = JcodeUsageTracker()
+    /// Reads run off the main actor (the files can be tens of MB), but within one
+    /// session they must finish in event order: a smaller, older total landing
+    /// after a newer one would lower the baseline (it looks like compaction) and
+    /// the next turn would feed the same tokens again. Per session, not global:
+    /// a slow scan of one session must not delay another session's baseline, or
+    /// that session's first turn would be read as already part of the baseline.
+    private let jcodeQueue = KeyedSerialQueue()
 
     private func feedJcodeTokens(for event: AgentEvent) {
         let sid = event.sessionId
@@ -162,17 +176,20 @@ final class AppDaemon: ObservableObject {
         }
         guard let path = JcodeUsage.sessionPath(sessionId: sid, home: NSHomeDirectory()) else { return }
         let isEnd = event.eventName == "turn_end" || event.eventName == AgentState.waiting.rawValue
+        // A start event only sets the baseline, which is already set for a tracked
+        // session, so skip scanning the whole snapshot and journal again.
+        if !isEnd, jcodeUsage.isTracking(sid) { return }
         let project = event.project
-        Task.detached(priority: .utility) {
-            let total = JcodeUsage.totalTokens(snapshotPath: path)
-            await MainActor.run {
-                let daemon = AppDaemon.shared
-                guard isEnd else { return daemon.jcodeUsage.baseline(sessionId: sid, total: total) }
-                let tokens = daemon.jcodeUsage.delta(sessionId: sid, total: total)
-                guard tokens > 0 else { return }
-                PetCareController.shared.feedTokens(tokens, petID: daemon.careTarget(forProject: project))
-                ProjectUsageStore.shared.recordTokens(tokens, project: project, agent: "jcode")
-            }
+        jcodeQueue.enqueue(sid) {
+            let total = await Task.detached(priority: .utility) {
+                JcodeUsage.totalTokens(snapshotPath: path)
+            }.value
+            let daemon = AppDaemon.shared
+            guard isEnd else { return daemon.jcodeUsage.baseline(sessionId: sid, total: total) }
+            let tokens = daemon.jcodeUsage.delta(sessionId: sid, total: total)
+            guard tokens > 0 else { return }
+            PetCareController.shared.feedTokens(tokens, petID: daemon.careTarget(forProject: project))
+            ProjectUsageStore.shared.recordTokens(tokens, project: project, agent: "jcode")
         }
     }
 
@@ -313,7 +330,9 @@ final class AppDaemon: ObservableObject {
                 title: "\(project) finished", body: "Agent completed its turn")
             SoundSettings.shared.play(.done)
             PetCareController.shared.recordMeal(petID: careTarget(forProject: session.project))
-            ProjectUsageStore.shared.recordSession(project: session.project, agent: session.agentKind.rawValue)
+            ProjectUsageStore.shared.recordSession(
+                project: session.project,
+                agent: AgentUsage.key(kind: session.agentKind, agentName: session.agentName))
         default:
             break
         }

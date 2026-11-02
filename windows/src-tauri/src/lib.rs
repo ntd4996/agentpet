@@ -2,6 +2,8 @@ pub mod antigravity_usage;
 pub mod cli;
 pub mod geometry;
 pub mod hooks;
+pub mod jcode;
+pub mod jcode_usage;
 pub mod limits;
 pub mod server;
 pub mod statemap;
@@ -16,6 +18,7 @@ use tauri::{Emitter, Manager, PhysicalPosition, WebviewUrl, WebviewWindowBuilder
 /// Tray menu items kept around so the language switcher can re-label them live.
 struct TrayItems {
     show_pet: tauri::menu::CheckMenuItem<tauri::Wry>,
+    sessions: MenuItem<tauri::Wry>,
     settings: MenuItem<tauri::Wry>,
     updates: MenuItem<tauri::Wry>,
     quit: MenuItem<tauri::Wry>,
@@ -85,6 +88,11 @@ fn set_hit_rect(app: tauri::AppHandle, window: tauri::WebviewWindow, x: f64, y: 
     if let Ok(mut m) = hit_rects().lock() {
         m.insert(window.label().to_string(), (x, y, w, h));
     }
+    // The global rect drives the MAIN pet's click-through loop and off-screen
+    // clamp, so split `pet-<projectId>` windows must not overwrite it.
+    if window.label() != "pet" {
+        return;
+    }
     if let Some(state) = app.try_state::<Mutex<HitRect>>() {
         if let Ok(mut r) = state.lock() {
             *r = HitRect { x, y, w, h };
@@ -121,28 +129,33 @@ fn write_lang(code: &str) {
 }
 
 /// Localised tray labels (the only app text on the Rust side).
-fn tray_labels(code: &str) -> (&'static str, &'static str, &'static str, &'static str) {
+fn tray_labels(code: &str) -> (&'static str, &'static str, &'static str, &'static str, &'static str) {
     match code {
-        "vi" => ("Hiện pet", "Cài đặt", "Kiểm tra cập nhật", "Thoát AgentPet"),
-        "zh" => ("显示宠物", "设置", "检查更新", "退出 AgentPet"),
-        "zh-TW" => ("顯示寵物", "設定", "檢查更新", "結束 AgentPet"),
-        _ => ("Show pet", "Settings", "Check for updates", "Quit AgentPet"),
+        "vi" => ("Hiện pet", "Phiên làm việc", "Cài đặt", "Kiểm tra cập nhật", "Thoát AgentPet"),
+        "zh" => ("显示宠物", "会话", "设置", "检查更新", "退出 AgentPet"),
+        "zh-TW" => ("顯示寵物", "工作階段", "設定", "檢查更新", "結束 AgentPet"),
+        _ => ("Show pet", "Sessions", "Settings", "Check for updates", "Quit AgentPet"),
     }
 }
 
+// These touch config files, jcode's on a `\\wsl.localhost` share, and enabling
+// jcode may run `wsl.exe`. Sync commands run on the main thread and would freeze
+// the UI while WSL boots, so they go to the blocking pool.
 #[tauri::command]
-fn list_agents() -> Vec<hooks::AgentInfo> {
-    hooks::catalog()
+async fn list_agents() -> Vec<hooks::AgentInfo> {
+    tauri::async_runtime::spawn_blocking(hooks::catalog).await.unwrap_or_default()
 }
 
 #[tauri::command]
-fn is_installed(kind: String) -> bool {
-    hooks::is_installed(&kind)
+async fn is_installed(kind: String) -> bool {
+    tauri::async_runtime::spawn_blocking(move || hooks::is_installed(&kind)).await.unwrap_or(false)
 }
 
 #[tauri::command]
-fn toggle_install(kind: String) -> Result<bool, String> {
-    hooks::toggle(&kind)
+async fn toggle_install(kind: String) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || hooks::toggle(&kind))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// True while the left mouse button is held (a drag in progress), so the
@@ -223,6 +236,35 @@ fn open_settings_impl(app: tauri::AppHandle) {
             Err(e) => dlog(&format!("open_settings: BUILD FAILED: {e}")),
         }
     });
+}
+
+/// Plays the default done/waiting sound natively (port of the macOS
+/// SoundSettings, which plays the system sounds Glass/Submarine via NSSound).
+/// The toast itself is sent with `<audio silent="true"/>` (winrt-notification's
+/// default when no sound is set), and the old WebAudio fallback was a 0.13 s
+/// beep at gain 0.05, so on Windows "done" was effectively silent. Playing the
+/// .wav by file name also works when the Windows sound scheme is "No Sounds".
+#[tauri::command]
+fn play_sound(event: String) {
+    #[cfg(windows)]
+    {
+        #[link(name = "winmm")]
+        extern "system" {
+            fn PlaySoundW(psz: *const u16, hmod: *mut std::ffi::c_void, flags: u32) -> i32;
+        }
+        const SND_ASYNC: u32 = 0x0001;
+        const SND_NODEFAULT: u32 = 0x0002;
+        const SND_FILENAME: u32 = 0x0002_0000;
+        let file = if event == "waiting" { "Windows Notify Messaging.wav" } else { "Windows Notify System Generic.wav" };
+        let windir = std::env::var("WINDIR").unwrap_or_else(|_| r"C:\Windows".into());
+        let path = format!(r"{}\Media\{}", windir, file);
+        let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+        // SAFETY: `wide` is a NUL-terminated UTF-16 path that outlives the call;
+        // SND_ASYNC makes winmm copy what it needs before returning.
+        unsafe { PlaySoundW(wide.as_ptr(), std::ptr::null_mut(), SND_ASYNC | SND_NODEFAULT | SND_FILENAME); }
+    }
+    #[cfg(not(windows))]
+    let _ = event; // Linux build keeps the WebAudio chime (see main.ts)
 }
 
 /// Subscription limits for the Care tab and the pet's "limit low" mood. Only
@@ -347,10 +389,11 @@ fn sync_project_windows(app: tauri::AppHandle, projects: Vec<String>) {
 #[tauri::command]
 fn set_lang(app: tauri::AppHandle, code: String) {
     write_lang(&code);
-    let (p, s, u, q) = tray_labels(&code);
+    let (p, ss, s, u, q) = tray_labels(&code);
     if let Some(items) = app.try_state::<Mutex<TrayItems>>() {
         if let Ok(it) = items.lock() {
             let _ = it.show_pet.set_text(p);
+            let _ = it.sessions.set_text(ss);
             let _ = it.settings.set_text(s);
             let _ = it.updates.set_text(u);
             let _ = it.quit.set_text(q);
@@ -624,6 +667,7 @@ pub fn run() {
             drag_pet,
             log_debug,
             set_hit_rect,
+            play_sound,
             get_limits
         ])
         .setup(|app| {
@@ -755,7 +799,7 @@ pub fn run() {
             // Tray menu , the pet window is frameless, so this is how you reach
             // Settings or quit the app. Labels start in the saved language; the
             // Settings switcher re-labels them live via the `set_lang` command.
-            let (p_lbl, s_lbl, u_lbl, q_lbl) = tray_labels(&read_lang());
+            let (p_lbl, ss_lbl, s_lbl, u_lbl, q_lbl) = tray_labels(&read_lang());
             let pet_visible = dirs::config_dir()
                 .map(|d| d.join("AgentPet").join("petvisible"))
                 .and_then(|p| std::fs::read_to_string(p).ok())
@@ -763,10 +807,13 @@ pub fn run() {
                 .unwrap_or(true);
             let show_pet_i = tauri::menu::CheckMenuItem::with_id(
                 app, "show_pet", p_lbl, true, pet_visible, None::<&str>)?;
+            // Linux appindicator never fires tray left-click, so the popover
+            // (agents list, Clear all, size) needs a menu entry to be reachable.
+            let sessions_i = MenuItem::with_id(app, "sessions", ss_lbl, true, None::<&str>)?;
             let settings_i = MenuItem::with_id(app, "settings", s_lbl, true, None::<&str>)?;
             let updates_i = MenuItem::with_id(app, "check_updates", u_lbl, true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", q_lbl, true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&show_pet_i, &settings_i, &updates_i, &quit_i])?;
+            let menu = Menu::with_items(app, &[&show_pet_i, &sessions_i, &settings_i, &updates_i, &quit_i])?;
             let mut tray = TrayIconBuilder::new()
                 .tooltip("AgentPet")
                 .menu(&menu)
@@ -793,6 +840,11 @@ pub fn run() {
                             .unwrap_or(true);
                         set_pet_visible(app.clone(), !now_visible);
                     }
+                    "sessions" => {
+                        // Window creation must not run on the menu callback.
+                        let app = app.clone();
+                        std::thread::spawn(move || show_popover(&app));
+                    }
                     "settings" => open_settings_impl(app.clone()),
                     "check_updates" => {
                         // The updater plugin is driven from JS; the pet window is
@@ -813,6 +865,7 @@ pub fn run() {
             let tray = tray.build(app)?;
             app.manage(Mutex::new(TrayItems {
                 show_pet: show_pet_i.clone(),
+                sessions: sessions_i.clone(),
                 settings: settings_i.clone(),
                 updates: updates_i.clone(),
                 quit: quit_i.clone(),

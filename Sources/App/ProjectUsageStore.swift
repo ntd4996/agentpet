@@ -128,14 +128,9 @@ final class ProjectUsageStore: ObservableObject {
     // MARK: - Helpers
 
     static func projectIdentity(_ path: String) -> (id: String, name: String) {
-        let last = (path as NSString).lastPathComponent
-        let name = last.isEmpty ? path : last
-        return ("p" + String(format: "%08x", fnv1a(path)), String(name.prefix(60)))
-    }
-    private static func fnv1a(_ s: String) -> UInt32 {
-        var h: UInt32 = 2166136261
-        for b in s.utf8 { h ^= UInt32(b); h = h &* 16777619 }
-        return h
+        // One hash for the usage rows and the custom names (ProjectNames), so a
+        // name can never stop matching its project.
+        (ProjectNames.id(for: path), String(ProjectNames.folderName(path).prefix(60)))
     }
     private static func today() -> String {
         let f = DateFormatter()
