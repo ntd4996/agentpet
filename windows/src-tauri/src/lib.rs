@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod geometry;
 pub mod hooks;
+pub mod limits;
 pub mod server;
 pub mod statemap;
 pub mod transcript;
@@ -175,6 +176,15 @@ fn open_settings_impl(app: tauri::AppHandle) {
             Err(e) => dlog(&format!("open_settings: BUILD FAILED: {e}")),
         }
     });
+}
+
+/// Subscription limits for the Care tab and the pet's "limit low" mood. Only
+/// percentages and reset times cross into the webview, never the token.
+#[tauri::command]
+async fn get_limits() -> Vec<limits::LimitProvider> {
+    // default_paths() only reads a cache (no wsl.exe), so it is cheap; the file
+    // reads themselves run on the blocking pool inside probe_claude.
+    limits::probe_claude(limits::default_paths()).await.into_iter().collect()
 }
 
 #[tauri::command]
@@ -441,7 +451,8 @@ pub fn run() {
             get_pet_visible,
             open_popover,
             log_debug,
-            set_hit_rect
+            set_hit_rect,
+            get_limits
         ])
         .setup(|app| {
             server::start(app.handle().clone());

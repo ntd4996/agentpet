@@ -313,3 +313,151 @@ fn enable_codex_hooks() {
     if let Some(dir) = path.parent() { let _ = std::fs::create_dir_all(dir); }
     let _ = std::fs::write(&path, updated);
 }
+
+// ----- jcode home (shared by limits and the jcode hooks) --------------------
+//
+// jcode usually runs inside WSL, so its home is `\\wsl.localhost\<distro>\<home>`.
+// Finding it needs `wsl.exe`, which boots the WSL VM (vmmem) when it is off. So:
+//   * `jcode_home()` NEVER spawns anything: it answers from a cache (memory,
+//     seeded from a small marker file) and falls back to the native home.
+//   * `probe_jcode_wsl()` is the only place that spawns `wsl.exe`. It has a
+//     timeout and is meant to run only once jcode is known to be in use (the
+//     user enables jcode in Settings > Agents), always off the UI thread. A hung
+//     `wsl.exe` (broken distro, first-run prompt) can therefore never block a
+//     caller of `jcode_home()`.
+// Claude-only users, with or without WSL, never trigger a probe.
+
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+/// How long `wsl.exe` gets before it is killed. Booting a cold VM takes a few seconds.
+#[cfg_attr(not(windows), allow(dead_code))]
+const WSL_PROBE_TIMEOUT: Duration = Duration::from_secs(8);
+
+/// `%APPDATA%\AgentPet\jcode_wsl_home`: one line, the UNC home of the WSL distro
+/// where jcode lives. Written by a successful probe so later launches know
+/// without spawning `wsl.exe`. Delete the file to forget it.
+fn wsl_marker() -> Option<PathBuf> {
+    dirs::config_dir().map(|d| d.join("AgentPet").join("jcode_wsl_home"))
+}
+
+fn wsl_cache() -> &'static Mutex<Option<PathBuf>> {
+    static C: OnceLock<Mutex<Option<PathBuf>>> = OnceLock::new();
+    C.get_or_init(|| {
+        let saved = wsl_marker()
+            .and_then(|p| std::fs::read_to_string(p).ok())
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .map(PathBuf::from);
+        Mutex::new(saved)
+    })
+}
+
+/// The home directory jcode uses, as a path this process can open, plus whether
+/// it is inside WSL. Cache lookup only (see the block comment above): the WSL
+/// home is known after `probe_jcode_wsl` found one, else the native home.
+pub fn jcode_home() -> Option<(PathBuf, bool)> {
+    if let Some(wsl) = wsl_cache().lock().unwrap_or_else(|e| e.into_inner()).clone() {
+        return Some((wsl, true));
+    }
+    dirs::home_dir().map(|h| (h, false))
+}
+
+/// Looks for jcode in the default WSL distro and remembers the answer (also
+/// forgets a stale one). BLOCKS up to `WSL_PROBE_TIMEOUT` plus a UNC lookup, so
+/// call it from a worker (`spawn_blocking` / a thread), never from the UI thread.
+pub fn probe_jcode_wsl() {
+    #[cfg(windows)]
+    {
+        let found = wsl_default_home().and_then(|(distro, home)| {
+            let unc = PathBuf::from(format!(r"\\wsl.localhost\{}{}", distro, home.replace('/', r"\")));
+            unc.join(".jcode").is_dir().then_some(unc)
+        });
+        *wsl_cache().lock().unwrap_or_else(|e| e.into_inner()) = found.clone();
+        if let Some(m) = wsl_marker() {
+            match found {
+                Some(unc) => {
+                    if let Some(dir) = m.parent() { let _ = std::fs::create_dir_all(dir); }
+                    let _ = std::fs::write(m, unc.to_string_lossy().as_bytes());
+                }
+                None => { let _ = std::fs::remove_file(m); }
+            }
+        }
+    }
+}
+
+/// Runs `cmd` with stdout captured and kills it after `timeout`. `None` on a
+/// spawn error, a timeout, or a non-zero exit. Std only, so it is unit-tested.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn run_with_timeout(mut cmd: std::process::Command, timeout: Duration) -> Option<Vec<u8>> {
+    use std::io::Read;
+    use std::process::Stdio;
+    let mut child = cmd.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::null()).spawn().ok()?;
+    let mut stdout = child.stdout.take()?;
+    // Read on a thread so a full pipe can't stall the child while we poll it.
+    let reader = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        let _ = stdout.read_to_end(&mut buf);
+        buf
+    });
+    let deadline = Instant::now() + timeout;
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(st)) => break st,
+            Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(40)),
+            // Timed out (or wait failed): kill it. The reader thread ends by
+            // itself once the pipe closes, so it is not joined here.
+            _ => { let _ = child.kill(); let _ = child.wait(); return None; }
+        }
+    };
+    if !status.success() { return None; }
+    reader.join().ok()
+}
+
+/// (distro, $HOME) of the default WSL distro, via `wsl.exe`. None without WSL
+/// or when it does not answer in time.
+#[cfg(windows)]
+fn wsl_default_home() -> Option<(String, String)> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let mut cmd = std::process::Command::new("wsl.exe");
+    cmd.args(["-e", "sh", "-c", "printf '%s\\n%s' \"$WSL_DISTRO_NAME\" \"$HOME\""])
+        .creation_flags(CREATE_NO_WINDOW);
+    let out = run_with_timeout(cmd, WSL_PROBE_TIMEOUT)?;
+    let text = String::from_utf8_lossy(&out).replace('\r', "");
+    let mut it = text.lines();
+    let distro = it.next()?.trim().to_string();
+    let home = it.next()?.trim().to_string();
+    (!distro.is_empty() && home.starts_with('/')).then_some((distro, home))
+}
+
+#[cfg(test)]
+mod timeout_tests {
+    use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn returns_output_of_a_quick_command() {
+        let mut c = std::process::Command::new("sh");
+        c.args(["-c", "printf hi"]);
+        assert_eq!(run_with_timeout(c, Duration::from_secs(5)).as_deref(), Some(&b"hi"[..]));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn kills_a_hung_command() {
+        let mut c = std::process::Command::new("sh");
+        c.args(["-c", "sleep 30"]);
+        let t = Instant::now();
+        assert!(run_with_timeout(c, Duration::from_millis(300)).is_none());
+        assert!(t.elapsed() < Duration::from_secs(5), "must not wait for the child");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn non_zero_exit_is_none() {
+        let mut c = std::process::Command::new("sh");
+        c.args(["-c", "exit 3"]);
+        assert!(run_with_timeout(c, Duration::from_secs(5)).is_none());
+    }
+}

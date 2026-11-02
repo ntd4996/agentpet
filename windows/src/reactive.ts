@@ -1,14 +1,15 @@
 // Reactive bubbles , a TypeScript port of the macOS ReactiveEngine. The pet
 // spontaneously comments on live metrics (daily tokens, session count, hunger,
-// streak, daily meals) with tiered phrases and per-metric cooldowns. The macOS
-// rate-limit metric is omitted: it needs OpenUsage data the Tauri app lacks.
+// streak, daily meals, subscription budget left) with tiered phrases and
+// per-metric cooldowns. The rate-limit value comes from limits.ts.
 
 import { t } from "./i18n";
 import type { Hunger } from "./care";
 
-export type Metric = "dailyTokens" | "sessionCount" | "hunger" | "streak" | "dailyMeals";
+export type Metric = "rateLimit" | "dailyTokens" | "sessionCount" | "hunger" | "streak" | "dailyMeals";
 
 const TH = {
+  rateLimit: { silent: 0.5, low: 0.15, high: 0.05 }, // fraction of budget left
   dailyTokens: { silent: 1_000_000, low: 3_000_000, mid: 6_000_000 },
   sessionCount: { silent: 5, low: 8 },
   streak: { silent: 4, low: 7, mid: 14 },
@@ -18,6 +19,9 @@ const TH = {
 };
 
 const PHRASES: Record<string, string[]> = {
+  rateLimitLow: ["Usage is climbing~", "Take it easy, no rush", "Keep an eye on quota"],
+  rateLimitHigh: ["Rate limit running low…", "Use sparingly!", "Quota getting thin"],
+  rateLimitCritical: ["Almost out of quota 😰", "Maybe take a break…", "Quota nearly spent"],
   dailyTokensLow: ["Burned quite a few tokens today~", "Eaten a lot of tokens", "Token usage rising"],
   dailyTokensMid: ["Big appetite mode!", "Great appetite today~", "Tokens going fast"],
   dailyTokensHigh: ["Token usage off the charts today 🔥", "Token burn is extreme!", "Heavy burn today"],
@@ -63,8 +67,15 @@ function checkCooldown(metric: Metric, now: number): boolean {
   return true;
 }
 
-function pool(metric: Metric, value: number | Hunger): string[] | null {
+function pool(metric: Metric, value: number | Hunger | null): string[] | null {
   switch (metric) {
+    case "rateLimit": {
+      if (typeof value !== "number") return null;
+      if (value > TH.rateLimit.silent) return null;
+      if (value > TH.rateLimit.low) return PHRASES.rateLimitLow;
+      if (value > TH.rateLimit.high) return PHRASES.rateLimitHigh;
+      return PHRASES.rateLimitCritical;
+    }
     case "dailyTokens": {
       const v = value as number;
       if (v < TH.dailyTokens.silent) return null;
@@ -110,7 +121,7 @@ export function enabled(): boolean {
 
 /// Returns a localized reactive line if the metric warrants one and its cooldown
 /// has elapsed, else null. Mutates cooldown state when it fires.
-export function evaluate(metric: Metric, value: number | Hunger, now = Date.now()): string | null {
+export function evaluate(metric: Metric, value: number | Hunger | null, now = Date.now()): string | null {
   if (!enabled()) return null;
   const phrases = pool(metric, value);
   if (!phrases) return null;
