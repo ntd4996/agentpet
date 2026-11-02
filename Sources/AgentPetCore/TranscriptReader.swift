@@ -19,6 +19,24 @@ public enum TranscriptReader {
     nonisolated(unsafe) private static var recapCache: [String: String] = [:]
     // Byte offset already consumed by `newUsageTokens` per transcript path.
     nonisolated(unsafe) private static var usageOffsets: [String: UInt64] = [:]
+    /// Usage lines timestamped before this moment are not counted. The app sets
+    /// it at launch: offsets live in memory, so after a relaunch every transcript
+    /// is read from the start again, and a resumed session copies its earlier
+    /// replies into a new file. `nil` counts everything.
+    nonisolated(unsafe) public static var countUsageSince: Date?
+    // Message ids already counted, across transcripts: Claude Code writes one
+    // line per content block of a reply, each repeating the reply's usage, and a
+    // resumed session copies replies into a new file. Oldest ids are dropped
+    // past `countedLimit`.
+    nonisolated(unsafe) private static var countedIDs = Set<String>()
+    nonisolated(unsafe) private static var countedOrder: [String] = []
+    private static let countedLimit = 20_000
+    // Only used under `stateLock`.
+    nonisolated(unsafe) private static let usageTimestamp: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
     // Guards `usageOffsets` and the token/cost scan against concurrent callers.
     private static let stateLock = NSLock()
 
@@ -93,9 +111,11 @@ public enum TranscriptReader {
         summaryCache.removeAll()
         recapCache.removeAll()
         usageOffsets.removeAll()
+        countedIDs.removeAll()
+        countedOrder.removeAll()
     }
 
-    /// Sums the model usage tokens (input + output) appended since the previous call for `path`. The first call consumes the whole file; returns `nil` if unreadable, `0` if nothing new.
+    /// Sums the model usage tokens (input + output) appended since the previous call for `path`. The first call consumes the whole file; returns `nil` if unreadable, `0` if nothing new. Each reply counts once, and replies timestamped before `countUsageSince` don't count.
     public static func newUsageTokens(at path: String) -> Int? {
         stateLock.lock()
         defer { stateLock.unlock() }
@@ -141,6 +161,17 @@ public enum TranscriptReader {
                   let message = json["message"] as? [String: Any],
                   let usage = message["usage"] as? [String: Any]
             else { continue }
+            if let since = countUsageSince, let stamp = json["timestamp"] as? String,
+               let at = usageTimestamp.date(from: stamp), at < since { continue }
+            if let id = message["id"] as? String, !id.isEmpty {
+                guard countedIDs.insert(id).inserted else { continue }
+                countedOrder.append(id)
+                if countedOrder.count > countedLimit {
+                    let dropped = countedOrder.prefix(countedLimit / 2)
+                    countedIDs.subtract(dropped)
+                    countedOrder.removeFirst(dropped.count)
+                }
+            }
             let inputTokens = usage["input_tokens"] as? Int ?? 0
             let outputTokens = usage["output_tokens"] as? Int ?? 0
             total += inputTokens

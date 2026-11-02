@@ -88,7 +88,6 @@ export class Pet {
   private clips: Rect[][] = [];
   private frame = 0;
   private row = 0;
-  private lastTick = 0;
   private fps = 3;
   /// Unused space above the sprite, as a fraction of canvas height. The bubble
   /// uses it to sit right above the pet's head instead of the canvas top.
@@ -117,7 +116,7 @@ export class Pet {
     if (!c) throw new Error("no 2d context");
     this.ctx = c;
     this.ctx.imageSmoothingEnabled = false;
-    requestAnimationFrame((t) => this.loop(t));
+    this.loop();
   }
 
   /// Widest frame of each clip , scale is computed per CLIP (not per frame)
@@ -135,6 +134,7 @@ export class Pet {
       this.clipMaxW = this.clips.map((clip) => Math.max(...clip.map((r) => r.w)));
       this.frame = 0;
       this.loaded = true;
+      this.draw();
     };
     // A pre-CORS cached copy makes the crossOrigin load fail , retry plain
     // (displayable, but slicing falls back to the fixed grid).
@@ -150,6 +150,7 @@ export class Pet {
         this.clips = [];
         this.frame = 0;
         this.loaded = true;
+        this.draw();
       };
       plain.src = spritesheetUrl;
     };
@@ -175,13 +176,14 @@ export class Pet {
     return this.clips[Math.min(this.row, this.clips.length - 1)];
   }
 
-  private loop(t: number) {
-    if (this.loaded && t - this.lastTick > 1000 / this.fps) {
-      this.lastTick = t;
+  // Paced by the clip's fps (3-8) instead of a 60Hz requestAnimationFrame that
+  // woke the renderer ~8-20x more often than it drew. Skips while hidden.
+  private loop() {
+    if (this.loaded && !document.hidden) {
       this.frame++;
       this.draw();
     }
-    requestAnimationFrame((n) => this.loop(n));
+    window.setTimeout(() => this.loop(), 1000 / this.fps);
   }
 
   private draw() {
@@ -211,7 +213,12 @@ export class Pet {
     const s = fit >= 1 ? Math.floor(fit) : fit;
     const dw = r.w * s, dh = r.h * s;
     this.headroom = (H - dh) / H;
-    this.spriteRect = { x: (W - dw) / 2, y: H - dh, w: dw, h: dh };
-    this.ctx.drawImage(this.img, r.x, r.y, r.w, r.h, (W - dw) / 2, H - dh, dw, dh);
+    // Whole pixels only: an odd-width frame centred in an even canvas (or the
+    // reverse) lands on x.5, and with smoothing off the browser then doubles or
+    // drops pixel columns for that frame only (visible as noise, e.g. when a kneel
+    // clip stands up: a 103px frame at x=28.5). The hit rect uses the same value.
+    const dx = Math.round((W - dw) / 2), dy = Math.round(H - dh);
+    this.spriteRect = { x: dx, y: dy, w: dw, h: dh };
+    this.ctx.drawImage(this.img, r.x, r.y, r.w, r.h, dx, dy, dw, dh);
   }
 }

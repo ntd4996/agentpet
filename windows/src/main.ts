@@ -13,12 +13,15 @@ import * as usage from "./usage";
 import * as history from "./history";
 import * as reactive from "./reactive";
 import * as projectpets from "./projectpets";
+import * as limits from "./limits";
 import { projectLabel } from "./projectnames";
 
 // Which project THIS pet window represents. `null` = the main window (the
 // default single pet). Split-pet spawns extra windows with `?project=<id>`.
 const MY_PROJECT = new URLSearchParams(location.search).get("project");
 const IS_MAIN = MY_PROJECT === null;
+// WebView2 (Windows) vs WebKitGTK (Linux): picks the native sound path below.
+const IS_WINDOWS = navigator.userAgent.includes("Windows");
 
 // A project window sets this the moment its project is un-split, so it stops
 // feeding during the brief async gap before Rust closes it (else the main window
@@ -105,8 +108,9 @@ function applyPet() {
 }
 applyPet();
 
-// Simple synthesized chimes (no audio assets needed). Per-event enable, like
-// the macOS SoundSettings (done = high glass-ish, waiting = lower submarine).
+// Per-event enable + custom file, like the macOS SoundSettings. The default
+// sound is a real system sound on Windows (Rust `play_sound`, the macOS
+// Glass/Submarine equivalent); the synthesized chime is only the Linux fallback.
 let audioCtx: AudioContext | null = null;
 function chime(event: "done" | "waiting") {
   const key = event === "done" ? "ap_sound_done" : "ap_sound_waiting";
@@ -118,6 +122,7 @@ function chime(event: "done" | "waiting") {
   if (data) {
     try { void new Audio(data).play(); return; } catch {}
   }
+  if (IS_WINDOWS) { invoke("play_sound", { event }).catch(() => {}); return; }
   try {
     audioCtx = audioCtx || new AudioContext();
     const o = audioCtx.createOscillator();
@@ -193,6 +198,8 @@ function pickMoodLine(mood: string) {
   // simple-bubble mode (multi-agent off) always has something to say.
   let pool = bubbleLines(null, mood);
   if (!pool.length) pool = PET_CHAT[mood] ?? [];
+  // A nearly spent subscription makes the idle pet anxious (mac CareChat.idlePool).
+  if (mood === "idle" && limits.limitLow(limits.cached())) pool = [...pool, ...limits.ANXIOUS.map(t)];
   moodLine = pool.length ? pool[Math.floor(Math.random() * pool.length)] : "";
 }
 
@@ -262,6 +269,15 @@ setInterval(() => {
   const slug = myPetSlug();
   if (slug) flashReactive(reactive.evaluate("hunger", care.hunger(care.stateFor(slug))));
 }, 60_000);
+// Subscription limits: only the main window calls the provider (every 5 min,
+// like mac NativeUsageProbe); project windows read the shared cache. Each
+// window comments on the tightest visible window via the rateLimit metric.
+async function pollLimits() {
+  const found = IS_MAIN ? await limits.refresh() : limits.cached();
+  flashReactive(reactive.evaluate("rateLimit", limits.lowestFractionLeft(found)));
+}
+setTimeout(() => { void pollLimits(); }, IS_MAIN ? 5_000 : 15_000);
+setInterval(() => { void pollLimits(); }, limits.POLL_MS);
 // Carousel advance / fold clicks request a prompt repaint.
 setInterval(() => { if (bubble.dirty) { bubble.dirty = false; render(); } }, 120);
 // Live elapsed clocks tick every second.
@@ -320,8 +336,14 @@ function maybeNotify(e: AgentEventPayload) {
   const proj = projectLabel(e.project || "") || e.agent;
   // Same copy as the macOS notifications.
   const title = e.state === "done" ? `${proj} ${t("finished")}` : `${proj} ${t("needs input")}`;
+  // jcode only: its hooks carry the agent's opening line (what this turn did),
+  // with the session title as a fallback (it goes stale, one per session). Other
+  // agents keep the generic text, like macOS.
+  const doneBody = e.agent === "jcode"
+    ? ((e.message ?? "").trim() || (store.snapshot().find((s) => s.agent === e.agent && s.session === e.session)?.title ?? "").trim()).slice(0, 200)
+    : "";
   const body = e.state === "done"
-    ? t("Agent completed its turn")
+    ? (doneBody || t("Agent completed its turn"))
     : (e.message || t("Waiting for you"));
   try { sendNotification({ title, body }); } catch {}
 }
@@ -342,6 +364,10 @@ listen<{ id: string; session: string; tool: string; summary: string }>("agent-ap
 });
 listen<{ id: string; session: string }>("agent-approval-resolved", (e) => {
   store.clearApproval(e.payload.session);
+  render();
+});
+listen<{ agent: string; session: string; title: string }>("agent-title", (e) => {
+  store.setTitle(e.payload.agent, e.payload.session, e.payload.title);
   render();
 });
 listen<string>("agent-end", (e) => {

@@ -104,6 +104,18 @@ final class JcodeUsageTests: XCTestCase {
         XCTAssertEqual(t.delta(sessionId: "s", total: 350), 50)
     }
 
+    /// Sessions that never send session_end must not pile up forever.
+    func testTrackerKeepsOnlyRecentSessions() {
+        var t = JcodeUsageTracker()
+        let cap = JcodeUsageTracker.maxSessions
+        for i in 0..<(cap + 50) { t.baseline(sessionId: "s\(i)", total: 10) }
+        XCTAssertEqual(t.count, cap)
+        XCTAssertFalse(t.isTracking("s0"))
+        XCTAssertTrue(t.isTracking("s\(cap + 49)"))
+        // A dropped session just re-baselines: nothing is fed.
+        XCTAssertEqual(t.delta(sessionId: "s0", total: 999), 0)
+    }
+
     func testBaselineDoesNotOverwriteAndForgetResets() {
         var t = JcodeUsageTracker()
         t.baseline(sessionId: "s", total: 100)
