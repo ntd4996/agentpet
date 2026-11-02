@@ -213,7 +213,12 @@ export class Pet {
     const s = fit >= 1 ? Math.floor(fit) : fit;
     const dw = r.w * s, dh = r.h * s;
     this.headroom = (H - dh) / H;
-    this.spriteRect = { x: (W - dw) / 2, y: H - dh, w: dw, h: dh };
-    this.ctx.drawImage(this.img, r.x, r.y, r.w, r.h, (W - dw) / 2, H - dh, dw, dh);
+    // Whole pixels only: an odd-width frame centred in an even canvas (or the
+    // reverse) lands on x.5, and with smoothing off the browser then doubles or
+    // drops pixel columns for that frame only (visible as noise, e.g. when a kneel
+    // clip stands up: a 103px frame at x=28.5). The hit rect uses the same value.
+    const dx = Math.round((W - dw) / 2), dy = Math.round(H - dh);
+    this.spriteRect = { x: dx, y: dy, w: dw, h: dh };
+    this.ctx.drawImage(this.img, r.x, r.y, r.w, r.h, dx, dy, dw, dh);
   }
 }
