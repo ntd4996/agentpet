@@ -1,6 +1,8 @@
 pub mod cli;
 pub mod geometry;
 pub mod hooks;
+pub mod jcode;
+pub mod jcode_usage;
 pub mod limits;
 pub mod server;
 pub mod statemap;
@@ -117,19 +119,24 @@ fn tray_labels(code: &str) -> (&'static str, &'static str, &'static str, &'stati
     }
 }
 
+// These touch config files, jcode's on a `\\wsl.localhost` share, and enabling
+// jcode may run `wsl.exe`. Sync commands run on the main thread and would freeze
+// the UI while WSL boots, so they go to the blocking pool.
 #[tauri::command]
-fn list_agents() -> Vec<hooks::AgentInfo> {
-    hooks::catalog()
+async fn list_agents() -> Vec<hooks::AgentInfo> {
+    tauri::async_runtime::spawn_blocking(hooks::catalog).await.unwrap_or_default()
 }
 
 #[tauri::command]
-fn is_installed(kind: String) -> bool {
-    hooks::is_installed(&kind)
+async fn is_installed(kind: String) -> bool {
+    tauri::async_runtime::spawn_blocking(move || hooks::is_installed(&kind)).await.unwrap_or(false)
 }
 
 #[tauri::command]
-fn toggle_install(kind: String) -> Result<bool, String> {
-    hooks::toggle(&kind)
+async fn toggle_install(kind: String) -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(move || hooks::toggle(&kind))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// True while the left mouse button is held (a drag in progress), so the
@@ -176,6 +183,35 @@ fn open_settings_impl(app: tauri::AppHandle) {
             Err(e) => dlog(&format!("open_settings: BUILD FAILED: {e}")),
         }
     });
+}
+
+/// Plays the default done/waiting sound natively (port of the macOS
+/// SoundSettings, which plays the system sounds Glass/Submarine via NSSound).
+/// The toast itself is sent with `<audio silent="true"/>` (winrt-notification's
+/// default when no sound is set), and the old WebAudio fallback was a 0.13 s
+/// beep at gain 0.05, so on Windows "done" was effectively silent. Playing the
+/// .wav by file name also works when the Windows sound scheme is "No Sounds".
+#[tauri::command]
+fn play_sound(event: String) {
+    #[cfg(windows)]
+    {
+        #[link(name = "winmm")]
+        extern "system" {
+            fn PlaySoundW(psz: *const u16, hmod: *mut std::ffi::c_void, flags: u32) -> i32;
+        }
+        const SND_ASYNC: u32 = 0x0001;
+        const SND_NODEFAULT: u32 = 0x0002;
+        const SND_FILENAME: u32 = 0x0002_0000;
+        let file = if event == "waiting" { "Windows Notify Messaging.wav" } else { "Windows Notify System Generic.wav" };
+        let windir = std::env::var("WINDIR").unwrap_or_else(|_| r"C:\Windows".into());
+        let path = format!(r"{}\Media\{}", windir, file);
+        let wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
+        // SAFETY: `wide` is a NUL-terminated UTF-16 path that outlives the call;
+        // SND_ASYNC makes winmm copy what it needs before returning.
+        unsafe { PlaySoundW(wide.as_ptr(), std::ptr::null_mut(), SND_ASYNC | SND_NODEFAULT | SND_FILENAME); }
+    }
+    #[cfg(not(windows))]
+    let _ = event; // Linux build keeps the WebAudio chime (see main.ts)
 }
 
 /// Subscription limits for the Care tab and the pet's "limit low" mood. Only
@@ -452,6 +488,7 @@ pub fn run() {
             open_popover,
             log_debug,
             set_hit_rect,
+            play_sound,
             get_limits
         ])
         .setup(|app| {
