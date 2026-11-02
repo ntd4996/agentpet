@@ -21,6 +21,10 @@ final class AppDaemon: ObservableObject {
     private var pruneTimer: Timer?
 
     func start() {
+        // Feed the pet only what is spent from now on: transcripts are read from
+        // the start again on every launch, and a resumed session copies earlier
+        // replies into its new file.
+        TranscriptReader.countUsageSince = Date()
         // The approval reply can race the CLI closing its socket — a stray
         // write must return EPIPE, not SIGPIPE-kill the whole app.
         signal(SIGPIPE, SIG_IGN)
