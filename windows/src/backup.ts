@@ -21,10 +21,13 @@ export interface BackupFile {
 // Per-device keys that must never travel in a backup. `ap_care_token` is the
 // device sync token: restoring it on a second PC would make both machines push
 // care/usage as the same device (overwriting or double counting each other).
+// `ap_care_login` is its pair (LOGIN_KEY in sync.ts): restoring it alone would
+// put another account's login next to this device's token, or delete the local
+// login while the token stays.
 // `ap_usage_dirty` is the "not yet synced" set of that device. Excluding them
 // from isOurs also keeps them untouched on import (snapshot never sees them, so
 // applyBackup neither overwrites nor deletes them).
-const DEVICE_KEYS = new Set(["ap_care_token", "ap_usage_dirty"]);
+const DEVICE_KEYS = new Set(["ap_care_token", "ap_care_login", "ap_usage_dirty"]);
 
 export function isOurs(key: string): boolean {
   return !DEVICE_KEYS.has(key) && PREFIXES.some((p) => key.startsWith(p));

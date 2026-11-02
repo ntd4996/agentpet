@@ -1415,6 +1415,11 @@ function initBackup() {
     const f = pick.files?.[0];
     pick.value = "";
     if (!f) return;
+    // A wrong file (video, disk image) must not freeze Settings in f.text().
+    if (f.size > 20 * 1024 * 1024) {
+      say(`${t("Import failed")}: ${t("File too large")}`, true);
+      return;
+    }
     try {
       const parsed = backup.parseBackup(await f.text());
       const when = parsed.exportedAt ? parsed.exportedAt.slice(0, 16).replace("T", " ") : "?";
@@ -1425,7 +1430,10 @@ function initBackup() {
       const n = backup.applyBackup(parsed);
       // The tray reads its language from a file Rust writes on set_lang, which
       // otherwise only happens when Settings opens: push the restored one now.
-      await invoke("set_lang", { code: getLang() }).catch(() => {});
+      // getLang() is this window's startup cache, not the restored value.
+      const restored = localStorage.getItem("ap_lang");
+      const code = restored === "en" || restored === "vi" || restored === "zh" || restored === "zh-TW" ? restored : getLang();
+      await invoke("set_lang", { code }).catch(() => {});
       say(`${t("Restored")}: ${n} ${t("items")}. ${t("Restarting…")}`);
       // Every window caches state in memory: relaunch so they all reload it.
       setTimeout(() => { void relaunch(); }, 800);
