@@ -1,15 +1,15 @@
 {
-  "version": "0.1.14",
+  "version": "0.1.15",
   "notes": "See the GitHub release notes for what's new.",
-  "pub_date": "2026-11-02T05:47:05.047Z",
+  "pub_date": "2026-11-03T06:23:02.032Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZXpkWGd2RCszUDJMWmlkRmtOckpCWG9uQWRZbFo3TVNha0UzaGc0UUtUUHo1eDFZeVZaV2EzRFhYM3RYV3RDaDBITWdDUGRxeSs2TnJKOFVqUUVKMGQvb3NNS28xdFE0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNTk4MzEwCWZpbGU6QWdlbnRQZXRfMC4xLjE0X3g2NC1zZXR1cC5leGUKT3drVkZSSGJhQjFRZC8xa1RzUVNKVjcwTkEvVVlOUWtZSW92Wjl6VDVNTzB4cS85RFFmL1JEUDVuNWZIdm1nZmdRRmlYR0srM01WTDZYUkUvNG16QkE9PQo=",
-      "url": "https://github.com/ntd4996/agentpet/releases/download/win-v0.1.14/AgentPet_0.1.14_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZXpkWGd2RCszUDZETEplNmQrZVNsU2hFVm5uOWpwcFlRMldNR05HUFVBaDNqUVdwL1hlZ3JaNjNIUVpsL0RCMmdBN21SVHRyZ2V6dlJ3ZVp4NUduV3ZQODRpQTNwOVFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNjg2OTM2CWZpbGU6QWdlbnRQZXRfMC4xLjE1X3g2NC1zZXR1cC5leGUKYkI5MW9xc1ljWHRGUDd4NXFXN2xZUEIzV3BDa3RldFRkdWRaZGtSMkovRkwxRkcyMUZKR3pCWEJFZlZSdi9YU05hN09JS1dYQ1ZYOVN4ejl0NTk2QUE9PQo=",
+      "url": "https://github.com/ntd4996/agentpet/releases/download/win-v0.1.15/AgentPet_0.1.15_x64-setup.exe"
     },
     "linux-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZXpkWGd2RCszUDAvNjRlN3Z0bkpaSG0vRXZVVFVqTDlMaUdjd0JxTitzUWEwVVpCMkhLYlBVWk5Zd3FwTnUvQmpnYk1ibzRNb1NGamt4SzVPMlFhY3U2Rm12d1IvTmdvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNTk4Mzc5CWZpbGU6QWdlbnRQZXRfMC4xLjE0X2FtZDY0LkFwcEltYWdlCitwK0paUmt0WFFVTTBMZzB3UWtmVmxoL3o4Vk4vaW1oNlplSTVSa3AxM2cyQTlIZVgrWU8zVUVZQUx4c2grOEdlRHYydWs4eVhhRVZYTnhZUjYwa0F3PT0K",
-      "url": "https://github.com/ntd4996/agentpet/releases/download/linux-v0.1.14/AgentPet_0.1.14_amd64.AppImage"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZXpkWGd2RCszUHdpNW1aSzRLdFZqZ201YkVYTVlSWnUvUTJJZXJpYmFWZDhGcTlGMHB6OXNEbEJ0VDRTMFBzRHNiRXYwLzRpQTBwZ2NuQ2hUTlJ6UkZ6V01aUThmM2d3PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzkzNjg2OTE3CWZpbGU6QWdlbnRQZXRfMC4xLjE1X2FtZDY0LkFwcEltYWdlCis3bnpLUmVVNTA3dzN6NTRYdmhmcHlqVFdxM0R6YThheTZpUUtxMGlIUXhONzlPVWtYQStRUS93RjhFVkJsQWRwRDZoUEkvUlFjUW5lcE1WM0VnRkJBPT0K",
+      "url": "https://github.com/ntd4996/agentpet/releases/download/linux-v0.1.15/AgentPet_0.1.15_amd64.AppImage"
     }
   }
 }
