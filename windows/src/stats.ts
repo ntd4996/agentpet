@@ -71,7 +71,7 @@ function paint() {
   const state = slug ? care.stateFor(slug) : care.emptyState();
   const html = cardHtml({
     name: petName(slug), state, providers: limits.cached(),
-    costToday: usage.todayCostUSD(), costMonth: usage.monthlyCostUSD(), lang: getLang(),
+    costToday: usage.todayCostUSD(), costMonth: usage.monthlyCostUSD(), agents: usage.byAgent(), lang: getLang(),
   });
   if (html === lastHtml) return; // keep hover state + thumbnail when nothing changed
   lastHtml = html;

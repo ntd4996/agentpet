@@ -320,7 +320,7 @@ function maybeNotify(e: AgentEventPayload) {
   if (e.state === "done" && ownsProject(e.project)) {
     const slug = myPetSlug();
     if (slug) { care.mutate(slug, (s) => care.recordMeal(s)); emit("care-updated"); sync.schedulePush(); evaluateCareMetrics(); }
-    if (e.project) usage.recordSession(e.project, e.agent);
+    usage.recordSession(e.project, e.agent);
     const now = Date.now();
     history.log({
       id: e.session, agent: e.agent, project: e.project ? projectLabel(e.project) : "",
@@ -382,7 +382,7 @@ listen<{ agent: string; session: string; project: string; tokens: number; cost?:
   if (n <= 0) return;
   const p = e.payload;
   if (!ownsProject(p.project)) return;
-  if (p.project) usage.recordTokens(p.project, p.agent, n, p.cost || 0, { input: p.input, output: p.output, cacheRead: p.cacheRead, cacheWrite: p.cacheWrite });
+  usage.recordTokens(p.project, p.agent, n, p.cost || 0, { input: p.input, output: p.output, cacheRead: p.cacheRead, cacheWrite: p.cacheWrite });
   const slug = myPetSlug();
   if (!slug) return;
   care.mutate(slug, (s) => care.feedTokens(s, n));

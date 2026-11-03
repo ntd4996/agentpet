@@ -925,6 +925,7 @@ body.pop.stats .sc-card { height: 100%; }
 .cs-val { font-size: 20px; font-weight: 700; margin-top: 2px; }
 .cs-sub { font-size: 11px; opacity: .55; }
 .care-charthead { display: flex; justify-content: space-between; font-size: 11px; opacity: .7; margin-top: 2px; }
+.care-charthead[hidden] { display: none; }
 .limit-prov { padding: 6px 0 2px; }
 .limit-prov + .limit-prov { border-top: 1px solid rgba(127,127,127,.18); }
 .limit-row { margin-top: 6px; }

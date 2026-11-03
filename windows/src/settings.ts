@@ -16,6 +16,8 @@ import * as projectnames from "./projectnames";
 import * as sync from "./sync";
 import * as history from "./history";
 import * as limits from "./limits";
+import { agentLabel } from "./state";
+import { tokenString } from "./statscard";
 
 // ------------------------------------------------------------- segmented ----
 // macOS-style segmented controls: <span class="seg" data-key data-default>.
@@ -125,6 +127,14 @@ function renderCare() {
   setTxt("care-today-sub", `${s.mealsToday} ${t("sessions")}`);
   const money = (v: number) => `$${v.toFixed(2)}`;
   setTxt("care-cost", `${t("Today")} ${money(usage.todayCostUSD())} · ${t("Month")} ${money(usage.monthlyCostUSD())}`);
+  const agentsEl = document.getElementById("care-agents");
+  if (agentsEl) {
+    const rows = usage.byAgent();
+    // Compact numbers (1.2M / 34k) like the stats card; hidden when empty.
+    agentsEl.innerHTML = rows.map((a) => `<div class="care-charthead"><span>${esc(agentLabel(a.agent))}</span><span class="dim">${tokenString(a.today)} · ${tokenString(a.month)}</span></div>`).join("");
+    const head = document.getElementById("care-agents-head");
+    if (head) head.hidden = rows.length === 0;
+  }
   setTxt("care-streak", String(s.streakDays));
   setTxt("care-lifetime", fmtNum(s.totalTokens));
   setTxt("care-sessions", String(s.totalMeals));
@@ -1251,6 +1261,8 @@ function applyStatic() {
   set("tab-pet", "Pet");
   set("tab-bubble", "Bubble");
   set("tab-about", "About");
+  set("t-care-agents", "By agent");
+  set("t-care-agents-sub", "Today · Month");
   set("t-limits-head", "Subscription limits");
   set("t-limits-help", "Hidden providers stay out of Limits and don't make your pet anxious. Hiding every provider stops the sign-in read and the usage request.");
   // general

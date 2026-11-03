@@ -6,6 +6,7 @@
 import * as care from "./care";
 import * as limits from "./limits";
 import { t } from "./i18n";
+import { agentLabel } from "./state";
 
 // mac PetStatsView.stageColors: green, teal, blue, purple, orange.
 export const STAGE_COLORS = ["#30d158", "#40c8e0", "#0a84ff", "#bf5af2", "#ff9f0a"];
@@ -65,6 +66,8 @@ export interface CardInput {
   providers: limits.LimitProvider[];
   costToday: number;
   costMonth: number;
+  /// Per-agent token totals (usage.byAgent()); the section is hidden when empty.
+  agents?: { agent: string; today: number; month: number; sessions: number }[];
   now?: number;
   lang?: string;
 }
@@ -99,6 +102,12 @@ export function cardHtml(inp: CardInput): string {
   const bars = days.map((d, i) =>
     `<div class="sc-bw" title="${esc(tokenString(d.tokens))}"><div class="sc-bar" style="height:${Math.max(3, Math.round((d.tokens / peak) * 34))}px;background:${color};opacity:${i === days.length - 1 ? 1 : 0.4}"></div><div class="sc-bl">${esc(d.label)}</div></div>`).join("");
 
+  const agentRows = (inp.agents || []).slice(0, 6);
+  const agentsHtml = agentRows.length
+    ? `<div class="sc-sec"><span>${esc(t("By agent"))}</span><b>${esc(t("Today · Month"))}</b></div>` +
+      agentRows.map((a) =>
+        `<div class="sc-last"><span>${esc(agentLabel(a.agent))}</span><span>${esc(tokenString(a.today))} · ${esc(tokenString(a.month))}</span></div>`).join("")
+    : "";
   const shown = limits.visible(inp.providers);
   const limitsHtml = shown.length
     ? `<div class="sc-sec"><span>${esc(t("Limits"))}</span></div>` +
@@ -133,6 +142,7 @@ export function cardHtml(inp: CardInput): string {
   <div class="sc-sec"><span>${esc(t("Burn, last 7 days"))}</span><b>${esc(tokenString(days.reduce((a, d) => a + d.tokens, 0)))}</b></div>
   <div class="sc-chart">${bars}</div>
   <div class="sc-sec"><span>${esc(t("Est. cost (Claude)"))}</span><b>${esc(t("Today %@ · Month %@").replace("%@", money(inp.costToday)).replace("%@", money(inp.costMonth)))}</b></div>
+  ${agentsHtml}
   ${limitsHtml}
   ${s.lastFedAt != null ? `<div class="sc-last"><span>${esc(t("Last fed"))}</span><span>${esc(relativeAgo(s.lastFedAt, now, inp.lang))}</span></div>` : ""}`;
 }

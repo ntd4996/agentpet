@@ -330,6 +330,29 @@ fn handle_event(app: &AppHandle, body: &str) {
         });
     }
 
+    // Antigravity (agy): its hook payload has no token counts but carries
+    // `transcriptPath`; read the usage appended to that transcript since the last
+    // event (see antigravity_usage.rs). Off the listener thread.
+    if agent_kind == "antigravity" && !transcript.is_empty() {
+        let app2 = app.clone();
+        let sess = tok_session.clone();
+        let proj = tok_project.clone();
+        let path = transcript.clone();
+        // Events for one path are coalesced: a burst runs one scan plus at most one
+        // follow-up, never several concurrent full reads of the same file/DB.
+        std::thread::spawn(move || {
+            crate::antigravity_usage::coalesce(
+                &path,
+                || crate::antigravity_usage::new_usage_tokens(&path),
+                |tokens| {
+                    let _ = app2.emit("agent-tokens", serde_json::json!({
+                        "agent": "antigravity", "session": sess, "project": proj, "tokens": tokens,
+                    }));
+                },
+            );
+        });
+    }
+
     // The state event goes out inline for every agent, so lifecycle events keep
     // their order (a late `turn_end` can no longer overtake `agent-end` and bring
     // a finished session back as a ghost).
