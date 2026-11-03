@@ -4,7 +4,7 @@
 //! something, so a `Stop` that looks "done" is corrected to "waiting".
 
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::Mutex;
 
@@ -15,6 +15,16 @@ static SUMMARY_CACHE: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
 // repeated reads only sum the freshly-appended usage (a port of the macOS
 // TranscriptReader.usageOffsets).
 static USAGE_OFFSETS: Mutex<Option<HashMap<String, u64>>> = Mutex::new(None);
+// Claude reply ids already counted, across transcripts (port of the macOS
+// TranscriptReader.countedIDs, PR #84). Claude Code writes one line per content
+// block of a reply (thinking, text, tool_use) and each repeats the reply's
+// `usage`, and a resumed session copies earlier replies into a new file. Only
+// locked inside `new_usage_detail`, while USAGE_OFFSETS is held.
+static COUNTED: Mutex<Option<Counted>> = Mutex::new(None);
+// Usage lines timestamped before this (ISO 8601 UTC, same shape Claude Code
+// writes) are skipped. Set once at launch: offsets live in memory, so every
+// transcript is read from the start again after a relaunch.
+static COUNT_SINCE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 // Resolved Codex rollout path per session, so we don't re-walk ~/.codex/sessions
 // on every event (it fires on each tool use).
 static CODEX_PATHS: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
@@ -66,8 +76,66 @@ pub struct UsageDelta {
     pub cache_write: i64,
 }
 
-/// Parses transcript JSONL lines into a `UsageDelta` (pure, unit-tested).
-pub fn sum_usage_lines(text: &str) -> UsageDelta {
+/// Message ids seen so far; the oldest half is dropped past `LIMIT`.
+#[derive(Default)]
+pub struct Counted {
+    ids: HashSet<String>,
+    order: VecDeque<String>,
+}
+
+impl Counted {
+    const LIMIT: usize = 20_000;
+
+    /// True the first time `id` is seen.
+    fn insert(&mut self, id: &str) -> bool {
+        if !self.ids.insert(id.to_string()) {
+            return false;
+        }
+        self.order.push_back(id.to_string());
+        if self.order.len() > Self::LIMIT {
+            for old in self.order.drain(..Self::LIMIT / 2) {
+                self.ids.remove(&old);
+            }
+        }
+        true
+    }
+}
+
+/// Feed the pet only what is spent from now on (call once at launch).
+pub fn count_usage_from_now() {
+    let _ = COUNT_SINCE.set(iso_utc(std::time::SystemTime::now()));
+}
+
+/// `2026-11-03T01:02:03.456Z`, the format of Claude Code's `timestamp` field,
+/// so the two compare as strings.
+fn iso_utc(t: std::time::SystemTime) -> String {
+    let d = t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
+    let secs = d.as_secs() as i64;
+    let (days, rem) = (secs.div_euclid(86_400), secs.rem_euclid(86_400));
+    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z - era * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + if month <= 2 { 1 } else { 0 };
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}.{:03}Z",
+        rem / 3600,
+        rem % 3600 / 60,
+        rem % 60,
+        d.subsec_millis()
+    )
+}
+
+/// Parses transcript JSONL lines into a `UsageDelta` (pure, unit-tested). Each
+/// reply counts once (by `message.id`, across calls sharing `counted`), and
+/// lines timestamped before `since` are skipped. Lines without an id or a
+/// timestamp still count.
+pub fn sum_usage_lines(text: &str, since: Option<&str>, counted: &mut Counted) -> UsageDelta {
     let mut d = UsageDelta::default();
     for line in text.lines() {
         if !line.contains("\"usage\"") {
@@ -76,6 +144,16 @@ pub fn sum_usage_lines(text: &str) -> UsageDelta {
         let Ok(json) = serde_json::from_str::<Value>(line.trim()) else { continue };
         if let Some(msg) = json.get("message") {
             if let Some(usage) = msg.get("usage") {
+                if let (Some(since), Some(stamp)) = (since, json.get("timestamp").and_then(|v| v.as_str())) {
+                    if stamp.ends_with('Z') && stamp < since {
+                        continue;
+                    }
+                }
+                if let Some(id) = msg.get("id").and_then(|v| v.as_str()).filter(|s| !s.is_empty()) {
+                    if !counted.insert(id) {
+                        continue;
+                    }
+                }
                 let g = |k: &str| usage.get(k).and_then(|v| v.as_i64()).unwrap_or(0);
                 let (input, output) = (g("input_tokens"), g("output_tokens"));
                 let (cache_write, cache_read) = (g("cache_creation_input_tokens"), g("cache_read_input_tokens"));
@@ -118,7 +196,10 @@ pub fn new_usage_detail(path: &str) -> Option<UsageDelta> {
     let nl = buf.iter().rposition(|&b| b == b'\n')?;
     let consumable = &buf[..=nl];
     offsets.insert(path.to_string(), start + consumable.len() as u64);
-    Some(sum_usage_lines(&String::from_utf8_lossy(consumable)))
+    let mut counted = COUNTED.lock().unwrap_or_else(|e| e.into_inner());
+    let counted = counted.get_or_insert_with(Counted::default);
+    let since = COUNT_SINCE.get().map(String::as_str);
+    Some(sum_usage_lines(&String::from_utf8_lossy(consumable), since, counted))
 }
 
 #[cfg(test)]
@@ -129,10 +210,60 @@ mod usage_detail_tests {
     fn tokens_stay_input_plus_output_and_breakdown_sums() {
         let l1 = r#"{"message":{"model":"claude-opus-4","usage":{"input_tokens":10,"output_tokens":5,"cache_creation_input_tokens":100,"cache_read_input_tokens":1000}}}"#;
         let l2 = r#"{"message":{"model":"claude-haiku","usage":{"input_tokens":1,"output_tokens":2}}}"#;
-        let d = sum_usage_lines(&format!("{l1}\nnot json \"usage\"\n{l2}\n"));
+        let d = sum_usage_lines(&format!("{l1}\nnot json \"usage\"\n{l2}\n"), None, &mut Counted::default());
         assert_eq!(d.tokens, 18); // pet XP basis: input+output only, cache excluded
         assert_eq!((d.input, d.output, d.cache_write, d.cache_read), (11, 7, 100, 1000));
         assert!(d.cost > 0.0);
+    }
+
+    fn line(id: &str, stamp: &str, input: i64, output: i64) -> String {
+        format!(r#"{{"timestamp":"{stamp}","message":{{"id":"{id}","model":"claude-opus-4","usage":{{"input_tokens":{input},"output_tokens":{output}}}}}}}"#)
+    }
+
+    #[test]
+    fn one_reply_split_into_blocks_counts_once() {
+        // Thinking, text and tool_use lines of one reply all repeat its usage.
+        let t = "2026-11-03T01:00:00.000Z";
+        let text = [line("msg_a", t, 10, 5), line("msg_a", t, 10, 5), line("msg_a", t, 10, 5), line("msg_b", t, 1, 1)].join("\n");
+        let d = sum_usage_lines(&text, None, &mut Counted::default());
+        assert_eq!(d.tokens, 17);
+    }
+
+    #[test]
+    fn resumed_session_copy_in_another_file_is_not_recounted() {
+        let mut c = Counted::default();
+        let t = "2026-11-03T01:00:00.000Z";
+        assert_eq!(sum_usage_lines(&line("msg_a", t, 10, 5), None, &mut c).tokens, 15);
+        // Same reply copied into the resumed session's new transcript.
+        assert_eq!(sum_usage_lines(&(line("msg_a", t, 10, 5) + "\n" + &line("msg_c", t, 2, 2)), None, &mut c).tokens, 4);
+    }
+
+    #[test]
+    fn replies_from_before_launch_are_skipped() {
+        let since = "2026-11-03T01:00:00.000Z";
+        let text = [line("msg_old", "2026-11-02T23:59:59.999Z", 100, 100), line("msg_new", "2026-11-03T01:00:00.001Z", 3, 4)].join("\n");
+        assert_eq!(sum_usage_lines(&text, Some(since), &mut Counted::default()).tokens, 7);
+        // No id and no timestamp: still counted, like before.
+        let bare = r#"{"message":{"usage":{"input_tokens":2,"output_tokens":3}}}"#;
+        assert_eq!(sum_usage_lines(&format!("{bare}\n{bare}"), Some(since), &mut Counted::default()).tokens, 10);
+    }
+
+    #[test]
+    fn id_cache_is_bounded() {
+        let mut c = Counted::default();
+        for i in 0..=Counted::LIMIT {
+            assert!(c.insert(&format!("m{i}")));
+        }
+        assert_eq!(c.ids.len(), c.order.len());
+        assert!(c.ids.len() <= Counted::LIMIT);
+        assert!(c.insert("m0")); // oldest dropped, so it would count again
+    }
+
+    #[test]
+    fn iso_utc_matches_claude_timestamp_format() {
+        let t = std::time::UNIX_EPOCH + std::time::Duration::from_millis(1_793_235_723_456);
+        assert_eq!(iso_utc(t), "2026-10-29T01:02:03.456Z");
+        assert_eq!(iso_utc(std::time::UNIX_EPOCH), "1970-01-01T00:00:00.000Z");
     }
 }
 

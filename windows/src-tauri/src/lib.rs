@@ -691,6 +691,10 @@ pub fn run() {
             set_hit_parts
         ])
         .setup(|app| {
+            // Feed the pet only what is spent from now on: transcripts are read
+            // from the start again on every launch, and a resumed session copies
+            // earlier replies into its new file.
+            transcript::count_usage_from_now();
             server::start(app.handle().clone());
             app.manage(Mutex::new(HitRect::default()));
 
