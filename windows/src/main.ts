@@ -1,6 +1,6 @@
 import { listen, emit } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { Pet } from "./pet";
+import { Pet, HIT_PAD } from "./pet";
 import { SessionStore, aggregateMood, type AgentEventPayload } from "./state";
 import { BubbleRenderer } from "./bubble";
 import { loadCatalog, savedSlug, saveSlug } from "./catalog";
@@ -514,17 +514,37 @@ function reportHitRect() {
   } else {
     rects.push({ left: cr.left, top: cr.top, right: cr.right, bottom: cr.bottom });
   }
+  // The union below stays the "visible bounds" (keeps the pet on screen). Clicks
+  // use the PARTS (bubble, sprite) separately: a wide bubble above a narrow pet
+  // otherwise makes one big box that also grabs the empty corners beside the pet.
+  const pad = HIT_PAD; // px of slack so grabbing right at the edge still works
+  const parts: number[][] = [];
+  if (!bubbleEl.hidden) {
+    const b = bubbleEl.getBoundingClientRect();
+    if (b.width > 0) parts.push([(b.left - pad) * d, (b.top - pad) * d, (b.width + 2 * pad) * d, (b.height + 2 * pad) * d]);
+  }
+  if (pet.silhouette.length && canvas.width > 0) {
+    // The pet's outline (bands of the current frame), not its bounding box.
+    const kx = cr.width / canvas.width, ky = cr.height / canvas.height;
+    for (const b of pet.silhouette) {
+      parts.push([(cr.left + b.x * kx - pad) * d, (cr.top + b.y * ky - pad) * d, (b.w * kx + 2 * pad) * d, (b.h * ky + 2 * pad) * d]);
+    }
+  } else {
+    parts.push([(cr.left - pad) * d, (cr.top - pad) * d, (cr.width + 2 * pad) * d, (cr.height + 2 * pad) * d]);
+  }
   const left = Math.min(...rects.map((r) => r.left));
   const top = Math.min(...rects.map((r) => r.top));
   const right = Math.max(...rects.map((r) => r.right));
   const bottom = Math.max(...rects.map((r) => r.bottom));
   hitCss = { left, top, right, bottom };
-  const sig = [left, top, right, bottom].map((v) => Math.round(v)).join(",");
+  const sig = [left, top, right, bottom, ...parts.flat()].map((v) => Math.round(v)).join(",");
   if (sig === lastHitSig) return;
   lastHitSig = sig;
+  if (IS_MAIN) invoke("set_hit_parts", { parts }).catch(() => {});
   invoke("set_hit_rect", { x: left * d, y: top * d, w: (right - left) * d, h: (bottom - top) * d })
     .catch((err) => invoke("log_debug", { msg: `set_hit_rect failed: ${err}` }).catch(() => {}));
 }
+pet.onFrame = reportHitRect; // the outline changes with every animation frame
 new ResizeObserver(reportHitRect).observe(petRoot);
 window.addEventListener("resize", reportHitRect);
 reportHitRect();

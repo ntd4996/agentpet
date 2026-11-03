@@ -107,6 +107,25 @@ fn hit_rects() -> &'static Mutex<std::collections::HashMap<String, (f64, f64, f6
     M.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
 }
 
+/// The separate clickable parts (bubble, sprite) in physical px, window-relative.
+/// Click-through uses these; the union in `HitRect` is only the visible bounds.
+fn hit_parts() -> &'static Mutex<Vec<(f64, f64, f64, f64)>> {
+    static P: std::sync::OnceLock<Mutex<Vec<(f64, f64, f64, f64)>>> = std::sync::OnceLock::new();
+    P.get_or_init(|| Mutex::new(Vec::new()))
+}
+
+#[tauri::command]
+fn set_hit_parts(window: tauri::WebviewWindow, parts: Vec<[f64; 4]>) {
+    // Only the main pet's click-through loop reads this: split `pet-<projectId>`
+    // windows run the same frontend and must not overwrite its region.
+    if window.label() != "pet" {
+        return;
+    }
+    if let Ok(mut p) = hit_parts().lock() {
+        *p = parts.into_iter().map(|[x, y, w, h]| (x, y, w, h)).collect();
+    }
+}
+
 fn lang_file() -> Option<std::path::PathBuf> {
     dirs::config_dir().map(|d| d.join("AgentPet").join("lang"))
 }
@@ -668,7 +687,8 @@ pub fn run() {
             log_debug,
             set_hit_rect,
             play_sound,
-            get_limits
+            get_limits,
+            set_hit_parts
         ])
         .setup(|app| {
             server::start(app.handle().clone());
@@ -728,16 +748,28 @@ pub fn run() {
                             let rect = handle
                                 .try_state::<Mutex<HitRect>>()
                                 .and_then(|s| s.lock().ok().map(|r| (r.x, r.y, r.w, r.h)));
+                            let parts = hit_parts().lock().map(|p| p.clone()).unwrap_or_default();
                             let inside = match rect {
                                 Some((x, y, w, h)) if w > 0.0 => {
                                     let rx = cur.x - wp.x as f64;
                                     let ry = cur.y - wp.y as f64;
-                                    rx >= x && rx <= x + w && ry >= y && ry <= y + h
+                                    if parts.is_empty() {
+                                        rx >= x && rx <= x + w && ry >= y && ry <= y + h
+                                    } else {
+                                        // Any part counts; the empty space between a wide bubble and
+                                        // a narrow pet is click-through.
+                                        parts.iter().any(|&(px, py, pw, ph)| rx >= px && rx <= px + pw && ry >= py && ry <= py + ph)
+                                    }
                                 }
                                 _ => true, // no rect yet , stay interactive
                             };
                             // ignore_cursor_events = true -> clicks pass through.
-                            let ignore = !inside;
+                            let mut ignore = !inside;
+                            // Never switch to click-through mid-drag: the pet may
+                            // move under the cursor and the drag would be dropped.
+                            if ignore && last_ignore == Some(false) && mouse_down() {
+                                ignore = false;
+                            }
                             if Some(ignore) != last_ignore {
                                 let _ = win.set_ignore_cursor_events(ignore);
                                 last_ignore = Some(ignore);
