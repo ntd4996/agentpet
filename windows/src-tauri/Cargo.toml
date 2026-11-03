@@ -1,6 +1,6 @@
 [package]
 name = "agentpet"
-version = "0.1.14"
+version = "0.1.15"
 description = "AgentPet for Windows"
 authors = ["ntd4996"]
 edition = "2021"
