@@ -12,7 +12,7 @@
     <a href="https://ko-fi.com/ntd4996"><img src="https://img.shields.io/badge/Ko--fi-FF5E5B?logo=ko-fi&logoColor=white" alt="Ko-fi" /></a>
     <a href="https://buymeacoffee.com/ntd4996"><img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?logo=buymeacoffee&logoColor=black" alt="Buy me a coffee" /></a>
   </p>
-  <p><b>A desktop pet that reacts while your AI coding agents work , and grows the more you code.</b></p>
+  <p><b>A desktop pet that reacts while your AI coding agents work, and grows the more you code.</b></p>
   <p>
     <a href="https://agentpet.thenightwatcher.online">Website</a> ·
     <a href="https://agentpet.thenightwatcher.online/install">Install</a> ·
@@ -20,7 +20,7 @@
     <a href="https://agentpet.thenightwatcher.online/leaderboard">Leaderboard</a> ·
     <a href="https://discord.gg/kzFJKsZav">Discord</a>
   </p>
-  <p><b>If AgentPet brightens your workflow, please <a href="https://github.com/ntd4996/agentpet">give it a star</a> , it genuinely helps others find it.</b></p>
+  <p><b>If AgentPet brightens your workflow, please <a href="https://github.com/ntd4996/agentpet">give it a star</a>, it genuinely helps others find it.</b></p>
   <p>
     <b>English</b> ·
     <a href="docs/readme/README.vi.md">Tiếng Việt</a> ·
@@ -33,7 +33,7 @@
 
 Run several coding agents at once (Claude Code, Codex, Gemini, Cursor and more) and it gets hard to tell who is **working**, who is **done**, and who is **waiting for your input**. AgentPet answers that at a glance: a menu-bar monitor shows every agent's live state, and a little pixel pet floats on your desktop and reacts to it all.
 
-It is also a **tamagotchi**. The pet is fed by real work , the tokens your agents burn and the sessions they finish , so it earns XP, levels up, unlocks achievements, and evolves as you code. Free, open source, and fully offline unless you choose to connect.
+It is also a **tamagotchi**. The pet is fed by real work, the tokens your agents burn and the sessions they finish, so it earns XP, levels up, unlocks achievements, and evolves as you code. Free, open source, and fully offline unless you choose to connect.
 
 <div align="center">
   <h3>Enjoying AgentPet? Help keep it free.</h3>
@@ -60,6 +60,7 @@ It is also a **tamagotchi**. The pet is fed by real work , the tokens your agent
 - [Platforms](#platforms)
 - [Community ports](#community-ports)
 - [Contributors](#contributors)
+- [Star history](#star-history)
 - [Acknowledgements](#acknowledgements)
 - [Support](#support)
 - [License](#license)
@@ -71,7 +72,7 @@ It is also a **tamagotchi**. The pet is fed by real work , the tokens your agent
 - 🎮 **Raise your pet**: real tokens and finished sessions feed it, level it up, and unlock 14 achievements.
 - 🗂️ **Per-project pets** and a **per-project token usage dashboard** (daily and monthly).
 - 🔌 **11 coding agents** supported out of the box, plus a universal wrapper for anything else.
-- ☁️ **Optional web profile, leaderboard, and cross-device restore** , everything works offline if you skip it.
+- ☁️ **Optional web profile, leaderboard, and cross-device restore**, everything works offline if you skip it.
 - 🌍 **Localized** in English, Tiếng Việt, 简体中文 and 繁體中文.
 - 🍎 **macOS** (native Swift/SwiftUI, notarized), 🪟 **Windows** and 🐧 **Linux** (one Tauri app), with auto-update on macOS and Windows.
 
@@ -90,7 +91,7 @@ It is also a **tamagotchi**. The pet is fed by real work , the tokens your agent
 - Your pet eats the **real tokens your agents burn** and the **sessions they finish** (including subagents). It earns XP, levels up, and evolves through five stages: Hatchling → Companion → Scout → Hero → Legend.
 - **Every pet keeps its own level**, so the more you code with a companion, the more it grows.
 - **14 achievements** from real milestones: first session, level-ups, token burns (1M / 10M / 50M), session counts, feeding streaks, a Night Owl badge, and more.
-- **Stats HUD**: right-click the pet for a game-style card , level, XP, hunger, a 7-day burn chart, your streak, and your live **Claude / Codex subscription limits read directly from your sign-ins** (no extra tool needed).
+- **Stats HUD**: right-click the pet for a game-style card, level, XP, hunger, a 7-day burn chart, your streak, and your live **Claude / Codex subscription limits read directly from your sign-ins** (no extra tool needed).
 - **Break reminder** (off by default) nudges you to step away after long stretches.
 
 **Work across projects**
@@ -105,7 +106,7 @@ It is also a **tamagotchi**. The pet is fed by real work , the tokens your agent
 - **Cross-device restore**: sign in on a second machine (or after a fresh install) and your pets come back at the level you raised them. Progress merges forward only, so it is never undone on either machine.
 - **Community pet gallery**: browse thousands of pets, adopt one in a click, submit your own, and request new ones.
 
-AgentPet runs completely offline. Connecting only adds the web profile, leaderboard and cross-device sync , nothing leaves your machine until you sign in.
+AgentPet runs completely offline. Connecting only adds the web profile, leaderboard and cross-device sync, nothing leaves your machine until you sign in.
 
 ## Supported agents
 
@@ -116,19 +117,19 @@ Install a hook from **Settings** with one click, or wrap any command.
 | Claude Code, Codex, Gemini CLI, opencode, Factory Droid | working · **waiting for input** · done |
 | Cursor, Windsurf, Antigravity, GitHub Copilot, Kiro CLI, Pi | working · done |
 | GLM (Z.AI) | works through Claude Code automatically |
-| **Anything else** | `agentpet run -- <command>` , working while it runs, done when it exits |
+| **Anything else** | `agentpet run -- <command>`, working while it runs, done when it exits |
 
 ## Screenshots
 
 <div align="center">
   <img src="assets/screenshot-hud.png" width="300" alt="Right-click the pet for a stats HUD: level, XP, hunger, 7-day burn and live subscription limits" />
-  <p><sub><b>Right-click the pet</b> for a game-style HUD , level, XP, hunger, a 7-day burn chart and your live Claude/Codex limits.</sub></p>
+  <p><sub><b>Right-click the pet</b> for a game-style HUD, level, XP, hunger, a 7-day burn chart and your live Claude/Codex limits.</sub></p>
 </div>
 
 <table align="center">
   <tr>
-    <td align="center" width="50%"><img src="assets/screenshot-menubar.png" width="380" alt="Menu bar monitor" /><br/><sub>Menu-bar monitor , every agent at a glance</sub></td>
-    <td align="center" width="50%"><img src="assets/screenshot-care.png" width="380" alt="Pet care tab" /><br/><sub>Care tab , raise your pet with real work</sub></td>
+    <td align="center" width="50%"><img src="assets/screenshot-menubar.png" width="380" alt="Menu bar monitor" /><br/><sub>Menu-bar monitor, every agent at a glance</sub></td>
+    <td align="center" width="50%"><img src="assets/screenshot-care.png" width="380" alt="Pet care tab" /><br/><sub>Care tab, raise your pet with real work</sub></td>
   </tr>
   <tr>
     <td align="center" width="50%"><img src="assets/screenshot-settings.png" width="380" alt="Settings" /><br/><sub>Native, tabbed Settings</sub></td>
@@ -139,19 +140,19 @@ Install a hook from **Settings** with one click, or wrap any command.
 <div align="center">
   <br/>
   <img src="assets/screenshot-leaderboard.png" width="660" alt="Community leaderboard of raised companions" />
-  <p><sub>Community <a href="https://agentpet.thenightwatcher.online/leaderboard">leaderboard</a> , by level, sessions or tokens.</sub></p>
+  <p><sub>Community <a href="https://agentpet.thenightwatcher.online/leaderboard">leaderboard</a>, by level, sessions or tokens.</sub></p>
   <img src="assets/demo.gif" width="600" alt="Pet reacting to agent activity" />
 </div>
 
 ## Install
 
-### macOS , Homebrew
+### macOS, Homebrew
 
 ```bash
 brew install --cask ntd4996/tap/agentpet
 ```
 
-### macOS , direct download
+### macOS, direct download
 
 Grab the latest `AgentPet.dmg` from [Releases](https://github.com/ntd4996/agentpet/releases/latest), open it, and drag AgentPet to Applications. Builds are Developer ID-signed and notarized by Apple, so they open without a Gatekeeper warning, and update themselves via the menu-bar **Updates** button.
 
@@ -164,7 +165,7 @@ Download the installer or portable build from the [website](https://agentpet.the
 Download an AppImage, `.deb`, or `.rpm` from the [website](https://agentpet.thenightwatcher.online/install) or the [releases](https://github.com/ntd4996/agentpet/releases):
 
 ```bash
-# AppImage , any distro
+# AppImage, any distro
 chmod +x AgentPet_*_amd64.AppImage && ./AgentPet_*_amd64.AppImage
 
 # Debian / Ubuntu
@@ -176,7 +177,7 @@ sudo rpm -i AgentPet-*.x86_64.rpm
 
 Same Tauri app as Windows, so it has full feature parity with macOS. From 0.1.5 the AppImage auto-updates in-app; still unsigned. If the tray icon is missing on GNOME, install an AppIndicator extension.
 
-Or install with one line , grabs the latest AppImage, no root:
+Or install with one line, grabs the latest AppImage, no root:
 
 ```bash
 curl -fsSL https://agentpet.thenightwatcher.online/install.sh | sh
@@ -195,7 +196,7 @@ Requires Xcode 16 / Swift 6. The Windows app lives under [`windows/`](windows/) 
 
 ## Getting started
 
-1. Launch AgentPet , it lives in the menu bar.
+1. Launch AgentPet, it lives in the menu bar.
 2. Open **Settings → General** and click **Install** next to Claude Code (or your agent), then **Enable** notifications.
 3. Run an agent. The pet reacts, and the menu-bar icon shows who is working or waiting.
 4. (Optional) Open **Settings → Care → Sign in with GitHub** to sync your companions and unlock the web profile, leaderboard and cross-device restore.
@@ -229,13 +230,13 @@ Pets use the open Codex pet-pack format (`pet.json` + a spritesheet). You can:
 - **Map animations** to states, resize, rename, and customise chat lines.
 - **Make your own** and [submit it](https://agentpet.thenightwatcher.online/submit) to the community gallery.
 
-A starter pet is installed on first launch. **AgentPet bundles no pet art** , every pack is added at runtime, and each asset is owned by its submitter under their own license.
+A starter pet is installed on first launch. **AgentPet bundles no pet art**, every pack is added at runtime, and each asset is owned by its submitter under their own license.
 
 ## Platforms
 
-- **macOS 13 Ventura or later** , native Swift / SwiftUI, notarized, Sparkle auto-update, Homebrew cask. Apple Silicon and Intel.
-- **Windows 10 / 11 (64-bit)** , Tauri (Rust), auto-update. Feature parity with macOS.
-- **Linux (64-bit)** , the same Tauri app, shipped as AppImage / `.deb` / `.rpm`. Feature parity with macOS. In-app auto-update from 0.1.5 (AppImage); still unsigned.
+- **macOS 13 Ventura or later**, native Swift / SwiftUI, notarized, Sparkle auto-update, Homebrew cask. Apple Silicon and Intel.
+- **Windows 10 / 11 (64-bit)**, Tauri (Rust), auto-update. Feature parity with macOS.
+- **Linux (64-bit)**, the same Tauri app, shipped as AppImage / `.deb` / `.rpm`. Feature parity with macOS. In-app auto-update from 0.1.5 (AppImage); still unsigned.
 
 Under the hood: a Unix-socket daemon receives agent events from lightweight hooks, an on-device store drives the pet, and an optional Astro + Cloudflare Workers/D1 backend powers the web profile, leaderboard and usage dashboard. See [`docs/specs`](docs/specs) for the design.
 
@@ -243,19 +244,29 @@ Under the hood: a Unix-socket daemon receives agent events from lightweight hook
 
 Alongside the official macOS, Windows, and Linux builds, the community has reimagined AgentPet with its own stack:
 
-- **Linux (Rust + GTK4)** , [agentpet-linux](https://github.com/tranhuuhuy297/agentpet-linux) by [@tranhuuhuy297](https://github.com/tranhuuhuy297). An independent, from-scratch GTK4 port for Ubuntu (Claude Code + Codex) , distinct from the official Tauri Linux build above.
+- **Linux (Rust + GTK4)**, [agentpet-linux](https://github.com/tranhuuhuy297/agentpet-linux) by [@tranhuuhuy297](https://github.com/tranhuuhuy297). An independent, from-scratch GTK4 port for Ubuntu (Claude Code + Codex), distinct from the official Tauri Linux build above.
 
 These are separate community projects, not maintained here. Building one? Open an issue and we'll link it.
 
 ## Contributors
 
-AgentPet is a community effort. Huge thanks to everyone who has shipped code, pets, translations and ports , see the full [Hall of Fame](https://agentpet.thenightwatcher.online/contributors).
+AgentPet is a community effort. Huge thanks to everyone who has shipped code, pets, translations and ports, see the full [Hall of Fame](https://agentpet.thenightwatcher.online/contributors).
 
-- **[@ntd4996](https://github.com/ntd4996)** , creator and maintainer
-- **[@hoangphison](https://github.com/hoangphison)** , co-founder
+- **[@ntd4996](https://github.com/ntd4996)**, creator and maintainer
+- **[@hoangphison](https://github.com/hoangphison)**, co-founder
 - ...and many more contributors on the [website](https://agentpet.thenightwatcher.online/contributors) and in the repo's [contributors list](https://github.com/ntd4996/agentpet/graphs/contributors).
 
-Contributions are welcome , features, agent integrations, pets, translations and bug fixes. Open an issue or a pull request.
+Contributions are welcome, features, agent integrations, pets, translations and bug fixes. Open an issue or a pull request.
+
+## Star history
+
+<a href="https://www.star-history.com/?repos=ntd4996/agentpet&type=date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=ntd4996/agentpet&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=ntd4996/agentpet&type=Date" />
+    <img alt="AgentPet star history chart" src="https://api.star-history.com/svg?repos=ntd4996/agentpet&type=Date" width="600" />
+  </picture>
+</a>
 
 ## Acknowledgements
 
@@ -278,4 +289,4 @@ Built by **[Nguyễn Thành Đạt (@ntd4996)](https://github.com/ntd4996)** and
 
 ## License
 
-MIT , see [LICENSE](LICENSE). Application code only; pet assets are not part of this repository and belong to their respective creators.
+MIT, see [LICENSE](LICENSE). Application code only; pet assets are not part of this repository and belong to their respective creators.
