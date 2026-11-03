@@ -66,6 +66,80 @@ pub fn keep_visible_on_screen(
     (moved.0 - vis.0, moved.1 - vis.1)
 }
 
+/// Which side of the pet the stats card sits on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Edge {
+    /// Card above the pet, arrow on the card's bottom edge.
+    Above,
+    /// Card below the pet, arrow on the card's top edge.
+    Below,
+    /// No vertical room: card beside the pet, no arrow.
+    Side,
+}
+
+impl Edge {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Edge::Above => "above",
+            Edge::Below => "below",
+            Edge::Side => "side",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Placement {
+    pub x: i32,
+    pub y: i32,
+    pub edge: Edge,
+    /// Arrow x inside the card (card-relative px), pointing at the pet centre.
+    pub arrow: i32,
+    /// Tallest the card may be here; the card scrolls when its content is taller.
+    pub max_h: i32,
+}
+
+/// Gap between the pet and the card, room for the arrow.
+pub const CARD_GAP: i32 = 6;
+/// Below this much room the card goes beside the pet instead of shrinking.
+pub const MIN_CARD_H: i32 = 260;
+
+/// Where the stats card goes so it never covers the pet (macOS NSPopover on
+/// the pet): above when it fits, else below, else on whichever of the two has
+/// more room with the card capped to that room (it scrolls), else beside the
+/// pet. `pet` is the pet's visible content (sprite + bubble) in screen px,
+/// `area` the monitor's work area. Horizontally centred on the pet, clamped.
+pub fn place_card(card: (i32, i32), pet: Rect, area: Rect) -> Placement {
+    let (cw, ch) = card;
+    let (px, py, pw, ph) = pet;
+    let (ax, ay, aw, ah) = area;
+    let centre = px + pw / 2;
+    let x = (centre - cw / 2).max(ax).min(ax + aw - cw);
+    let arrow = (centre - x).clamp(16, (cw - 16).max(16));
+    let room_above = py - CARD_GAP - ay;
+    let below = py + ph + CARD_GAP;
+    let room_below = ay + ah - below;
+    let above_at = |h: i32| Placement { x, y: py - CARD_GAP - h, edge: Edge::Above, arrow, max_h: h };
+    let below_at = |h: i32| Placement { x, y: below, edge: Edge::Below, arrow, max_h: h };
+    if ch <= room_above {
+        return above_at(ch);
+    }
+    if ch <= room_below {
+        return below_at(ch);
+    }
+    let room = room_above.max(room_below);
+    if room >= MIN_CARD_H {
+        return if room_below >= room_above { below_at(room_below) } else { above_at(room_above) };
+    }
+    // Pet in the middle of a very short screen: beside it on the roomier side.
+    let right_room = ax + aw - (px + pw);
+    let left_room = px - ax;
+    let sx = if right_room >= left_room { px + pw + CARD_GAP } else { px - CARD_GAP - cw };
+    let sx = sx.max(ax).min(ax + aw - cw);
+    let h = ch.min(ah);
+    let sy = (py + ph / 2 - h / 2).max(ay).min(ay + ah - h);
+    Placement { x: sx, y: sy, edge: Edge::Side, arrow: 0, max_h: h }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,5 +219,70 @@ mod tests {
     fn no_monitors_leaves_origin() {
         assert_eq!(keep_on_screen((5, 6), PET, &[]), (5, 6));
         assert_eq!(nearest_rect_index((0, 0), &[]), None);
+    }
+
+    const CARD: (i32, i32) = (332, 596);
+    const RIGHT: Rect = (1600, 0, 1600, 900);
+
+    fn overlaps(p: &Placement, card: (i32, i32), pet: Rect) -> bool {
+        let (px, py, pw, ph) = pet;
+        let h = card.1.min(p.max_h);
+        p.x < px + pw && p.x + card.0 > px && p.y < py + ph && p.y + h > py
+    }
+
+    #[test]
+    fn pet_at_top_puts_card_below_with_arrow_on_pet() {
+        // The user's layout: pet at the top-right, content 151..320 of a 260x320 window.
+        // 596 px card, 574 px of room below: below, capped to the room (scrolls).
+        let pet = (2873 + 31, 151, 198, 169);
+        let p = place_card(CARD, pet, RIGHT);
+        assert_eq!(p.edge, Edge::Below);
+        assert_eq!(p.y, 320 + CARD_GAP);
+        assert_eq!(p.max_h, 900 - (320 + CARD_GAP));
+        assert!(!overlaps(&p, CARD, pet));
+        assert!(p.x + CARD.0 <= 3200, "stays on the monitor");
+        assert_eq!(p.x + p.arrow, 2873 + 31 + 99, "arrow points at the pet centre");
+    }
+
+    #[test]
+    fn short_card_fits_below_uncapped() {
+        let p = place_card((332, 400), (2904, 151, 198, 169), RIGHT);
+        assert_eq!((p.edge, p.max_h), (Edge::Below, 400));
+    }
+
+    #[test]
+    fn pet_low_on_screen_puts_card_above() {
+        let pet = (2000, 700, 198, 169);
+        let p = place_card(CARD, pet, RIGHT);
+        assert_eq!(p.edge, Edge::Above);
+        assert_eq!(p.y + CARD.1 + CARD_GAP, 700);
+        assert!(!overlaps(&p, CARD, pet));
+    }
+
+    #[test]
+    fn pet_mid_screen_takes_the_roomier_side_capped() {
+        let pet = (2000, 300, 198, 169);
+        let p = place_card(CARD, pet, RIGHT);
+        assert_eq!(p.edge, Edge::Below);
+        assert_eq!(p.max_h, 900 - (469 + CARD_GAP));
+        assert!(!overlaps(&p, CARD, pet));
+    }
+
+    #[test]
+    fn very_short_screen_goes_beside() {
+        let area = (0, 0, 1600, 500);
+        let pet = (600, 200, 198, 169);
+        let p = place_card(CARD, pet, area);
+        assert_eq!(p.edge, Edge::Side);
+        assert!(!overlaps(&p, CARD, pet));
+        assert!(p.y >= 0 && p.y + p.max_h <= 500);
+    }
+
+    #[test]
+    fn pet_at_left_edge_clamps_card_and_keeps_arrow_inside() {
+        let pet = (0, 0, 198, 169);
+        let p = place_card(CARD, pet, (0, 0, 1600, 900));
+        assert_eq!(p.x, 0);
+        assert!(p.arrow >= 16 && p.arrow <= CARD.0 - 16);
     }
 }

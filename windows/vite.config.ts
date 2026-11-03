@@ -12,6 +12,7 @@ export default defineConfig({
         main: resolve(__dirname, "index.html"),
         settings: resolve(__dirname, "settings.html"),
         popover: resolve(__dirname, "popover.html"),
+        stats: resolve(__dirname, "stats.html"),
       },
     },
   },
