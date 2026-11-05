@@ -14,6 +14,7 @@ public enum StateMapper {
         case .cursor: return eventName == "sessionEnd"
         case .droid: return eventName == "SessionEnd"
         case .grok, .jcode: return eventName == "session_end"
+        case .omp, .pi: return eventName == "session_shutdown"
         default: return false
         }
     }
@@ -119,6 +120,23 @@ public enum StateMapper {
             case "session_start": return .registered
             case "agent_start", "turn_start", "tool_execution_start": return .working
             case "agent_end", "session_shutdown": return .done
+            default: return nil
+            }
+        case .omp:
+            // Oh My Pi (omp.sh) extension. High-level agent lifecycle:
+            // session_start -> .registered
+            // agent_start -> .working
+            // tool_approval_requested -> .waiting (user confirmation)
+            // tool_approval_resolved -> .working
+            // agent_end -> .done (entire prompt complete, single notification)
+            // session_shutdown -> .done / isSessionEnd
+            // NOTE: turn_start and turn_end are deliberately excluded to prevent
+            // notification and sound spam on every individual tool call or thinking step.
+            switch eventName {
+            case "session_start": return .registered
+            case "agent_start", "tool_execution_start", "tool_call", "tool_approval_resolved", "working": return .working
+            case "tool_approval_requested", "waiting": return .waiting
+            case "agent_end", "session_shutdown", "done": return .done
             default: return nil
             }
         case .grok:
