@@ -18,6 +18,7 @@ public enum TickerFormatter {
         case .kiroCLI:   return "Kiro"
         case .droid:     return "Droid"
         case .pi:        return "Pi"
+        case .omp:       return "Oh My Pi"
         case .grok:      return "Grok"
         case .jcode:     return "jcode"
         case .cli:       return "Agent"

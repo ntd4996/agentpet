@@ -94,11 +94,31 @@ public enum TranscriptReader {
         for trimmed in lines {
             guard let lineData = trimmed.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                  json["type"] as? String == "assistant",
-                  let message = json["message"] as? [String: Any],
-                  let model = message["model"] as? String
+                  let type = json["type"] as? String
             else { continue }
-            return model
+
+            if type == "assistant",
+               let message = json["message"] as? [String: Any],
+               let model = message["model"] as? String {
+                return model
+            }
+
+            if type == "model_change",
+               let model = json["model"] as? String,
+               !model.isEmpty {
+                return model
+            }
+
+            if type == "message",
+               let message = json["message"] as? [String: Any],
+               message["role"] as? String == "assistant" {
+                if let model = json["model"] as? String, !model.isEmpty {
+                    return model
+                }
+                if let model = message["model"] as? String, !model.isEmpty {
+                    return model
+                }
+            }
         }
 
         return nil
@@ -157,13 +177,14 @@ public enum TranscriptReader {
             // Fast reject: most lines carry no usage object at all.
             guard line.contains("\"usage\"") else { continue }
             guard let data = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let message = json["message"] as? [String: Any],
-                  let usage = message["usage"] as? [String: Any]
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { continue }
+            let message = json["message"] as? [String: Any]
+            guard let usage = (message?["usage"] as? [String: Any]) ?? (json["usage"] as? [String: Any])
             else { continue }
             if let since = countUsageSince, let stamp = json["timestamp"] as? String,
                let at = usageTimestamp.date(from: stamp), at < since { continue }
-            if let id = message["id"] as? String, !id.isEmpty {
+            if let id = (message?["id"] as? String) ?? (json["id"] as? String), !id.isEmpty {
                 guard countedIDs.insert(id).inserted else { continue }
                 countedOrder.append(id)
                 if countedOrder.count > countedLimit {
@@ -172,16 +193,16 @@ public enum TranscriptReader {
                     countedOrder.removeFirst(dropped.count)
                 }
             }
-            let inputTokens = usage["input_tokens"] as? Int ?? 0
-            let outputTokens = usage["output_tokens"] as? Int ?? 0
+            let inputTokens = (usage["input_tokens"] as? Int) ?? (usage["inputTokens"] as? Int) ?? 0
+            let outputTokens = (usage["output_tokens"] as? Int) ?? (usage["outputTokens"] as? Int) ?? 0
             total += inputTokens
             total += outputTokens
             costAccumulator += ModelPricing.costUSD(
-                model: message["model"] as? String,
+                model: (message?["model"] as? String) ?? (json["model"] as? String),
                 inputTokens: inputTokens,
                 outputTokens: outputTokens,
-                cacheCreateTokens: usage["cache_creation_input_tokens"] as? Int ?? 0,
-                cacheReadTokens: usage["cache_read_input_tokens"] as? Int ?? 0
+                cacheCreateTokens: (usage["cache_creation_input_tokens"] as? Int) ?? (usage["cacheCreationInputTokens"] as? Int) ?? 0,
+                cacheReadTokens: (usage["cache_read_input_tokens"] as? Int) ?? (usage["cacheReadInputTokens"] as? Int) ?? 0
             )
         }
         return UsageDelta(tokens: total, costUSD: costAccumulator)
@@ -320,9 +341,22 @@ public enum TranscriptReader {
                 return (summary, true)
             }
 
+            // Oh My Pi writes a "title" event with the conversation title.
+            if type == "title",
+               let title = json["title"] as? String,
+               !title.trimmingCharacters(in: .whitespaces).isEmpty {
+                return (title, true)
+            }
+
             // Scan every user event; keep the first that yields real human text.
-            if firstUserText == nil, type == "user" {
-                firstUserText = extractUserText(from: json)
+            if firstUserText == nil {
+                if type == "user" {
+                    firstUserText = extractUserText(from: json)
+                } else if type == "message",
+                          let msg = json["message"] as? [String: Any],
+                          msg["role"] as? String == "user" {
+                    firstUserText = extractUserText(from: json)
+                }
             }
         }
 
