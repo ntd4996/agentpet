@@ -1026,30 +1026,44 @@ private struct AgentRow: View {
     }
 
     private var projectName: String {
-        session.project.map { projectNames.label(for: $0) } ?? session.id
+        let base = session.project.map { projectNames.label(for: $0) } ?? session.id
+        if let host = session.host {
+            return "[\(host)] \(base)"
+        }
+        return base
     }
 
     private var messageText: String {
         let mood = moodFor(session.state)
+        let base: String
         // Working shows the live activity from the hook ("Editing X…"); a custom
         // working line, if set, still overrides it.
         if mood == .working {
             if bubbleMsgs.source == .custom {
                 let custom = bubbleMsgs.line(for: session.agentKind, mood: .working, seed: session.id)
-                if !custom.isEmpty { return custom }
+                if !custom.isEmpty {
+                    base = custom
+                } else {
+                    let m = session.message?.trimmingCharacters(in: .whitespaces) ?? ""
+                    base = !m.isEmpty ? m : (ActivityFormatter.stateMessage(for: session.state) ?? session.state.rawValue.capitalized)
+                }
+            } else {
+                let m = session.message?.trimmingCharacters(in: .whitespaces) ?? ""
+                base = !m.isEmpty ? m : (ActivityFormatter.stateMessage(for: session.state) ?? session.state.rawValue.capitalized)
             }
-            let m = session.message?.trimmingCharacters(in: .whitespaces) ?? ""
-            if !m.isEmpty { return m }
-            return ActivityFormatter.stateMessage(for: session.state)
-                ?? session.state.rawValue.capitalized
+        } else {
+            // done / waiting / idle: always use the bubble message (custom when set,
+            // otherwise the localized built-in default). The hook's own message is
+            // unlocalized (a separate process), so we never fall back to it here.
+            let line = bubbleMsgs.line(for: session.agentKind, mood: mood, seed: session.id)
+            base = !line.isEmpty ? line : (ActivityFormatter.stateMessage(for: session.state) ?? session.state.rawValue.capitalized)
         }
-        // done / waiting / idle: always use the bubble message (custom when set,
-        // otherwise the localized built-in default). The hook's own message is
-        // unlocalized (a separate process), so we never fall back to it here.
-        let line = bubbleMsgs.line(for: session.agentKind, mood: mood, seed: session.id)
-        if !line.isEmpty { return line }
-        return ActivityFormatter.stateMessage(for: session.state)
-            ?? session.state.rawValue.capitalized
+
+        let hasProjectToken = settings.effectiveLayout.tokens.contains { $0.isVisible && $0.token == .project }
+        if let host = session.host, !hasProjectToken {
+            return "[\(host)] \(base)"
+        }
+        return base
     }
 
     private func moodFor(_ state: AgentState) -> PetMood {

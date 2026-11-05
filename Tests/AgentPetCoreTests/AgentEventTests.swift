@@ -9,6 +9,19 @@ final class AgentEventTests: XCTestCase {
         XCTAssertNil(event.approvalRequestId)
         XCTAssertNil(event.toolName)
         XCTAssertNil(event.toolSummary)
+        XCTAssertNil(event.host)
+    }
+
+    func testCodableRoundTripPreservesHost() throws {
+        let event = AgentEvent(
+            sessionId: "s1", agentKind: .claude, eventName: "SessionStart",
+            host: "vps-test",
+            timestamp: now
+        )
+        let data = try EventCoding.encoder.encode(event)
+        let decoded = try EventCoding.decoder.decode(AgentEvent.self, from: data)
+        XCTAssertEqual(decoded, event)
+        XCTAssertEqual(decoded.host, "vps-test")
     }
 
     func testCodableRoundTripPreservesApprovalFields() throws {
