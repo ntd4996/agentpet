@@ -70,8 +70,8 @@ public enum StateMapper {
             // The plugin sends normalised states directly (handled above); these
             // map the raw opencode event names as a fallback.
             switch eventName {
-            case "session.created": return .working
-            case "session.idle": return .done
+            case "session.created", "turn.start", "message.updated", "chat.message", "session.status.busy", "session.status.running": return .working
+            case "session.idle", "turn.end", "session.status.idle": return .done
             default: return nil
             }
         case .antigravity:

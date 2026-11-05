@@ -245,10 +245,14 @@ private struct GeneralTab: View {
     @ObservedObject private var sound = SoundSettings.shared
     @ObservedObject private var appLang = AppLanguage.shared
     @ObservedObject private var breaks = BreakReminderSettings.shared
+    @ObservedObject private var remoteSettings = RemoteServerSettings.shared
     // Local mirror of the system login-item state so the toggle re-renders
     // reliably (the SMAppService status isn't observable on its own).
     @State private var launchAtLogin = LoginItem.isEnabled
     @State private var showCodexHelp = false
+    @State private var copiedToken = false
+    @State private var copiedSSH = false
+    @State private var copiedSetup = false
 
     var body: some View {
         Form {
@@ -387,6 +391,124 @@ private struct GeneralTab: View {
                 }
                 if let err = model.installError {
                     Text(err).font(.caption).foregroundStyle(.red).textSelection(.enabled)
+                }
+            }
+
+            Section("Remote Server / VPS") {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Receive events from VPS")
+                        Text("Forward coding agent events from remote machines via SSH tunnel.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    ColorSwitch(isOn: $remoteSettings.isEnabled)
+                }
+
+                if remoteSettings.isEnabled {
+                    HStack {
+                        Text("Local Port")
+                        Spacer()
+                        Text("\(remoteSettings.port)")
+                            .font(.system(.body, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Secret Token")
+                            Spacer()
+                            Button("Regenerate") {
+                                remoteSettings.regenerateToken()
+                            }
+                            .buttonStyle(.borderless)
+                            .font(.caption)
+                        }
+                        HStack {
+                            Text(remoteSettings.authToken)
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                            Spacer()
+                            Button {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(remoteSettings.authToken, forType: .string)
+                                copiedToken = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copiedToken = false }
+                            } label: {
+                                Image(systemName: copiedToken ? "checkmark" : "doc.on.doc")
+                            }
+                            .buttonStyle(.borderless)
+                            .help("Copy Auth Token")
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("1. SSH Tunnel Setup")
+                            .font(.caption).fontWeight(.semibold)
+                        Text("Add to ~/.ssh/config or run with -R flag:")
+                            .font(.caption2).foregroundStyle(.secondary)
+                        HStack {
+                            Text(remoteSettings.sshCommandSnippet())
+                                .font(.system(size: 11, design: .monospaced))
+                                .lineLimit(1)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(remoteSettings.sshCommandSnippet(), forType: .string)
+                                copiedSSH = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copiedSSH = false }
+                            } label: {
+                                Label(copiedSSH ? "Copied" : "Copy Command", systemImage: copiedSSH ? "checkmark" : "terminal")
+                            }
+                            .font(.caption)
+                            .buttonStyle(.bordered)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("2. Remote Server Setup")
+                            .font(.caption).fontWeight(.semibold)
+                        Text("Run once on your VPS (after SSH connection is active):")
+                            .font(.caption2).foregroundStyle(.secondary)
+                        HStack {
+                            Text(remoteSettings.setupCommand())
+                                .font(.system(size: 11, design: .monospaced))
+                                .lineLimit(1)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Button {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(remoteSettings.setupCommand(), forType: .string)
+                                copiedSetup = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 2) { copiedSetup = false }
+                            } label: {
+                                Label(copiedSetup ? "Copied" : "Copy Setup", systemImage: copiedSetup ? "checkmark" : "doc.on.doc")
+                            }
+                            .font(.caption)
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+
+                    if !remoteSettings.connectedHosts.isEmpty {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Connected Hosts")
+                                .font(.caption).fontWeight(.semibold)
+                            ForEach(Array(remoteSettings.connectedHosts.keys.sorted()), id: \.self) { host in
+                                HStack {
+                                    Image(systemName: "server.rack")
+                                        .foregroundStyle(.green)
+                                    Text(host)
+                                        .font(.system(.caption, design: .monospaced))
+                                    Spacer()
+                                    Text("Active")
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
                 }
             }
 

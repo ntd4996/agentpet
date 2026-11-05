@@ -18,6 +18,7 @@ final class AppDaemon: ObservableObject {
         return s
     }()
     private let server = EventSocketServer(path: AgentPetPaths.socketPath)
+    private var remoteServer: RemoteEventServer?
     private var pruneTimer: Timer?
 
     func start() {
@@ -44,6 +45,8 @@ final class AppDaemon: ObservableObject {
         try? server.start { event in
             Task { @MainActor [weak self] in self?.ingest(event) }
         }
+
+        startRemoteServerIfNeeded()
 
         pruneTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { _ in
             Task { @MainActor [weak self] in self?.prune() }
@@ -357,6 +360,35 @@ final class AppDaemon: ObservableObject {
         store.prune(now: Date())
         guard store.sorted != sessions else { return }
         refresh()
+    }
+
+    func startRemoteServerIfNeeded() {
+        let settings = RemoteServerSettings.shared
+        guard settings.isEnabled else { return }
+        let server = RemoteEventServer(
+            port: UInt16(settings.port),
+            authTokenProvider: { RemoteServerSettings.currentAuthToken() },
+            setupScriptProvider: { RemoteSetupScript.generate() }
+        )
+        do {
+            try server.start { [weak self] event in
+                Task { @MainActor [weak self] in
+                    if let host = event.host {
+                        RemoteServerSettings.shared.recordHost(host)
+                    }
+                    self?.ingest(event)
+                }
+            }
+            self.remoteServer = server
+        } catch {
+            NSLog("Failed to start RemoteEventServer: \(error)")
+        }
+    }
+
+    func restartRemoteServer() {
+        remoteServer?.stop()
+        remoteServer = nil
+        startRemoteServerIfNeeded()
     }
 
     private func refresh() {
