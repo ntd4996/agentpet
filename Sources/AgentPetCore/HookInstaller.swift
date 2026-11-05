@@ -240,6 +240,52 @@ public enum HookInstaller {
         """
     }
 
+    // MARK: - Oh My Pi TypeScript extension
+
+    static func ompExtension(binary: String) -> String {
+        """
+        // AgentPet integration (auto-generated, safe to delete to uninstall).
+        // Reports Oh My Pi session lifecycle to AgentPet's menu bar app.
+        import { spawn } from "node:child_process"
+        const AGENTPET_BIN = \(jsString(binary))
+        export default function (pi) {
+          const send = (state, ctx, extra = {}) => {
+            try {
+              const cwd = (ctx && ctx.cwd) || process.cwd()
+              const file = ctx && ctx.sessionManager && ctx.sessionManager.getSessionFile
+                ? ctx.sessionManager.getSessionFile() : null
+              const sid = "omp:" + (file || cwd)
+              const args = ["hook", "--agent", "omp",
+                "--event", state, "--session", sid, "--project", cwd]
+              if (file) {
+                args.push("--transcript", file)
+              }
+              const model = (ctx && (ctx.model || ctx.currentModel)) || extra.model
+              if (model) {
+                args.push("--model", String(model))
+              }
+              if (extra.message) {
+                args.push("--message", String(extra.message))
+              }
+              const p = spawn(AGENTPET_BIN, args, { stdio: "ignore" })
+              if (p && p.unref) p.unref()
+            } catch (e) {}
+          }
+          pi.on("session_start", async (_e, ctx) => send("session_start", ctx))
+          pi.on("agent_start", async (_e, ctx) => send("agent_start", ctx))
+          pi.on("turn_start", async (_e, ctx) => send("turn_start", ctx))
+          pi.on("tool_approval_requested", async (e, ctx) => {
+            const tool = e && e.toolName ? e.toolName : "tool"
+            send("waiting", ctx, { message: `Needs approval for ${tool}` })
+          })
+          pi.on("tool_approval_resolved", async (_e, ctx) => send("working", ctx))
+          pi.on("turn_end", async (_e, ctx) => send("turn_end", ctx))
+          pi.on("agent_end", async (_e, ctx) => send("agent_end", ctx))
+          pi.on("session_shutdown", async (_e, ctx) => send("done", ctx))
+        }
+        """
+    }
+
     /// JSON-encodes a string for safe embedding in JS source. Slashes are left
     /// unescaped so embedded file paths stay readable (`"/a/b"`, not `"\/a\/b"`).
     private static func jsString(_ s: String) -> String {
@@ -287,11 +333,16 @@ public enum HookInstaller {
             try writeSettings(s, path: path)
         case .antigravityNested:
             try writeSettings(installAntigravity(into: readSettings(path: path), command: command, events: events), path: path)
-        case .opencodePlugin, .piExtension:
+        case .opencodePlugin, .piExtension, .ompExtension:
             let dir = (path as NSString).deletingLastPathComponent
             try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
             let bin = binaryPath(fromCommand: command)
-            let source = style == .piExtension ? piExtension(binary: bin) : opencodePlugin(binary: bin)
+            let source: String
+            switch style {
+            case .piExtension: source = piExtension(binary: bin)
+            case .ompExtension: source = ompExtension(binary: bin)
+            default: source = opencodePlugin(binary: bin)
+            }
             try Data(source.utf8).write(to: URL(fileURLWithPath: path), options: .atomic)
         case .jcodeToml:
             try JcodeHookConfig.installToDisk(command: command, path: path, events: events)
@@ -307,7 +358,7 @@ public enum HookInstaller {
             try writeSettings(uninstallFlat(from: readSettings(path: path), events: events), path: path)
         case .antigravityNested:
             try writeSettings(uninstallAntigravity(from: readSettings(path: path), events: events), path: path)
-        case .opencodePlugin, .piExtension:
+        case .opencodePlugin, .piExtension, .ompExtension:
             if isInstalledOnDisk(path: path, events: events, style: style) {
                 try? FileManager.default.removeItem(atPath: path)
             }
@@ -325,7 +376,7 @@ public enum HookInstaller {
             return isInstalledFlat(in: (try? readSettings(path: path)) ?? [:], events: events)
         case .antigravityNested:
             return isInstalledAntigravity(in: (try? readSettings(path: path)) ?? [:], events: events)
-        case .opencodePlugin, .piExtension:
+        case .opencodePlugin, .piExtension, .ompExtension:
             guard let s = try? String(contentsOfFile: path, encoding: .utf8) else { return false }
             return isOurs(s)
         case .jcodeToml:

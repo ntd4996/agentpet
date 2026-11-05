@@ -121,6 +121,17 @@ public enum StateMapper {
             case "agent_end", "session_shutdown": return .done
             default: return nil
             }
+        case .omp:
+            // Oh My Pi (omp.sh) extension. Unlike vanilla Pi, OMP fires
+            // tool_approval_requested when paused waiting for user consent,
+            // which transitions to .waiting, and tool_approval_resolved restores .working.
+            switch eventName {
+            case "session_start": return .registered
+            case "agent_start", "turn_start", "tool_execution_start", "tool_call", "tool_approval_resolved": return .working
+            case "tool_approval_requested", "waiting": return .waiting
+            case "agent_end", "turn_end", "session_shutdown", "done": return .done
+            default: return nil
+            }
         case .grok:
             // Grok Build sends snake_case event VALUES in its payload. PreToolUse
             // is deliberately not registered (its deny gate is risky), so tool

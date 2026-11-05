@@ -157,13 +157,14 @@ public enum TranscriptReader {
             // Fast reject: most lines carry no usage object at all.
             guard line.contains("\"usage\"") else { continue }
             guard let data = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let message = json["message"] as? [String: Any],
-                  let usage = message["usage"] as? [String: Any]
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else { continue }
+            let message = json["message"] as? [String: Any]
+            guard let usage = (message?["usage"] as? [String: Any]) ?? (json["usage"] as? [String: Any])
             else { continue }
             if let since = countUsageSince, let stamp = json["timestamp"] as? String,
                let at = usageTimestamp.date(from: stamp), at < since { continue }
-            if let id = message["id"] as? String, !id.isEmpty {
+            if let id = (message?["id"] as? String) ?? (json["id"] as? String), !id.isEmpty {
                 guard countedIDs.insert(id).inserted else { continue }
                 countedOrder.append(id)
                 if countedOrder.count > countedLimit {
@@ -172,16 +173,16 @@ public enum TranscriptReader {
                     countedOrder.removeFirst(dropped.count)
                 }
             }
-            let inputTokens = usage["input_tokens"] as? Int ?? 0
-            let outputTokens = usage["output_tokens"] as? Int ?? 0
+            let inputTokens = (usage["input_tokens"] as? Int) ?? (usage["inputTokens"] as? Int) ?? 0
+            let outputTokens = (usage["output_tokens"] as? Int) ?? (usage["outputTokens"] as? Int) ?? 0
             total += inputTokens
             total += outputTokens
             costAccumulator += ModelPricing.costUSD(
-                model: message["model"] as? String,
+                model: (message?["model"] as? String) ?? (json["model"] as? String),
                 inputTokens: inputTokens,
                 outputTokens: outputTokens,
-                cacheCreateTokens: usage["cache_creation_input_tokens"] as? Int ?? 0,
-                cacheReadTokens: usage["cache_read_input_tokens"] as? Int ?? 0
+                cacheCreateTokens: (usage["cache_creation_input_tokens"] as? Int) ?? (usage["cacheCreationInputTokens"] as? Int) ?? 0,
+                cacheReadTokens: (usage["cache_read_input_tokens"] as? Int) ?? (usage["cacheReadInputTokens"] as? Int) ?? 0
             )
         }
         return UsageDelta(tokens: total, costUSD: costAccumulator)
