@@ -317,7 +317,7 @@ final class AppDaemon: ObservableObject {
     private let modelResolveThrottle = PerKeyThrottle(interval: 30)
 
     private func resolveModel(for event: AgentEvent) {
-        guard event.agentKind == .claude else { return }
+        guard event.agentKind == .claude || event.agentKind == .omp else { return }
         guard modelResolveThrottle.shouldRun(event.sessionId, now: Date()) else { return }
         let sessionId = event.sessionId
         let path: String? = event.transcriptPath

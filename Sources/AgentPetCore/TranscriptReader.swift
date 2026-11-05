@@ -94,11 +94,31 @@ public enum TranscriptReader {
         for trimmed in lines {
             guard let lineData = trimmed.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                  json["type"] as? String == "assistant",
-                  let message = json["message"] as? [String: Any],
-                  let model = message["model"] as? String
+                  let type = json["type"] as? String
             else { continue }
-            return model
+
+            if type == "assistant",
+               let message = json["message"] as? [String: Any],
+               let model = message["model"] as? String {
+                return model
+            }
+
+            if type == "model_change",
+               let model = json["model"] as? String,
+               !model.isEmpty {
+                return model
+            }
+
+            if type == "message",
+               let message = json["message"] as? [String: Any],
+               message["role"] as? String == "assistant" {
+                if let model = json["model"] as? String, !model.isEmpty {
+                    return model
+                }
+                if let model = message["model"] as? String, !model.isEmpty {
+                    return model
+                }
+            }
         }
 
         return nil
@@ -321,9 +341,22 @@ public enum TranscriptReader {
                 return (summary, true)
             }
 
+            // Oh My Pi writes a "title" event with the conversation title.
+            if type == "title",
+               let title = json["title"] as? String,
+               !title.trimmingCharacters(in: .whitespaces).isEmpty {
+                return (title, true)
+            }
+
             // Scan every user event; keep the first that yields real human text.
-            if firstUserText == nil, type == "user" {
-                firstUserText = extractUserText(from: json)
+            if firstUserText == nil {
+                if type == "user" {
+                    firstUserText = extractUserText(from: json)
+                } else if type == "message",
+                          let msg = json["message"] as? [String: Any],
+                          msg["role"] as? String == "user" {
+                    firstUserText = extractUserText(from: json)
+                }
             }
         }
 

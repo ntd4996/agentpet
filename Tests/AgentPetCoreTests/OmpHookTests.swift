@@ -21,14 +21,18 @@ final class OmpHookTests: XCTestCase {
         let ts = HookInstaller.ompExtension(binary: "/x/agentpet")
         XCTAssertTrue(ts.contains("pi.on(\"session_start\""))
         XCTAssertTrue(ts.contains("pi.on(\"agent_start\""))
-        XCTAssertTrue(ts.contains("pi.on(\"turn_start\""))
+        XCTAssertFalse(ts.contains("pi.on(\"turn_start\""), "turn_start excluded to avoid notification spam")
+        XCTAssertFalse(ts.contains("pi.on(\"turn_end\""), "turn_end excluded to avoid notification spam")
         XCTAssertTrue(ts.contains("pi.on(\"tool_approval_requested\""))
         XCTAssertTrue(ts.contains("pi.on(\"tool_approval_resolved\""))
         XCTAssertTrue(ts.contains("pi.on(\"agent_end\""))
+        XCTAssertTrue(ts.contains("extractModel"))
+        XCTAssertTrue(ts.contains("extractTitle"))
         XCTAssertTrue(ts.contains("--agent"))
         XCTAssertTrue(ts.contains("omp"))
         XCTAssertTrue(ts.contains("--transcript"))
         XCTAssertTrue(ts.contains("--model"))
+        XCTAssertTrue(ts.contains("--title"))
         XCTAssertTrue(HookInstaller.isOurs(ts.replacingOccurrences(of: "\n", with: " ")))
     }
 
@@ -50,14 +54,15 @@ final class OmpHookTests: XCTestCase {
     func testOmpStateMapping() {
         XCTAssertEqual(StateMapper.state(for: .omp, eventName: "session_start"), .registered)
         XCTAssertEqual(StateMapper.state(for: .omp, eventName: "agent_start"), .working)
-        XCTAssertEqual(StateMapper.state(for: .omp, eventName: "turn_start"), .working)
+        XCTAssertNil(StateMapper.state(for: .omp, eventName: "turn_start"), "turn_start ignored to avoid spam")
+        XCTAssertNil(StateMapper.state(for: .omp, eventName: "turn_end"), "turn_end ignored to avoid spam")
         XCTAssertEqual(StateMapper.state(for: .omp, eventName: "tool_call"), .working)
         XCTAssertEqual(StateMapper.state(for: .omp, eventName: "tool_approval_resolved"), .working)
         XCTAssertEqual(StateMapper.state(for: .omp, eventName: "tool_approval_requested"), .waiting)
         XCTAssertEqual(StateMapper.state(for: .omp, eventName: "waiting"), .waiting)
-        XCTAssertEqual(StateMapper.state(for: .omp, eventName: "turn_end"), .done)
         XCTAssertEqual(StateMapper.state(for: .omp, eventName: "agent_end"), .done)
         XCTAssertEqual(StateMapper.state(for: .omp, eventName: "session_shutdown"), .done)
+        XCTAssertTrue(StateMapper.isSessionEnd(for: .omp, eventName: "session_shutdown"))
     }
 
     func testOmpEventViaExplicitFlags() {
@@ -68,6 +73,7 @@ final class OmpHookTests: XCTestCase {
             "--project", "/Users/test/myproject",
             "--transcript", "/Users/test/session.jsonl",
             "--model", "claude-3-7-sonnet",
+            "--title", "Fix pipeline bug",
             "--message", "Needs approval for bash"
         ])
         let event = args.makeEvent(now: Date())
@@ -76,6 +82,7 @@ final class OmpHookTests: XCTestCase {
         XCTAssertEqual(event?.project, "/Users/test/myproject")
         XCTAssertEqual(event?.transcriptPath, "/Users/test/session.jsonl")
         XCTAssertEqual(event?.model, "claude-3-7-sonnet")
+        XCTAssertEqual(event?.title, "Fix pipeline bug")
         XCTAssertEqual(event?.message, "Needs approval for bash")
     }
 
@@ -120,5 +127,39 @@ final class OmpHookTests: XCTestCase {
         let delta2 = TranscriptReader.newUsageDelta(at: path)
         XCTAssertNotNil(delta2)
         XCTAssertEqual(delta2?.tokens, 300)
+    }
+
+    func testOmpTranscriptTitleAndModel() throws {
+        let path = tmp("omp_session_title.jsonl")
+        let dir = (path as NSString).deletingLastPathComponent
+        try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItem(atPath: dir)
+            TranscriptReader.clearCache()
+        }
+
+        // Test fallback to first user message when title is empty
+        let content1 = """
+        {"type":"title","v":1,"title":"","updatedAt":"2026-11-05T20:03:21.149Z"}
+        {"type":"model_change","model":"ninerouter/team-pi-lead"}
+        {"type":"message","message":{"role":"user","content":[{"type":"text","text":"Implement full Oh My Pi support"}]}}
+        {"type":"message","message":{"role":"assistant","content":[{"type":"text","text":"I will help you implement that."}]},"model":"team-pi-lead"}
+        """
+        try content1.write(toFile: path, atomically: true, encoding: .utf8)
+
+        XCTAssertEqual(TranscriptReader.title(at: path), "Implement full Oh My Pi support")
+        XCTAssertEqual(TranscriptReader.latestAssistantModel(at: path), "team-pi-lead")
+
+        // Test explicit title event
+        let path2 = tmp("omp_session_title_explicit.jsonl")
+        let dir2 = (path2 as NSString).deletingLastPathComponent
+        try FileManager.default.createDirectory(atPath: dir2, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: dir2) }
+        let content2 = """
+        {"type":"title","v":1,"title":"Refactor pipeline code","source":"auto"}
+        {"type":"message","message":{"role":"user","content":[{"type":"text","text":"First user prompt"}]}}
+        """
+        try content2.write(toFile: path2, atomically: true, encoding: .utf8)
+        XCTAssertEqual(TranscriptReader.title(at: path2), "Refactor pipeline code")
     }
 }

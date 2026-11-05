@@ -248,24 +248,65 @@ public enum HookInstaller {
         // Reports Oh My Pi session lifecycle to AgentPet's menu bar app.
         import { spawn } from "node:child_process"
         const AGENTPET_BIN = \(jsString(binary))
+
+        function extractModel(ctx, extra) {
+          const raw = (ctx && (ctx.model || ctx.currentModel)) || (extra && extra.model)
+          if (!raw) return null
+          if (typeof raw === "string") {
+            const s = raw.trim()
+            return s && s !== "[object Object]" ? s : null
+          }
+          if (typeof raw === "object") {
+            const provider = typeof raw.provider === "string" ? raw.provider.trim() : ""
+            const id = typeof raw.id === "string" ? raw.id.trim()
+              : (typeof raw.name === "string" ? raw.name.trim()
+              : (typeof raw.modelId === "string" ? raw.modelId.trim() : ""))
+            if (provider && id) return `${provider}/${id}`
+            if (id) return id
+          }
+          return null
+        }
+
+        function extractTitle(pi, extra) {
+          if (extra && typeof extra.title === "string" && extra.title.trim()) {
+            const t = extra.title.trim()
+            return t !== "[object Object]" ? t : null
+          }
+          if (typeof pi?.getSessionName === "function") {
+            try {
+              const name = pi.getSessionName()
+              if (typeof name === "string" && name.trim()) {
+                const s = name.trim()
+                return s !== "[object Object]" ? s : null
+              }
+            } catch {}
+          }
+          return null
+        }
+
         export default function (pi) {
           const send = (state, ctx, extra = {}) => {
             try {
-              const cwd = (ctx && ctx.cwd) || process.cwd()
-              const file = ctx && ctx.sessionManager && ctx.sessionManager.getSessionFile
+              const cwd = (ctx && typeof ctx.cwd === "string" && ctx.cwd) || process.cwd()
+              const sessionFile = ctx && ctx.sessionManager && typeof ctx.sessionManager.getSessionFile === "function"
                 ? ctx.sessionManager.getSessionFile() : null
+              const file = typeof sessionFile === "string" && sessionFile.trim() ? sessionFile.trim() : null
               const sid = "omp:" + (file || cwd)
               const args = ["hook", "--agent", "omp",
                 "--event", state, "--session", sid, "--project", cwd]
               if (file) {
                 args.push("--transcript", file)
               }
-              const model = (ctx && (ctx.model || ctx.currentModel)) || extra.model
+              const model = extractModel(ctx, extra)
               if (model) {
-                args.push("--model", String(model))
+                args.push("--model", model)
               }
-              if (extra.message) {
-                args.push("--message", String(extra.message))
+              const title = extractTitle(pi, extra)
+              if (title) {
+                args.push("--title", title)
+              }
+              if (extra && typeof extra.message === "string" && extra.message.trim()) {
+                args.push("--message", extra.message.trim())
               }
               const p = spawn(AGENTPET_BIN, args, { stdio: "ignore" })
               if (p && p.unref) p.unref()
@@ -273,15 +314,14 @@ public enum HookInstaller {
           }
           pi.on("session_start", async (_e, ctx) => send("session_start", ctx))
           pi.on("agent_start", async (_e, ctx) => send("agent_start", ctx))
-          pi.on("turn_start", async (_e, ctx) => send("turn_start", ctx))
           pi.on("tool_approval_requested", async (e, ctx) => {
-            const tool = e && e.toolName ? e.toolName : "tool"
+            const tool = e && typeof e.toolName === "string" ? e.toolName
+              : (typeof e?.tool === "string" ? e.tool : (e?.tool?.name || "tool"))
             send("waiting", ctx, { message: `Needs approval for ${tool}` })
           })
           pi.on("tool_approval_resolved", async (_e, ctx) => send("working", ctx))
-          pi.on("turn_end", async (_e, ctx) => send("turn_end", ctx))
           pi.on("agent_end", async (_e, ctx) => send("agent_end", ctx))
-          pi.on("session_shutdown", async (_e, ctx) => send("done", ctx))
+          pi.on("session_shutdown", async (_e, ctx) => send("session_shutdown", ctx))
         }
         """
     }

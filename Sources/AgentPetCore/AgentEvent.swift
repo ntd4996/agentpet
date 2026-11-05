@@ -15,6 +15,8 @@ public struct AgentEvent: Codable, Sendable, Equatable {
     /// Path to the agent's conversation transcript file (e.g. Claude Code JSONL).
     /// Used to derive a human-readable title for the session.
     public var transcriptPath: String?
+    /// Conversation title reported directly by the agent hook.
+    public var title: String?
     /// Subagent identifier from a `SubagentStop` event (e.g. `"agent-abc123"`).
     public var subagentId: String?
     /// Non-nil marks this event as a gated `PreToolUse` request: the daemon
@@ -50,6 +52,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         message: String? = nil,
         model: String? = nil,
         transcriptPath: String? = nil,
+        title: String? = nil,
         subagentId: String? = nil,
         approvalRequestId: String? = nil,
         toolName: String? = nil,
@@ -67,6 +70,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         self.message = message
         self.model = model
         self.transcriptPath = transcriptPath
+        self.title = title
         self.subagentId = subagentId
         self.approvalRequestId = approvalRequestId
         self.toolName = toolName
