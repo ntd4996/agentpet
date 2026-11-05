@@ -47,12 +47,19 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
     /// Sticky. Keeps distinct custom agents from merging and drives their
     /// bubble icon (issue #56).
     public var agentName: String?
+    /// Hostname or label of the remote machine running this session (e.g. "vps-ubuntu").
+    /// Sticky. `nil` for local sessions.
+    public var host: String?
 
     /// Grouping/identity key for the bubble. Known kinds group by kind; custom
     /// (`.unknown`) agents group by their raw name so two different custom
     /// agents don't collapse into one row (issue #56).
     public var groupKey: String {
-        agentKind == .unknown ? "unknown:\(agentName?.lowercased() ?? "")" : agentKind.rawValue
+        let base = agentKind == .unknown ? "unknown:\(agentName?.lowercased() ?? "")" : agentKind.rawValue
+        if let host {
+            return "\(base)@\(host)"
+        }
+        return base
     }
 
     public init(
@@ -71,7 +78,8 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
         terminalProgram: String? = nil,
         terminalTTY: String? = nil,
         terminalFocusURL: String? = nil,
-        agentName: String? = nil
+        agentName: String? = nil,
+        host: String? = nil
     ) {
         self.id = id
         self.agentKind = agentKind
@@ -89,5 +97,6 @@ public struct AgentSession: Identifiable, Sendable, Equatable {
         self.terminalTTY = terminalTTY
         self.terminalFocusURL = terminalFocusURL
         self.agentName = agentName
+        self.host = host
     }
 }
