@@ -39,6 +39,27 @@ final class ProjectNameStore: ObservableObject {
 struct ProjectNamesSection: View {
     @ObservedObject private var names = ProjectNameStore.shared
     @State private var projects: [(id: String, folder: String)] = []
+    @State private var expanded = false
+    @State private var query = ""
+    /// Rows shown before "Show N more"; the list is newest first.
+    private static let collapsedCount = 5
+
+    private var searching: Bool {
+        !query.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    /// Matches on folder or custom name while searching; otherwise newest first,
+    /// capped unless expanded.
+    private var visible: [(id: String, folder: String)] {
+        if searching {
+            let q = query.trimmingCharacters(in: .whitespaces)
+            return projects.filter {
+                $0.folder.localizedCaseInsensitiveContains(q)
+                    || names.customName(forID: $0.id).localizedCaseInsensitiveContains(q)
+            }
+        }
+        return expanded ? projects : Array(projects.prefix(Self.collapsedCount))
+    }
 
     var body: some View {
         Section {
@@ -46,8 +67,24 @@ struct ProjectNamesSection: View {
                 Text("No projects seen yet.")
                     .font(.caption).foregroundStyle(.secondary)
             }
-            ForEach(projects, id: \.id) { p in
+            if projects.count > Self.collapsedCount {
+                TextField(NSLocalizedString("Search projects", comment: "filter the project names list"), text: $query)
+            }
+            if searching, visible.isEmpty {
+                Text("No matching projects.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+            ForEach(visible, id: \.id) { p in
                 ProjectNameField(id: p.id, folder: p.folder)
+            }
+            if !searching, projects.count > Self.collapsedCount {
+                Button(expanded
+                       ? NSLocalizedString("Show less", comment: "collapse the project names list")
+                       : String(format: NSLocalizedString("Show %d more", comment: "expand the project names list"),
+                                projects.count - Self.collapsedCount)) {
+                    expanded.toggle()
+                }
+                .buttonStyle(.link)
             }
         } header: {
             Text("Project names")

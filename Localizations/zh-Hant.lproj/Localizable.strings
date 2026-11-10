@@ -526,3 +526,5 @@
 "Show less" = "收合";
 "Show %d more" = "再顯示 %d 項";
 "Limit" = "額度";
+"Search projects" = "搜尋專案";
+"No matching projects." = "沒有符合的專案。";

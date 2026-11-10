@@ -527,3 +527,5 @@
 "Show less" = "Thu gọn";
 "Show %d more" = "Xem thêm %d";
 "Limit" = "Hạn mức";
+"Search projects" = "Tìm project";
+"No matching projects." = "Không có project nào khớp.";

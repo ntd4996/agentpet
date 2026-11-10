@@ -526,3 +526,5 @@
 "Show less" = "收起";
 "Show %d more" = "再显示 %d 项";
 "Limit" = "额度";
+"Search projects" = "搜索项目";
+"No matching projects." = "没有匹配的项目。";
