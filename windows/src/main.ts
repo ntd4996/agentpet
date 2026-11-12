@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Pet, HIT_PAD } from "./pet";
 import { SessionStore, aggregateMood, type AgentEventPayload } from "./state";
 import { BubbleRenderer } from "./bubble";
-import { loadCatalog, savedSlug, saveSlug } from "./catalog";
+import { loadCatalog, savedSlug, saveSlug, rememberPetUrl, selectedPetUrl } from "./catalog";
 import { t, setLang, type Lang } from "./i18n";
 import { bubbleLines, PET_CHAT } from "./activity";
 import * as care from "./care";
@@ -145,7 +145,7 @@ function chime(event: "done" | "waiting") {
     if (url) { pet.load(url); return; }
   }
   // Library selection (Browse/Create) wins; legacy ap_pet_custom still honoured.
-  const url = localStorage.getItem("ap_pet_custom") || localStorage.getItem("ap_pet_url");
+  const url = selectedPetUrl();
   if (url) { pet.load(url); return; }
   // First run: no selection yet , pick a starter from the catalog.
   for (;;) {
@@ -423,7 +423,7 @@ listen("sessions-request", () => {
 listen<{ slug: string; url: string }>("set-pet", (e) => {
   pet.load(e.payload.url);
   saveSlug(e.payload.slug);
-  localStorage.setItem("ap_pet_url", e.payload.url);
+  rememberPetUrl(e.payload.url);
 });
 // Language changed from Settings , re-render the bubble in the new language.
 listen<Lang>("lang-changed", (e) => { setLang(e.payload); render(); });

@@ -56,14 +56,33 @@ export function getLibrary(): LibPet[] {
   } catch { return []; }
 }
 
-export function saveLibrary(lib: LibPet[]) {
-  try { localStorage.setItem(LIB_KEY, JSON.stringify(lib)); } catch {}
+export function saveLibrary(lib: LibPet[]): boolean {
+  try { localStorage.setItem(LIB_KEY, JSON.stringify(lib)); return true; } catch { return false; }
 }
 
-export function addToLibrary(p: LibPet) {
+/// False when localStorage is full (created pets keep their whole sheet as a data URL).
+export function addToLibrary(p: LibPet): boolean {
   const lib = getLibrary().filter((x) => x.slug !== p.slug);
   lib.unshift(p);
-  saveLibrary(lib);
+  return saveLibrary(lib);
+}
+
+/// Remembers the selected sheet URL for startup. A data URL is never copied
+/// into `ap_pet_url`: it already lives in the library, and a second copy of a
+/// 1-2 MB sheet overflows the localStorage quota (issue #94).
+export function rememberPetUrl(url: string) {
+  try {
+    if (url.startsWith("data:")) localStorage.removeItem("ap_pet_url");
+    else localStorage.setItem("ap_pet_url", url);
+  } catch {}
+}
+
+/// The selected pet's sheet: library entry for the saved slug first, then the
+/// legacy keys.
+export function selectedPetUrl(): string | null {
+  const slug = savedSlug();
+  const lib = slug ? getLibrary().find((x) => x.slug === slug)?.url : undefined;
+  return lib || localStorage.getItem("ap_pet_custom") || localStorage.getItem("ap_pet_url");
 }
 
 export function removeFromLibrary(slug: string) {

@@ -9,7 +9,7 @@ import { getCurrentWindow, LogicalSize } from "@tauri-apps/api/window";
 import { Pet } from "./pet";
 import { BubbleRenderer } from "./bubble";
 import { bubbleLines, PET_CHAT } from "./activity";
-import { loadCatalog, savedSlug } from "./catalog";
+import { loadCatalog, savedSlug, selectedPetUrl } from "./catalog";
 import { agentIconUrl, uiIcon } from "./icons";
 import { agentLabel, aggregateMood, type Session } from "./state";
 import { t } from "./i18n";
@@ -264,7 +264,7 @@ export function initDemo() {
       if (!pet) {
         pet = new Pet(stageCanvas);
         bubble = new BubbleRenderer(stageBubble);
-        const url = localStorage.getItem("ap_pet_custom") || localStorage.getItem("ap_pet_url");
+        const url = selectedPetUrl();
         if (url) pet.load(url);
         else {
           const pets = await loadCatalog();

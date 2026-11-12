@@ -3,7 +3,7 @@ import { emit, listen } from "@tauri-apps/api/event";
 import { getVersion } from "@tauri-apps/api/app";
 import { exit, relaunch } from "@tauri-apps/plugin-process";
 import { enable, disable, isEnabled } from "@tauri-apps/plugin-autostart";
-import { loadCatalog, savedSlug, saveSlug, getLibrary, addToLibrary, removeFromLibrary, petDisplayName, renamePet, type Pet, type LibPet } from "./catalog";
+import { loadCatalog, savedSlug, saveSlug, getLibrary, addToLibrary, removeFromLibrary, rememberPetUrl, selectedPetUrl, petDisplayName, renamePet, type Pet, type LibPet } from "./catalog";
 import { t, getLang, setLang, type Lang } from "./i18n";
 import { agentIconUrl, uiIcon } from "./icons";
 import { LAYOUT_PRESETS, readBubbleConfig, type TokenItem, type BubbleToken } from "./bubble";
@@ -333,7 +333,7 @@ function selectedPet(): LibPet | undefined {
 
 async function pick(p: LibPet) {
   saveSlug(p.slug);
-  localStorage.setItem("ap_pet_url", p.url);
+  rememberPetUrl(p.url);
   localStorage.removeItem("ap_pet_custom"); // legacy key
   await emit("set-pet", { slug: p.slug, url: p.url });
   showCurrent();
@@ -654,7 +654,11 @@ function initCreate() {
   };
   createBtn.onclick = () => {
     const slug = `local-${Date.now()}`;
-    addToLibrary({ slug, name: name.value.trim(), url: dataUrl, custom: true });
+    if (!addToLibrary({ slug, name: name.value.trim(), url: dataUrl, custom: true })) {
+      err.textContent = t("Not enough storage for this image. Remove a created pet or use a smaller spritesheet.");
+      err.hidden = false;
+      return;
+    }
     void pick({ slug, name: name.value.trim(), url: dataUrl, custom: true });
     modal.hidden = true;
     renderPage();
@@ -1141,9 +1145,7 @@ function initAnimations() {
   });
 
   const loadSheet = () => {
-    const lib = getLibrary();
-    const sel = lib.find((x) => x.slug === savedSlug()) ?? lib[0];
-    const url = localStorage.getItem("ap_pet_custom") || localStorage.getItem("ap_pet_url") || sel?.url;
+    const url = selectedPetUrl() || getLibrary()[0]?.url;
     if (!url) { setTimeout(loadSheet, 3000); return; } // library may seed late
     const im = new Image();
     im.crossOrigin = "anonymous";
