@@ -10,6 +10,17 @@ fn main() {
     if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
         std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
     }
+    // Wayland compositors (GNOME) ignore always-on-top for client windows, so
+    // the pet hides behind whatever gets focus. Run through XWayland instead,
+    // where always-on-top is honoured. Only when XWayland is available and the
+    // user has not picked a backend themselves (GDK_BACKEND=wayland opts out). (#64)
+    #[cfg(target_os = "linux")]
+    if std::env::var_os("GDK_BACKEND").is_none()
+        && std::env::var_os("WAYLAND_DISPLAY").is_some()
+        && std::env::var_os("DISPLAY").is_some()
+    {
+        std::env::set_var("GDK_BACKEND", "x11");
+    }
 
     let args: Vec<String> = std::env::args().collect();
     // Invoked by an agent's hook: `agentpet hook --agent <kind>` (reads stdin).
