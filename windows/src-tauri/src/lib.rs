@@ -82,7 +82,7 @@ fn write_pos(x: i32, y: i32) {
 /// Report the pet's opaque rectangle (physical px, window-relative) so empty
 /// transparent areas of the overlay let clicks pass through to apps below.
 #[tauri::command]
-fn set_hit_rect(app: tauri::AppHandle, window: tauri::WebviewWindow, x: f64, y: f64, w: f64, h: f64) {
+fn set_hit_rect(app: tauri::AppHandle, window: tauri::WebviewWindow, x: f64, y: f64, w: f64, h: f64, sprite: Option<[f64; 4]>) {
     // Also remembered per window label, so the stats card can anchor on the pet
     // that opened it (split pets each have their own rect).
     if let Ok(mut m) = hit_rects().lock() {
@@ -98,6 +98,17 @@ fn set_hit_rect(app: tauri::AppHandle, window: tauri::WebviewWindow, x: f64, y: 
             *r = HitRect { x, y, w, h };
         }
     }
+    if let Ok(mut r) = sprite_rect().lock() {
+        *r = sprite.map(|[sx, sy, sw, sh]| (sx, sy, sw, sh)).unwrap_or((x, y, w, h));
+    }
+}
+
+/// The main pet's sprite alone (physical px, window-relative), without the
+/// bubble. The off-screen clamp uses this: clamping the bubble too pushed a pet
+/// parked at the top edge down while a bubble showed, and it stayed there.
+fn sprite_rect() -> &'static Mutex<(f64, f64, f64, f64)> {
+    static S: std::sync::OnceLock<Mutex<(f64, f64, f64, f64)>> = std::sync::OnceLock::new();
+    S.get_or_init(|| Mutex::new((0.0, 0.0, 0.0, 0.0)))
 }
 
 /// Last reported hit rect (x, y, w, h in physical px, window-relative) by window label.
@@ -810,9 +821,9 @@ pub fn run() {
                                         let wa = m.work_area();
                                         (wa.position.x, wa.position.y, wa.size.width as i32, wa.size.height as i32)
                                     }).collect();
-                                    let visible = handle
-                                        .try_state::<Mutex<HitRect>>()
-                                        .and_then(|s| s.lock().ok().map(|r| (r.x, r.y, r.w, r.h)))
+                                    let visible = sprite_rect()
+                                        .lock()
+                                        .map(|r| *r)
                                         .unwrap_or((0.0, 0.0, 0.0, 0.0));
                                     let fixed = geometry::keep_visible_on_screen((p.x, p.y), (size.width as i32, size.height as i32), visible, &areas);
                                     if fixed != (p.x, p.y) {

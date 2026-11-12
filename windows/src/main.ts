@@ -532,16 +532,18 @@ function reportHitRect() {
   } else {
     parts.push([(cr.left - pad) * d, (cr.top - pad) * d, (cr.width + 2 * pad) * d, (cr.height + 2 * pad) * d]);
   }
+  const sp = rects[rects.length - 1]; // the sprite alone (pushed last), for the off-screen clamp
   const left = Math.min(...rects.map((r) => r.left));
   const top = Math.min(...rects.map((r) => r.top));
   const right = Math.max(...rects.map((r) => r.right));
   const bottom = Math.max(...rects.map((r) => r.bottom));
   hitCss = { left, top, right, bottom };
-  const sig = [left, top, right, bottom, ...parts.flat()].map((v) => Math.round(v)).join(",");
+  const sig = [left, top, right, bottom, sp.left, sp.top, sp.right, sp.bottom, ...parts.flat()].map((v) => Math.round(v)).join(",");
   if (sig === lastHitSig) return;
   lastHitSig = sig;
   if (IS_MAIN) invoke("set_hit_parts", { parts }).catch(() => {});
-  invoke("set_hit_rect", { x: left * d, y: top * d, w: (right - left) * d, h: (bottom - top) * d })
+  invoke("set_hit_rect", { x: left * d, y: top * d, w: (right - left) * d, h: (bottom - top) * d,
+    sprite: [sp.left * d, sp.top * d, (sp.right - sp.left) * d, (sp.bottom - sp.top) * d] })
     .catch((err) => invoke("log_debug", { msg: `set_hit_rect failed: ${err}` }).catch(() => {}));
 }
 pet.onFrame = reportHitRect; // the outline changes with every animation frame
