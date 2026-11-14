@@ -110,11 +110,16 @@ public final class SessionStore {
             if let tty = event.terminalTTY { existing.terminalTTY = tty }
             if let focusURL = event.terminalFocusURL { existing.terminalFocusURL = focusURL }
             if let name = event.agentName { existing.agentName = name }
+            if let host = event.host {
+                existing.host = host
+                existing.source = .remote
+            }
             existing.message = event.message
             existing.pendingApproval = pendingApproval
             byID[event.sessionId] = existing
             return existing
         }
+        let source: AgentSource = event.host != nil ? .remote : .hook
         let session = AgentSession(
             id: event.sessionId,
             agentKind: event.agentKind,
@@ -122,13 +127,14 @@ public final class SessionStore {
             state: state,
             message: event.message,
             model: event.model,
-            source: .hook,
+            source: source,
             updatedAt: now,
             pendingApproval: pendingApproval,
             terminalProgram: event.terminalProgram,
             terminalTTY: event.terminalTTY,
             terminalFocusURL: event.terminalFocusURL,
-            agentName: event.agentName
+            agentName: event.agentName,
+            host: event.host
         )
         byID[event.sessionId] = session
         return session
