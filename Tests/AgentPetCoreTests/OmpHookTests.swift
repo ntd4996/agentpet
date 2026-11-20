@@ -102,9 +102,10 @@ final class OmpHookTests: XCTestCase {
             TranscriptReader.clearCache()
         }
 
-        // Test camelCase tokens format used in Pi / Oh My Pi session files
+        // Test actual Oh My Pi (omp) session format (can1357/oh-my-pi docs/session.md):
+        // usage is at root with input, output, cacheRead, cacheWrite, totalTokens
         let line1 = """
-        {"type":"message","id":"msg-1","message":{"id":"msg-1","model":"claude-3-7-sonnet","usage":{"inputTokens":100,"outputTokens":50,"cacheReadInputTokens":10}}}
+        {"type":"message","id":"msg-1","parentId":null,"timestamp":"2026-11-05T20:03:26.963Z","message":{"role":"assistant","content":[{"type":"text","text":"hello"}]},"api":"openai-completions","provider":"anthropic","model":"claude-3-7-sonnet","usage":{"input":100,"output":50,"cacheRead":10,"cacheWrite":0,"totalTokens":150,"cost":{"input":0,"output":0,"total":0}}}
         \n
         """
         try line1.write(toFile: path, atomically: true, encoding: .utf8)
@@ -114,9 +115,9 @@ final class OmpHookTests: XCTestCase {
         XCTAssertEqual(delta1?.tokens, 150)
         XCTAssertGreaterThan(delta1?.costUSD ?? 0, 0)
 
-        // Append line2
+        // Append line2 with another actual OMP assistant response
         let line2 = """
-        {"type":"message","id":"msg-2","message":{"id":"msg-2","model":"claude-3-7-sonnet","usage":{"inputTokens":200,"outputTokens":100}}}
+        {"type":"message","id":"msg-2","parentId":"msg-1","timestamp":"2026-11-05T20:03:30.123Z","message":{"role":"assistant","content":[{"type":"text","text":"world"}]},"api":"openai-completions","provider":"anthropic","model":"claude-3-7-sonnet","usage":{"input":200,"output":100,"cacheRead":0,"cacheWrite":0,"totalTokens":300}}
         \n
         """
         let handle = try FileHandle(forWritingTo: URL(fileURLWithPath: path))

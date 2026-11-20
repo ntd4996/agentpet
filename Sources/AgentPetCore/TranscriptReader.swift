@@ -193,16 +193,28 @@ public enum TranscriptReader {
                     countedOrder.removeFirst(dropped.count)
                 }
             }
-            let inputTokens = (usage["input_tokens"] as? Int) ?? (usage["inputTokens"] as? Int) ?? 0
-            let outputTokens = (usage["output_tokens"] as? Int) ?? (usage["outputTokens"] as? Int) ?? 0
+            let inputTokens = (usage["input_tokens"] as? Int)
+                ?? (usage["input"] as? Int)
+                ?? (usage["inputTokens"] as? Int)
+                ?? 0
+            let outputTokens = (usage["output_tokens"] as? Int)
+                ?? (usage["output"] as? Int)
+                ?? (usage["outputTokens"] as? Int)
+                ?? 0
             total += inputTokens
             total += outputTokens
             costAccumulator += ModelPricing.costUSD(
                 model: (message?["model"] as? String) ?? (json["model"] as? String),
                 inputTokens: inputTokens,
                 outputTokens: outputTokens,
-                cacheCreateTokens: (usage["cache_creation_input_tokens"] as? Int) ?? (usage["cacheCreationInputTokens"] as? Int) ?? 0,
-                cacheReadTokens: (usage["cache_read_input_tokens"] as? Int) ?? (usage["cacheReadInputTokens"] as? Int) ?? 0
+                cacheCreateTokens: (usage["cache_creation_input_tokens"] as? Int)
+                    ?? (usage["cacheWrite"] as? Int)
+                    ?? (usage["cacheCreationInputTokens"] as? Int)
+                    ?? 0,
+                cacheReadTokens: (usage["cache_read_input_tokens"] as? Int)
+                    ?? (usage["cacheRead"] as? Int)
+                    ?? (usage["cacheReadInputTokens"] as? Int)
+                    ?? 0
             )
         }
         return UsageDelta(tokens: total, costUSD: costAccumulator)
