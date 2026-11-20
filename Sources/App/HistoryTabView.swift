@@ -233,6 +233,7 @@ private func sfSymbol(for kind: AgentKind) -> String {
     case .kiroCLI:     return "k.circle.fill"
     case .droid:       return "cpu.fill"
     case .pi:          return "pi"
+    case .omp:         return "pi"
     case .grok:        return "slash.circle.fill"
     case .jcode:       return "j.circle.fill"
     case .cli:         return "terminal.fill"

@@ -7,14 +7,21 @@ public struct HookArguments: Equatable {
     public var project: String?
     public var agent: String?
     public var message: String?
+    public var transcript: String?
+    public var model: String?
+    public var title: String?
 
     public init(event: String? = nil, session: String? = nil, project: String? = nil,
-                agent: String? = nil, message: String? = nil) {
+                agent: String? = nil, message: String? = nil, transcript: String? = nil,
+                model: String? = nil, title: String? = nil) {
         self.event = event
         self.session = session
         self.project = project
         self.agent = agent
         self.message = message
+        self.transcript = transcript
+        self.model = model
+        self.title = title
     }
 
     /// Parses `--key value` pairs from the argument list.
@@ -30,6 +37,9 @@ public struct HookArguments: Equatable {
             case "--project": result.project = value
             case "--agent": result.agent = value
             case "--message": result.message = value
+            case "--transcript": result.transcript = value
+            case "--model": result.model = value
+            case "--title": result.title = value
             default:
                 i += 1
                 continue
@@ -56,7 +66,8 @@ public struct HookArguments: Equatable {
         }
         return AgentEvent(
             sessionId: session, agentKind: kind, eventName: event,
-            project: project, message: message, agentName: name, timestamp: now
+            project: project, message: message, model: model,
+            transcriptPath: transcript, title: title, agentName: name, timestamp: now
         )
     }
 }

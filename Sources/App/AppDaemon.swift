@@ -150,6 +150,21 @@ final class AppDaemon: ObservableObject {
             feedCodexTokens(for: event)
         case .jcode:
             feedJcodeTokens(for: event)
+        case .omp, .pi:
+            let path: String? = event.transcriptPath
+                ?? (event.sessionId.hasPrefix("omp:") ? String(event.sessionId.dropFirst(4)) : nil)
+                ?? (event.sessionId.hasPrefix("pi:") ? String(event.sessionId.dropFirst(3)) : nil)
+            guard let path, path.hasSuffix(".jsonl") || path.hasSuffix(".json") else { return }
+            let project = event.project
+            let agent = event.agentKind.rawValue
+            Task.detached(priority: .utility) {
+                guard let delta = TranscriptReader.newUsageDelta(at: path), delta.tokens > 0 else { return }
+                await MainActor.run {
+                    PetCareController.shared.feedTokens(delta.tokens,
+                        petID: AppDaemon.shared.careTarget(forProject: project))
+                    ProjectUsageStore.shared.recordTokens(delta.tokens, project: project, agent: agent, costUSD: delta.costUSD)
+                }
+            }
         default:
             return
         }
@@ -302,7 +317,7 @@ final class AppDaemon: ObservableObject {
     private let modelResolveThrottle = PerKeyThrottle(interval: 30)
 
     private func resolveModel(for event: AgentEvent) {
-        guard event.agentKind == .claude else { return }
+        guard event.agentKind == .claude || event.agentKind == .omp else { return }
         guard modelResolveThrottle.shouldRun(event.sessionId, now: Date()) else { return }
         let sessionId = event.sessionId
         let path: String? = event.transcriptPath
