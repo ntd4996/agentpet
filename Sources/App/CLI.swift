@@ -4,6 +4,7 @@ import Foundation
 /// CLI helper invoked by agent hooks: `agentpet hook --event ... --session ...`.
 enum HookCLI {
     static func run(arguments: [String]) -> Never {
+        ActivityFormatter.loadStoredTheme()
         // Explicit flags win (used by opencode's plugin and the run wrapper);
         // otherwise fall back to the agent's hook payload on stdin, decoded with
         // that agent's field convention. `--agent` selects the agent.

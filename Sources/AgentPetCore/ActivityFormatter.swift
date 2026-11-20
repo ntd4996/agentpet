@@ -21,17 +21,39 @@ public struct ToolActivityInput: Decodable, Equatable, Sendable {
         self.prompt = prompt; self.subagentType = subagentType
     }
 
-    enum CodingKeys: String, CodingKey {
-        case filePath = "file_path"
-        case command, description, pattern, query, url, prompt
-        case subagentType = "subagent_type"
+    public init(from decoder: Decoder) throws {
+        struct DynamicKey: CodingKey {
+            var stringValue: String
+            var intValue: Int?
+            init?(stringValue: String) { self.stringValue = stringValue; self.intValue = nil }
+            init?(intValue: Int) { self.stringValue = "\(intValue)"; self.intValue = intValue }
+        }
+        let container = try decoder.container(keyedBy: DynamicKey.self)
+        func findString(_ candidates: [String]) -> String? {
+            for c in candidates {
+                if let key = DynamicKey(stringValue: c),
+                   let val = try? container.decodeIfPresent(String.self, forKey: key) {
+                    let trimmed = val.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !trimmed.isEmpty { return trimmed }
+                }
+            }
+            return nil
+        }
+        self.filePath = findString(["file_path", "filePath", "path", "Path"])
+        self.command = findString(["command", "CommandLine", "command_line", "cmd"])
+        self.description = findString(["description", "toolSummary", "tool_summary", "summary"])
+        self.pattern = findString(["pattern"])
+        self.query = findString(["query", "q"])
+        self.url = findString(["url", "uri"])
+        self.prompt = findString(["prompt", "Prompt"])
+        self.subagentType = findString(["subagent_type", "subagentType", "role", "Role", "type"])
     }
 }
 
 // MARK: - Activity Theme
 
 public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
-    case chef, engineer, wizard, explorer, scientist
+    case chef, engineer, wizard, explorer, scientist, literal
 
     public var displayName: String {
         switch self {
@@ -40,6 +62,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
         case .wizard:    return NSLocalizedString("Wizard", comment: "activity theme")
         case .explorer:  return NSLocalizedString("Explorer", comment: "activity theme")
         case .scientist: return NSLocalizedString("Scientist", comment: "activity theme")
+        case .literal:   return NSLocalizedString("Literal", comment: "activity theme")
         }
     }
 
@@ -50,6 +73,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
         case .wizard:    return "🧙"
         case .explorer:  return "🧭"
         case .scientist: return "🔬"
+        case .literal:   return "⚡️"
         }
     }
 
@@ -62,6 +86,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
         case .wizard:    return ["Studying the scrolls…", "Deciphering…", "Consulting the tome…", "Peering within…"]
         case .explorer:  return ["Surveying…", "Mapping the terrain…", "Examining the site…", "Charting…"]
         case .scientist: return ["Observing…", "Reviewing the data…", "Analyzing the sample…", "Examining…"]
+        case .literal:   return ["Reading…", "Inspecting…"]
         }
     }
 
@@ -72,6 +97,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
         case .wizard:    return ["Inscribing…", "Enchanting…", "Weaving a spell…", "Scribing…"]
         case .explorer:  return ["Logging the expedition…", "Marking the map…", "Recording findings…", "Documenting…"]
         case .scientist: return ["Synthesizing…", "Documenting findings…", "Writing the report…", "Formulating…"]
+        case .literal:   return ["Editing…", "Writing…"]
         }
     }
 
@@ -82,6 +108,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
         case .wizard:    return ["Casting…", "Invoking…", "Summoning…", "Channeling magic…"]
         case .explorer:  return ["Blazing a trail…", "Trekking…", "Venturing forth…", "Pushing on…"]
         case .scientist: return ["Running the experiment…", "Executing the protocol…", "Testing the hypothesis…", "Processing…"]
+        case .literal:   return ["Executing…", "Running…"]
         }
     }
 
@@ -92,6 +119,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
         case .wizard:    return ["Divining…", "Scrying…", "Seeking…", "Gazing into the orb…"]
         case .explorer:  return ["Scouting ahead…", "Seeking passage…", "Exploring…", "Reconnoitering…"]
         case .scientist: return ["Scanning the dataset…", "Cross-referencing…", "Searching for patterns…", "Correlating…"]
+        case .literal:   return ["Searching…", "Scanning…"]
         }
     }
 
@@ -102,6 +130,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
         case .wizard:    return ["Calling forth…", "Summoning a familiar…", "Conjuring help…"]
         case .explorer:  return ["Sending a scout…", "Dispatching a guide…", "Rallying the crew…"]
         case .scientist: return ["Assigning to the lab…", "Tasking the team…", "Delegating to an assistant…"]
+        case .literal:   return ["Delegating…", "Spawning…"]
         }
     }
 
@@ -112,6 +141,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
         case .wizard:    return ["Meditating…", "Pondering the arcane…", "Consulting the stars…", "Prophesying…"]
         case .explorer:  return ["Plotting a course…", "Reading the stars…", "Studying the map…", "Planning the route…"]
         case .scientist: return ["Hypothesizing…", "Theorizing…", "Modeling…", "Calculating…", "Reasoning…"]
+        case .literal:   return ["Thinking…", "Analyzing request…", "Processing…"]
         }
     }
 
@@ -122,6 +152,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
         case .wizard:    return ["The spell is cast!", "It is done!", "Magic complete!", "Quest fulfilled!"]
         case .explorer:  return ["Base camp reached!", "Trail blazed!", "Discovery made!", "Expedition complete!"]
         case .scientist: return ["Hypothesis confirmed!", "Results in!", "Experiment complete!", "Published!"]
+        case .literal:   return ["Done", "Task complete", "Finished"]
         }
     }
 
@@ -132,6 +163,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
         case .wizard:    return ["Awaiting the omens…", "The stars are aligning…", "Patience, young apprentice…"]
         case .explorer:  return ["Awaiting the tide…", "Resting at camp…", "Holding position…"]
         case .scientist: return ["Awaiting results…", "Incubating…", "Waiting for the reaction…"]
+        case .literal:   return ["Waiting for input…", "Needs approval…"]
         }
     }
 
@@ -142,6 +174,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
         case .wizard:    return ["Consulting the scrolls…", "Channeling a skill…", "Reading the grimoire…"]
         case .explorer:  return ["Consulting the guide…", "Reading the field notes…", "Checking the compass…"]
         case .scientist: return ["Consulting the protocol…", "Reviewing the literature…", "Checking the procedure…"]
+        case .literal:   return ["Running skill…", "Executing workflow…"]
         }
     }
 
@@ -152,6 +185,7 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
         case .wizard:    return ["Weaving…", "Working the magic…", "At work…"]
         case .explorer:  return ["Moving forward…", "Pressing on…", "On the trail…"]
         case .scientist: return ["Analyzing…", "Processing…", "At work…"]
+        case .literal:   return ["Working…", "Processing…"]
         }
     }
 }
@@ -162,8 +196,35 @@ public enum ActivityTheme: String, CaseIterable, Codable, Sendable {
 /// Vocabulary is controlled by `currentTheme` (default: `.chef`).
 public enum ActivityFormatter {
 
-    /// Set from `BubbleSettings.activityTheme.didSet` on the main thread.
-    public nonisolated(unsafe) static var currentTheme: ActivityTheme = .chef
+    /// Loads the stored activity theme from user preferences (checking the app suite first
+    /// so CLI helper processes invoked by agent hooks pick up the GUI's selection).
+    public static func loadStoredTheme() {
+        let ud: UserDefaults = {
+            if Bundle.main.bundleIdentifier == "com.agentpet.app" {
+                return UserDefaults.standard
+            }
+            return UserDefaults(suiteName: "com.agentpet.app") ?? UserDefaults.standard
+        }()
+        if let raw = ud.string(forKey: "agentpet.bubble.activityTheme"),
+           let theme = ActivityTheme(rawValue: raw) {
+            currentTheme = theme
+        }
+    }
+
+    /// Set from `BubbleSettings.activityTheme.didSet` on the main thread, or loaded from preferences.
+    public nonisolated(unsafe) static var currentTheme: ActivityTheme = {
+        let ud: UserDefaults = {
+            if Bundle.main.bundleIdentifier == "com.agentpet.app" {
+                return UserDefaults.standard
+            }
+            return UserDefaults(suiteName: "com.agentpet.app") ?? UserDefaults.standard
+        }()
+        if let raw = ud.string(forKey: "agentpet.bubble.activityTheme"),
+           let theme = ActivityTheme(rawValue: raw) {
+            return theme
+        }
+        return .chef
+    }()
 
     public static func activityMessage(
         eventName: String,
@@ -176,15 +237,21 @@ public enum ActivityFormatter {
             return trimmed(explicitMessage)
         }
         switch eventName {
-        case "UserPromptSubmit":
-            return pick(from: currentTheme.thinking, key: eventName)
+        case "UserPromptSubmit", "PreInvocation", "turn_start", "agent_start":
+            return pick(from: currentTheme.thinking, key: "thinking")
         case "PreToolUse", "PostToolUse":
             return toolActivity(toolName: toolName, toolInput: toolInput)
         default:
             if toolName != nil {
                 return toolActivity(toolName: toolName, toolInput: toolInput)
             }
-            return trimmed(explicitMessage)
+            if let explicit = trimmed(explicitMessage) {
+                return explicit
+            }
+            if eventName == "working" {
+                return pick(from: currentTheme.thinking, key: "thinking")
+            }
+            return nil
         }
     }
 
@@ -222,9 +289,92 @@ public enum ActivityFormatter {
         return .generic
     }
 
+    public static func literalAction(toolName: String, toolInput: ToolActivityInput?) -> String? {
+        let cat = category(forToolName: toolName)
+        return literalAction(category: cat, toolName: toolName, toolInput: toolInput)
+    }
+
+    private static func literalAction(
+        category: ActivityCategory,
+        toolName: String,
+        toolInput: ToolActivityInput?
+    ) -> String? {
+        if let desc = toolInput?.description?.trimmingCharacters(in: .whitespacesAndNewlines), !desc.isEmpty {
+            return desc
+        }
+
+        if let path = toolInput?.filePath?.trimmingCharacters(in: .whitespacesAndNewlines), !path.isEmpty {
+            let fileName = (path as NSString).lastPathComponent
+            switch category {
+            case .writing:
+                return "Editing \(fileName)"
+            case .reading:
+                return "Reading \(fileName)"
+            default:
+                return "\(fileName)"
+            }
+        }
+
+        if let cmd = toolInput?.command?.trimmingCharacters(in: .whitespacesAndNewlines), !cmd.isEmpty {
+            let firstLine = cmd.components(separatedBy: .newlines).first ?? cmd
+            let clean = firstLine.trimmingCharacters(in: .whitespaces)
+            let truncated = clean.count > 35 ? String(clean.prefix(32)) + "…" : clean
+            return "Running: \(truncated)"
+        }
+
+        if let q = (toolInput?.query ?? toolInput?.pattern)?.trimmingCharacters(in: .whitespacesAndNewlines), !q.isEmpty {
+            let truncated = q.count > 30 ? String(q.prefix(27)) + "…" : q
+            return "Searching: \"\(truncated)\""
+        }
+
+        if let sub = toolInput?.subagentType?.trimmingCharacters(in: .whitespacesAndNewlines), !sub.isEmpty {
+            return "Subagent: \(sub)"
+        }
+        if let prompt = toolInput?.prompt?.trimmingCharacters(in: .whitespacesAndNewlines), !prompt.isEmpty {
+            let truncated = prompt.count > 30 ? String(prompt.prefix(27)) + "…" : prompt
+            return "Subagent: \(truncated)"
+        }
+
+        return formatToolName(toolName)
+    }
+
+    private static func formatToolName(_ toolName: String) -> String {
+        let n = toolName.lowercased()
+        if n == "run_command" || n == "bash" || n == "run_terminal_cmd" {
+            return "Running command…"
+        }
+        if n == "read_file" || n == "read" || n == "view" {
+            return "Reading file…"
+        }
+        if n == "edit_file" || n == "write_file" || n == "edit" || n == "write" {
+            return "Editing file…"
+        }
+        if n == "search_web" || n == "websearch" || n == "web_search" {
+            return "Searching web…"
+        }
+        if n == "grep" || n == "glob" || n == "codebase_search" || n == "grep_search" {
+            return "Searching codebase…"
+        }
+        if n == "invoke_subagent" || n == "agent" || n == "task" {
+            return "Delegating task…"
+        }
+        if n == "ask_question" {
+            return "Asking question…"
+        }
+        return "Using \(toolName)…"
+    }
+
     private static func toolActivity(toolName: String?, toolInput: ToolActivityInput?) -> String? {
         guard let toolName else { return nil }
         let cat = category(forToolName: toolName)
+
+        if currentTheme == .literal {
+            if let literal = literalAction(category: cat, toolName: toolName, toolInput: toolInput) {
+                return literal
+            }
+            return currentTheme.generic.first ?? "Working…"
+        }
+
         if let hint = extensionHint(category: cat, filePath: toolInput?.filePath) { return hint }
         let phrases: [String]
         switch cat {
