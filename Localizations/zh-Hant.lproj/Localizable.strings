@@ -132,6 +132,7 @@
 "Wizard" = "巫師";
 "Explorer" = "探險家";
 "Scientist" = "科學家";
+"Literal" = "實時操作";
 
 /* Demo panel, notifications, sounds, footers */
 "Live preview" = "實時預覽";

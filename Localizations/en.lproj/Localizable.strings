@@ -132,6 +132,7 @@
 "Wizard" = "Wizard";
 "Explorer" = "Explorer";
 "Scientist" = "Scientist";
+"Literal" = "Literal";
 
 /* Demo panel, notifications, sounds, footers */
 "Live preview" = "Live preview";

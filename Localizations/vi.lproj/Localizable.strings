@@ -132,6 +132,7 @@
 "Wizard" = "Phù thủy";
 "Explorer" = "Nhà thám hiểm";
 "Scientist" = "Nhà khoa học";
+"Literal" = "Hành động thực tế";
 
 /* Demo panel, notifications, sounds, footers */
 "Live preview" = "Xem trực tiếp";

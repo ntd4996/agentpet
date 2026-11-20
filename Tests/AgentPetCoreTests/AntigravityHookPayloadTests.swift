@@ -54,4 +54,49 @@ final class AntigravityHookPayloadTests: XCTestCase {
         XCTAssertEqual(e?.agentKind, .antigravity)
         XCTAssertEqual(e?.eventName, "done")
     }
+
+    func testToolCallWithToolSummaryDecodesAndApplies() {
+        ActivityFormatter.currentTheme = .literal
+        defer { ActivityFormatter.currentTheme = .chef }
+        let json = """
+        {
+            "conversationId": "c6",
+            "workspacePaths": ["/Users/me/proj"],
+            "stepIdx": 1,
+            "toolCall": {
+                "name": "run_command",
+                "args": {
+                    "toolSummary": "Run test suite",
+                    "CommandLine": "swift test"
+                }
+            }
+        }
+        """
+        let e = event(json)
+        XCTAssertEqual(e?.agentKind, .antigravity)
+        XCTAssertEqual(e?.eventName, "working")
+        XCTAssertEqual(e?.message, "Run test suite")
+    }
+
+    func testToolCallWithFilePathDecodesAndApplies() {
+        ActivityFormatter.currentTheme = .literal
+        defer { ActivityFormatter.currentTheme = .chef }
+        let json = """
+        {
+            "conversationId": "c7",
+            "workspacePaths": ["/Users/me/proj"],
+            "stepIdx": 2,
+            "toolCall": {
+                "name": "edit_file",
+                "args": {
+                    "Path": "/Users/me/proj/Sources/App/PetView.swift"
+                }
+            }
+        }
+        """
+        let e = event(json)
+        XCTAssertEqual(e?.agentKind, .antigravity)
+        XCTAssertEqual(e?.eventName, "working")
+        XCTAssertEqual(e?.message, "Editing PetView.swift")
+    }
 }
