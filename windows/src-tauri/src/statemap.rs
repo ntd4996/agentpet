@@ -30,6 +30,9 @@ pub fn state(kind: &str, event: &str) -> Option<&'static str> {
             "UserPromptSubmit" | "PreToolUse" | "PostToolUse" | "SubagentStart" => Some("working"),
             "PermissionRequest" => Some("waiting"),
             "Stop" | "SubagentStop" => Some("done"),
+            // A user interrupt aborts the turn without a Stop, which would leave
+            // the session "running" until the stale timeout (issue #95).
+            "Interrupt" => Some("idle"),
             _ => None,
         },
         // Factory Droid CLI: same Claude-nested payload; Notification is a
@@ -114,7 +117,24 @@ pub fn state(kind: &str, event: &str) -> Option<&'static str> {
 pub fn is_session_end(kind: &str, event: &str) -> bool {
     matches!(
         (kind, event),
-        ("claude", "SessionEnd") | ("gemini", "SessionEnd") | ("cursor", "sessionEnd") | ("droid", "SessionEnd")
+        ("claude", "SessionEnd") | ("gemini", "SessionEnd") | ("cursor", "sessionEnd") | ("droid", "SessionEnd") | ("codex", "SessionEnd")
             | ("grok", "session_end") | ("jcode", "session_end")
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn codex_interrupt_is_idle_and_stop_stays_done() {
+        assert_eq!(state("codex", "Interrupt"), Some("idle"));
+        assert_eq!(state("codex", "Stop"), Some("done"));
+    }
+
+    #[test]
+    fn codex_session_end_ends_the_session() {
+        assert!(is_session_end("codex", "SessionEnd"));
+        assert!(!is_session_end("codex", "Stop"));
+    }
 }

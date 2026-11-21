@@ -15,6 +15,22 @@ pub struct AgentInfo {
     pub note: Option<String>,
 }
 
+const CATALOG: &[(&str, &str, Option<&str>)] = &[
+    ("claude", "Claude Code", None),
+    ("codex", "Codex", Some("After enabling, run /hooks in Codex and Trust the AgentPet hook")),
+    ("gemini", "Gemini CLI", None),
+    ("cursor", "Cursor", None),
+    ("opencode", "opencode", None),
+    ("windsurf", "Windsurf", Some("No \"needs input\" alerts (Windsurf has no such hook)")),
+    ("antigravity", "Antigravity", Some("No \"needs input\" alerts (Antigravity has no notification hook)")),
+    ("copilot", "GitHub Copilot", Some("Copilot CLI only (~/.copilot/hooks)")),
+    ("kiro", "Kiro CLI", Some("Hooks the default Kiro CLI agent")),
+    ("droid", "Factory Droid", Some("Factory Droid CLI (~/.factory/hooks.json)")),
+    ("pi", "Pi", Some("Pi extension (~/.pi/agent/extensions). No \"needs input\" alerts")),
+    ("grok", "Grok Build", Some("xAI Grok Build CLI (~/.grok/hooks/agentpet.json)")),
+    ("jcode", "jcode", Some("jcode lifecycle hooks (~/.jcode/config.toml, in WSL when present)")),
+];
+
 #[derive(Clone, Copy, PartialEq)]
 enum Style {
     ClaudeNested,      // {"hooks": {Event: [{"hooks": [{"type":"command","command":..}]}]}}
@@ -37,7 +53,7 @@ fn spec(kind: &str) -> Option<Spec> {
         "claude" => Spec { style: Style::ClaudeNested, rel_path: &[".claude", "settings.json"],
             events: &["SessionStart", "UserPromptSubmit", "PreToolUse", "Notification", "Stop", "SubagentStop", "SessionEnd"] },
         "codex" => Spec { style: Style::ClaudeNested, rel_path: &[".codex", "hooks.json"],
-            events: &["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "Stop", "SubagentStop"] },
+            events: &["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "Stop", "SubagentStop", "SessionEnd", "Interrupt"] },
         "gemini" => Spec { style: Style::ClaudeNested, rel_path: &[".gemini", "settings.json"],
             events: &["SessionStart", "BeforeAgent", "BeforeTool", "AfterTool", "Notification", "AfterAgent", "SessionEnd"] },
         "cursor" => Spec { style: Style::CursorFlat, rel_path: &[".cursor", "hooks.json"],
@@ -66,22 +82,7 @@ fn spec(kind: &str) -> Option<Spec> {
 }
 
 pub fn catalog() -> Vec<AgentInfo> {
-    let entries: &[(&str, &str, Option<&str>)] = &[
-        ("claude", "Claude Code", None),
-        ("codex", "Codex", Some("After enabling, run /hooks in Codex and Trust the AgentPet hook")),
-        ("gemini", "Gemini CLI", None),
-        ("cursor", "Cursor", None),
-        ("opencode", "opencode", None),
-        ("windsurf", "Windsurf", Some("No \"needs input\" alerts (Windsurf has no such hook)")),
-        ("antigravity", "Antigravity", Some("No \"needs input\" alerts (Antigravity has no notification hook)")),
-        ("copilot", "GitHub Copilot", Some("Copilot CLI only (~/.copilot/hooks)")),
-        ("kiro", "Kiro CLI", Some("Hooks the default Kiro CLI agent")),
-        ("droid", "Factory Droid", Some("Factory Droid CLI (~/.factory/hooks.json)")),
-        ("pi", "Pi", Some("Pi extension (~/.pi/agent/extensions). No \"needs input\" alerts")),
-        ("grok", "Grok Build", Some("xAI Grok Build CLI (~/.grok/hooks/agentpet.json)")),
-        ("jcode", "jcode", Some("jcode lifecycle hooks (~/.jcode/config.toml, in WSL when present)")),
-    ];
-    entries.iter().map(|(kind, name, note)| AgentInfo {
+    CATALOG.iter().map(|(kind, name, note)| AgentInfo {
         kind: kind.to_string(),
         display_name: name.to_string(),
         installed: is_installed(kind),
@@ -89,10 +90,13 @@ pub fn catalog() -> Vec<AgentInfo> {
     }).collect()
 }
 
-fn config_path(kind: &str) -> Option<PathBuf> {
-    let mut p = dirs::home_dir()?;
+fn config_path_for(kind: &str, home: &std::path::Path) -> Option<PathBuf> {
+    let mut p = home.to_path_buf();
     for part in spec(kind)?.rel_path { p.push(part); }
     Some(p)
+}
+fn config_path(kind: &str) -> Option<PathBuf> {
+    config_path_for(kind, &dirs::home_dir()?)
 }
 
 fn hook_command() -> String {
@@ -101,17 +105,25 @@ fn hook_command() -> String {
 }
 fn full_command(kind: &str) -> String { format!("{} {}", hook_command(), kind) }
 
+fn migration_marker_path(home: &std::path::Path, version: &str) -> PathBuf {
+    home.join(".agentpet").join(format!("hook-migration-{version}"))
+}
+
+fn migration_needed(marker: &std::path::Path) -> bool {
+    !marker.exists()
+}
+
 fn is_ours(cmd: &str) -> bool {
     let l = cmd.to_lowercase();
     l.contains("agentpet") && l.contains("hook")
 }
 
-fn read_json(path: &PathBuf) -> Value {
+fn read_json(path: &std::path::Path) -> Value {
     std::fs::read_to_string(path).ok()
         .and_then(|s| if s.trim().is_empty() { None } else { serde_json::from_str(&s).ok() })
         .unwrap_or_else(|| json!({}))
 }
-fn write_json(path: &PathBuf, v: &Value) -> std::io::Result<()> {
+fn write_json(path: &std::path::Path, v: &Value) -> std::io::Result<()> {
     if let Some(dir) = path.parent() { std::fs::create_dir_all(dir)?; }
     std::fs::write(path, serde_json::to_string_pretty(v).unwrap_or_default())
 }
@@ -161,7 +173,12 @@ pub fn is_installed(kind: &str) -> bool {
             .map(|t| crate::jcode::is_installed(&std::fs::read_to_string(&t.config).unwrap_or_default(), crate::jcode::EVENTS))
             .unwrap_or(false);
     }
-    let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else { return false };
+    let Some(home) = dirs::home_dir() else { return false };
+    is_installed_at(kind, &home)
+}
+
+fn is_installed_at(kind: &str, home: &std::path::Path) -> bool {
+    let (Some(path), Some(s)) = (config_path_for(kind, home), spec(kind)) else { return false };
     if s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
         return std::fs::read_to_string(&path).map(|c| is_ours(&c)).unwrap_or(false);
     }
@@ -186,7 +203,15 @@ pub fn toggle(kind: &str) -> Result<bool, String> {
 
 fn install(kind: &str) -> std::io::Result<()> {
     if kind == "jcode" { return jcode_install(); }
-    let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else {
+    let home = dirs::home_dir().ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "home directory not found"))?;
+    let path = config_path_for(kind, &home).ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::Other, "unknown agent")
+    })?;
+    install_at(kind, &home, &path)
+}
+
+fn install_at(kind: &str, home: &std::path::Path, path: &std::path::Path) -> std::io::Result<()> {
+    let Some(s) = spec(kind) else {
         return Err(std::io::Error::new(std::io::ErrorKind::Other, "unknown agent"));
     };
     let cmd = full_command(kind);
@@ -222,8 +247,57 @@ fn install(kind: &str) -> std::io::Result<()> {
         map.insert((*event).to_string(), Value::Array(kept));
     }
     write_json(&path, &v)?;
-    if kind == "codex" { enable_codex_hooks(); }
+    if kind == "codex" { enable_codex_hooks_at(home); }
     Ok(())
+}
+
+/// Re-applies hooks for agents that are already enabled, once per app version.
+/// The marker is written before installs so a failed migration is not retried
+/// on every launch; users can reinstall a failing agent from Settings.
+pub fn migrate_installed_hooks() {
+    let Some(home) = dirs::home_dir() else { return };
+    let marker = migration_marker_path(&home, env!("CARGO_PKG_VERSION"));
+    if !migration_needed(&marker) { return; }
+    if let Some(dir) = marker.parent() {
+        if let Err(e) = std::fs::create_dir_all(dir) {
+            eprintln!("AgentPet hook migration marker failed: {e}");
+            return;
+        }
+    }
+    if let Err(e) = std::fs::write(&marker, b"") {
+        eprintln!("AgentPet hook migration marker failed: {e}");
+        return;
+    }
+
+    let kinds: Vec<_> = home_migration_kinds().collect();
+    migrate_installed_hooks_for(&home, &kinds);
+
+    // jcode may resolve into WSL or %APPDATA%, so only the real startup wrapper
+    // handles it. This function runs on a background thread (see lib.rs).
+    if is_installed("jcode") {
+        if let Err(e) = install("jcode") {
+            eprintln!("AgentPet hook migration failed for jcode: {e}");
+        }
+    }
+}
+
+/// Agent kinds whose settings files are rooted under the caller-provided home.
+/// jcode is intentionally excluded because its config may live outside it.
+fn home_migration_kinds() -> impl Iterator<Item = &'static str> {
+    CATALOG.iter().map(|(kind, _, _)| *kind).filter(|kind| *kind != "jcode")
+}
+
+/// Reinstall already-enabled hooks only within `home`; safe for isolated tests.
+fn migrate_installed_hooks_for(home: &std::path::Path, kinds: &[&str]) {
+    for &kind in kinds {
+        let installed = is_installed_at(kind, home);
+        if !installed { continue; }
+        let Some(path) = config_path_for(kind, home) else { continue };
+        let result = install_at(kind, home, &path);
+        if let Err(e) = result {
+            eprintln!("AgentPet hook migration failed for {kind}: {e}");
+        }
+    }
 }
 
 fn uninstall(kind: &str) -> std::io::Result<()> {
@@ -300,8 +374,7 @@ fn pi_extension(binary: &str) -> String {
 
 /// Ensure `[features] hooks = true` in ~/.codex/config.toml (modern key; the
 /// `codex_hooks` alias is ignored by recent Codex).
-fn enable_codex_hooks() {
-    let Some(home) = dirs::home_dir() else { return };
+fn enable_codex_hooks_at(home: &std::path::Path) {
     let path = home.join(".codex").join("config.toml");
     let text = std::fs::read_to_string(&path).unwrap_or_default();
     let already = text.lines().any(|l| {
@@ -580,5 +653,86 @@ mod timeout_tests {
         let mut c = std::process::Command::new("sh");
         c.args(["-c", "exit 3"]);
         assert!(run_with_timeout(c, Duration::from_secs(5)).is_none());
+    }
+}
+
+#[cfg(test)]
+mod codex_spec_tests {
+    use super::*;
+
+    #[test]
+    fn codex_registers_session_end_and_interrupt() {
+        let events = spec("codex").unwrap().events;
+        assert!(events.contains(&"SessionEnd"));
+        assert!(events.contains(&"Interrupt"));
+    }
+}
+
+#[cfg(test)]
+mod migration_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_home() -> PathBuf {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+        let suffix = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
+        let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+        let path = std::env::temp_dir().join(format!("agentpet-hook-migration-{}-{suffix}-{id}", std::process::id()));
+        std::fs::create_dir(&path).unwrap();
+        path
+    }
+
+    #[test]
+    fn marker_runs_once_per_version() {
+        let home = temp_home();
+        let marker = migration_marker_path(&home, "1.0.0");
+        assert!(migration_needed(&marker));
+        std::fs::create_dir_all(marker.parent().unwrap()).unwrap();
+        std::fs::write(&marker, b"").unwrap();
+        assert!(!migration_needed(&marker));
+        assert!(migration_needed(&migration_marker_path(&home, "1.0.1")));
+        std::fs::remove_dir_all(home).unwrap();
+    }
+
+    #[test]
+    fn home_migration_kinds_exclude_agents_outside_home() {
+        assert!(!home_migration_kinds().any(|kind| kind == "jcode"));
+    }
+
+    #[test]
+    fn migrates_installed_codex_without_creating_uninstalled_gemini() {
+        let home = temp_home();
+        let codex = config_path_for("codex", &home).unwrap();
+        let old_events = ["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "Stop", "SubagentStop"];
+        let mut hooks = serde_json::Map::new();
+        for event in old_events {
+            hooks.insert(event.into(), json!([{ "hooks": [{ "type": "command", "command": "agentpet hook --agent codex" }] }]));
+        }
+        hooks.insert("SessionEnd".into(), json!([{ "hooks": [{ "type": "command", "command": "someone-else" }] }]));
+        let mut root = serde_json::Map::new();
+        root.insert("hooks".into(), Value::Object(hooks));
+        write_json(&codex, &Value::Object(root)).unwrap();
+
+        let kinds: Vec<_> = home_migration_kinds().collect();
+        migrate_installed_hooks_for(&home, &kinds);
+
+        let migrated = read_json(&codex);
+        let codex_hooks = migrated.get("hooks").unwrap();
+        for event in spec("codex").unwrap().events {
+            assert!(codex_hooks.get(event).and_then(Value::as_array).is_some(), "missing {event}");
+        }
+        assert_eq!(
+            codex_hooks.get("SessionEnd").unwrap().as_array().unwrap().len(),
+            2,
+            "foreign hook must remain alongside AgentPet's hook"
+        );
+        assert!(!home.join(".gemini/settings.json").exists());
+        migrate_installed_hooks_for(&home, &kinds);
+        assert_eq!(
+            read_json(&codex).get("hooks").unwrap().get("SessionEnd").unwrap().as_array().unwrap().len(),
+            2
+        );
+        std::fs::remove_dir_all(home).unwrap();
     }
 }
