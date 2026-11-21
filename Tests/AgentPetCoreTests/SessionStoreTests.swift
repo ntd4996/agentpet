@@ -62,6 +62,26 @@ final class SessionStoreTests: XCTestCase {
         AgentEvent(sessionId: session, agentKind: .claude, eventName: name, project: project, message: nil, timestamp: t0)
     }
 
+    func testCodexSessionEndRemovesWorkingSession() {
+        let store = SessionStore()
+        func codex(_ name: String) -> AgentEvent {
+            AgentEvent(sessionId: "cx1", agentKind: .codex, eventName: name, project: "/proj", message: nil, timestamp: t0)
+        }
+        XCTAssertEqual(store.apply(codex("UserPromptSubmit"), now: t0)?.state, .working)
+        XCTAssertEqual(store.sessions.count, 1)
+        XCTAssertNil(store.apply(codex("SessionEnd"), now: t0))
+        XCTAssertEqual(store.sessions.count, 0, "codex SessionEnd clears a working session at once")
+    }
+
+    func testCodexInterruptMovesWorkingSessionToIdle() {
+        let store = SessionStore()
+        func codex(_ name: String) -> AgentEvent {
+            AgentEvent(sessionId: "cx1", agentKind: .codex, eventName: name, project: "/proj", message: nil, timestamp: t0)
+        }
+        store.apply(codex("UserPromptSubmit"), now: t0)
+        XCTAssertEqual(store.apply(codex("Interrupt"), now: t0)?.state, .idle)
+    }
+
     func testApplyCreatesSession() {
         let store = SessionStore()
         let s = store.apply(event("SessionStart"), now: t0)
