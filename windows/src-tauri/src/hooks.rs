@@ -37,7 +37,7 @@ fn spec(kind: &str) -> Option<Spec> {
         "claude" => Spec { style: Style::ClaudeNested, rel_path: &[".claude", "settings.json"],
             events: &["SessionStart", "UserPromptSubmit", "PreToolUse", "Notification", "Stop", "SubagentStop", "SessionEnd"] },
         "codex" => Spec { style: Style::ClaudeNested, rel_path: &[".codex", "hooks.json"],
-            events: &["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "Stop", "SubagentStop"] },
+            events: &["SessionStart", "UserPromptSubmit", "PreToolUse", "PermissionRequest", "Stop", "SubagentStop", "SessionEnd", "Interrupt"] },
         "gemini" => Spec { style: Style::ClaudeNested, rel_path: &[".gemini", "settings.json"],
             events: &["SessionStart", "BeforeAgent", "BeforeTool", "AfterTool", "Notification", "AfterAgent", "SessionEnd"] },
         "cursor" => Spec { style: Style::CursorFlat, rel_path: &[".cursor", "hooks.json"],
@@ -580,5 +580,17 @@ mod timeout_tests {
         let mut c = std::process::Command::new("sh");
         c.args(["-c", "exit 3"]);
         assert!(run_with_timeout(c, Duration::from_secs(5)).is_none());
+    }
+}
+
+#[cfg(test)]
+mod codex_spec_tests {
+    use super::*;
+
+    #[test]
+    fn codex_registers_session_end_and_interrupt() {
+        let events = spec("codex").unwrap().events;
+        assert!(events.contains(&"SessionEnd"));
+        assert!(events.contains(&"Interrupt"));
     }
 }

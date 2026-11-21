@@ -13,6 +13,7 @@ public enum StateMapper {
         case .gemini: return eventName == "SessionEnd"
         case .cursor: return eventName == "sessionEnd"
         case .droid: return eventName == "SessionEnd"
+        case .codex: return eventName == "SessionEnd"
         case .grok, .jcode: return eventName == "session_end"
         default: return false
         }
@@ -42,6 +43,9 @@ public enum StateMapper {
             case "UserPromptSubmit", "PreToolUse", "PostToolUse", "SubagentStart": return .working
             case "PermissionRequest": return .waiting
             case "Stop", "SubagentStop": return .done
+            // A user interrupt aborts the turn without a Stop, which would leave
+            // the session "running" until the stale timeout (issue #95).
+            case "Interrupt": return .idle
             default: return nil
             }
         case .gemini:
