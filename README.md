@@ -285,7 +285,7 @@ If AgentPet saves you some tab-hunting:
 - ⭐ **[Star the repo](https://github.com/ntd4996/agentpet)** so more people find it.
 - ☕ **[Buy me a coffee](https://buymeacoffee.com/ntd4996)** or **[support on Ko-fi](https://ko-fi.com/ntd4996)** to fuel more features.
 
-Built by **[Nguyễn Thành Đạt (@ntd4996)](https://github.com/ntd4996)** and the community.
+Built by **[Nguyễn Thành Đạt](https://datnt.dev)** ([@ntd4996](https://github.com/ntd4996)) and the community.
 
 ## License
 
