@@ -18,6 +18,7 @@ export const DICT: Record<"vi" | "zh" | "zh-TW", Record<string, string>> = {
     "Get started": "Bắt đầu", "Make a pet": "Tạo thú cưng", "Submit a pet": "Gửi thú cưng",
     "Install guide": "Hướng dẫn cài", "Legal & takedown": "Pháp lý & gỡ bỏ",
     "Download AgentPet and pick a companion.": "Tải AgentPet và chọn một người bạn.",
+    "Made by": "Tạo bởi",
     // home
     "One pet, every coding agent": "Một thú cưng cho mọi agent code",
     "Free · Open source · One-command install": "Miễn phí · Mã nguồn mở · Cài bằng một lệnh",
@@ -402,6 +403,7 @@ export const DICT: Record<"vi" | "zh" | "zh-TW", Record<string, string>> = {
     "Get started": "开始使用", "Make a pet": "制作宠物", "Submit a pet": "提交宠物",
     "Install guide": "安装指南", "Legal & takedown": "法律与下架",
     "Download AgentPet and pick a companion.": "下载 AgentPet，挑一只伙伴。",
+    "Made by": "作者",
     // home
     "One pet, every coding agent": "一只宠物，对应每个编码 Agent",
     "Free · Open source · One-command install": "免费 · 开源 · 一条命令安装",
@@ -805,6 +807,7 @@ export const DICT: Record<"vi" | "zh" | "zh-TW", Record<string, string>> = {
     "Sign out": "退出登入",
     "Pet admin": "寵物管理",
     "Get the app": "獲取應用",
+    "Made by": "作者",
     "Explore": "探索",
     "Community": "社群",
     "Get started": "開始使用",

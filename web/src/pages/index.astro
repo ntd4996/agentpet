@@ -131,8 +131,29 @@ const bubblePos = [
   "right-1/3 bottom-4 h-12 w-12",
 ];
 const contributors = knownPeople();
+const maker = {
+  "@type": "Person",
+  "@id": "https://datnt.dev/#person",
+  name: "Nguyễn Thành Đạt",
+  url: "https://datnt.dev",
+  sameAs: ["https://github.com/ntd4996", "https://www.linkedin.com/in/ntd4996", "https://x.com/ntd4996"],
+};
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "AgentPet",
+  url: "https://agentpet.thenightwatcher.online",
+  applicationCategory: "DeveloperApplication",
+  operatingSystem: "macOS, Windows, Linux",
+  offers: { "@type": "Offer", price: 0, priceCurrency: "USD" },
+  sameAs: ["https://github.com/ntd4996/agentpet"],
+  author: maker,
+  creator: maker,
+  publisher: maker,
+};
 ---
 <Base title="AgentPet · pixel companions for your AI agents" active="">
+  <script type="application/ld+json" slot="head" set:html={JSON.stringify(jsonLd)} />
   <!-- HERO: chibi floating island in the sky -->
   <section class="relative overflow-hidden px-4 pb-6 pt-6">
     <!-- drifting clouds -->

@@ -47,6 +47,7 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="icon" href="/logo.png" />
+  <link rel="author" href="https://datnt.dev" />
   <title>{title}</title>
   <meta name="description" content={description} />
   <meta property="og:type" content="website" />
@@ -62,6 +63,7 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Baloo+2:wght@500;600;700&family=Pixelify+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <slot name="head" />
 </head>
 <body class="min-h-screen">
   <!-- ambient sky: spans the whole page (scrolls with it). Clouds drift behind
@@ -215,6 +217,7 @@ const clouds = Array.from({ length: N_CLOUDS }, (_, i) => ({
     </div>
     <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-line/70 px-8 py-5">
       <p class="text-xs text-faint">© 2026 AgentPet · Open source (MIT) · Made for terminal dwellers.</p>
+      <p class="text-xs text-faint"><span data-i18n="Made by">Made by</span> <a href="https://datnt.dev" rel="author" class="font-medium transition hover:text-brand-700">Nguyễn Thành Đạt</a></p>
       <a href="/legal" class="text-xs font-medium text-faint transition hover:text-brand-700">Legal &amp; takedown</a>
     </div>
   </footer>
