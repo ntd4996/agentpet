@@ -702,6 +702,10 @@ pub fn run() {
             set_hit_parts
         ])
         .setup(|app| {
+            // Re-apply newly-added hook events for users who already enabled a
+            // hook, without blocking startup on config or WSL I/O.
+            std::thread::spawn(hooks::migrate_installed_hooks);
+
             // Feed the pet only what is spent from now on: transcripts are read
             // from the start again on every launch, and a resumed session copies
             // earlier replies into its new file.
