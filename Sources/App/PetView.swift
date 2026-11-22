@@ -108,10 +108,11 @@ struct FloatingPetView: View {
                 // would leave an empty (off-centre, contentless) bubble.
                 if bubbleSettings.multiAgentBubbleEnabled
                     && !AgentBubble.visible(model.sessions, settings: bubbleSettings).isEmpty {
-                    alignedToPet(AgentBubble(sessions: model.sessions))
+                    alignedToPet(AgentBubble(sessions: model.sessions, petChat: true))
                 } else if !model.chatLine.isEmpty {
                     alignedToPet(ChatBubble(text: model.chatLine,
-                                            projectName: pet.splitPet ? model.projectName : nil))
+                                            projectName: pet.splitPet ? model.projectName : nil,
+                                            petChat: true))
                 }
             }
             PetView(model: model, size: pet.petPoint)
@@ -249,6 +250,7 @@ private struct GroupedSession: Identifiable {
 struct AgentBubble: View {
     let sessions: [AgentSession]
     var tailEdge: Edge = .bottom
+    var petChat = false
     @ObservedObject private var settings = BubbleSettings.shared
     @Environment(\.bubbleTailOffset) private var tailOffset
 
@@ -315,6 +317,9 @@ struct AgentBubble: View {
     }
 
     private var isPetChat: Bool { tailEdge == .bottom }
+    private var usesNarrowPetChatWidth: Bool {
+        petChat && settings.displayMode != .compact
+    }
     // Capsule for single visible row; rounded rect when taller or carousel dots are shown.
     private var useCapsule: Bool {
         isPetChat && groupedSessions.count <= 1 && settings.displayMode != .compact
@@ -359,13 +364,13 @@ struct AgentBubble: View {
                     .offset(x: tailOffset)
             }
         }
-        .fixedSize(horizontal: isPetChat, vertical: true)
-        .frame(maxWidth: 420, alignment: .leading)
+        .fixedSize(horizontal: isPetChat && !usesNarrowPetChatWidth, vertical: true)
+        .frame(maxWidth: usesNarrowPetChatWidth ? 260 : 420, alignment: .leading)
     }
 
     /// Inner content width cap (bubble max minus horizontal padding).
     static let contentMaxWidth: CGFloat = 396
-    /// Pet chat bubble hugs content; still capped for very long lines.
+    /// Compact pet-row width cap. Non-compact pet chat is capped at 260pt overall (236pt content).
     static let petContentMaxWidth: CGFloat = 320
 
     private var bubbleFill: Color {
@@ -1195,6 +1200,7 @@ private struct TapToFocus: ViewModifier {
 struct ChatBubble: View {
     let text: String
     var projectName: String? = nil
+    var petChat = false
     @ObservedObject private var settings = BubbleSettings.shared
     @Environment(\.bubbleTailOffset) private var tailOffset
 
@@ -1256,13 +1262,14 @@ struct ChatBubble: View {
             // (SwiftUI draws boxy shadows on composed views otherwise).
             .compositingGroup()
             .shadow(color: .black.opacity(0.18), radius: 5, y: 2)
+            .fixedSize(horizontal: !petChat, vertical: true)
             Triangle()
                 .fill(fill)
                 .frame(width: 12, height: 7)
                 .offset(x: tailOffset)
         }
-        .fixedSize(horizontal: true, vertical: true)
-        .frame(maxWidth: 420)
+        .fixedSize(horizontal: !petChat, vertical: true)
+        .frame(maxWidth: petChat ? 260 : 420)
     }
 }
 
