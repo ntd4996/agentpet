@@ -361,6 +361,7 @@ fn pi_extension(binary: &str) -> String {
          \x20     const file = ctx && ctx.sessionManager && ctx.sessionManager.getSessionFile ? ctx.sessionManager.getSessionFile() : null\n\
          \x20     const sid = \"pi:\" + (file || cwd)\n\
          \x20     const p = spawn(AGENTPET_BIN, [\"hook\", \"--agent\", \"pi\", \"--event\", state, \"--session\", sid, \"--project\", cwd], {{ stdio: \"ignore\" }})\n\
+         \x20     if (p && p.on) p.on(\"error\", () => {{}})\n\
          \x20     if (p && p.unref) p.unref()\n\
          \x20   }} catch (e) {{}}\n\
          \x20 }}\n\

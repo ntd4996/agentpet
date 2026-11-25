@@ -229,6 +229,8 @@ public enum HookInstaller {
               const sid = "pi:" + (file || cwd)
               const p = spawn(AGENTPET_BIN, ["hook", "--agent", "pi",
                 "--event", state, "--session", sid, "--project", cwd], { stdio: "ignore" })
+              // A missing binary emits "error" async; unhandled it would crash Pi.
+              if (p && p.on) p.on("error", () => {})
               if (p && p.unref) p.unref()
             } catch (e) {}
           }
