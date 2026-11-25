@@ -70,18 +70,17 @@ export function parseBackup(text: string): BackupFile {
 /// Writes the backup's keys into localStorage, then removes AgentPet keys that
 /// are NOT in the backup so the result matches it (a restore, not a merge).
 /// Order matters: nothing is deleted until every new value was written, and a
-/// failed write puts the previous values back, so a half restore can never leave
-/// the user with less data than before. Returns how many keys were written.
+/// quota failure puts the previous values back before reporting the error.
+/// Returns how many keys were written.
 export function applyBackup(b: BackupFile, ls: Storage = localStorage): number {
   const old = snapshot(ls);
   try {
     for (const [k, v] of Object.entries(b.data)) ls.setItem(k, v);
   } catch (e) {
-    // Quota or write error: restore every previous value, drop keys we added.
-    for (const k of Object.keys(b.data)) if (!(k in old)) ls.removeItem(k);
-    for (const [k, v] of Object.entries(old)) {
-      try { ls.setItem(k, v); } catch { /* the old value is still there if the write failed */ }
-    }
+    // Free imported values first: a larger replacement can otherwise prevent
+    // restoring an earlier key even though the complete old snapshot fits.
+    for (const k of Object.keys(b.data)) ls.removeItem(k);
+    for (const [k, v] of Object.entries(old)) ls.setItem(k, v);
     throw e;
   }
   for (const k of Object.keys(old)) if (!(k in b.data)) ls.removeItem(k);
