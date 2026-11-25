@@ -47,6 +47,53 @@ final class CodexHookConfigTests: XCTestCase {
         XCTAssertTrue(out.contains("hooks = true"))
     }
 
+    func testCommentedFeaturesHeaderDoesNotCreateDuplicateTable() {
+        let source = "[features] # comment\nweb_search = true\n"
+        XCTAssertEqual(CodexHookConfig.enableHooks(in: source), "[features] # comment\nhooks = true\nweb_search = true\n")
+    }
+
+    func testOnlyFeaturesHooksCanBeFlippedOrCountAsEnabled() {
+        for value in ["false", "true"] {
+            let source = "[other]\nhooks = \(value)\n[features]\nweb_search = true\n"
+            XCTAssertFalse(CodexHookConfig.alreadyEnabled(source))
+            XCTAssertEqual(CodexHookConfig.enableHooks(in: source), "[other]\nhooks = \(value)\n[features]\nhooks = true\nweb_search = true\n")
+        }
+    }
+
+    func testRootAndNestedHooksDoNotHideFeaturesFlag() {
+        let source = "hooks = true\n[features.extra]\nhooks = true\n"
+        XCTAssertFalse(CodexHookConfig.alreadyEnabled(source))
+        XCTAssertEqual(CodexHookConfig.enableHooks(in: source), source + "\n[features]\nhooks = true\n")
+    }
+
+    func testQuotedAndSpacedFeaturesHeadersAreRecognized() {
+        for header in ["[\"features\"] # flags", "['features']", "[ features ]\r"] {
+            let source = "\(header)\nweb_search = true\n"
+            XCTAssertEqual(CodexHookConfig.enableHooks(in: source), "\(header)\nhooks = true\nweb_search = true\n")
+        }
+    }
+
+    func testExistingFeaturesFlagKeepsInlineCommentAndOtherTable() {
+        let source = "[features] # flags\n  hooks\t= false # disabled\n[other]\nhooks = false\n"
+        XCTAssertEqual(CodexHookConfig.enableHooks(in: source), "[features] # flags\n  hooks\t= true # disabled\n[other]\nhooks = false\n")
+    }
+
+    func testQuotedHooksKeyIsNotDuplicated() {
+        XCTAssertEqual(CodexHookConfig.enableHooks(in: "[features]\n\"hooks\" = false\n"), "[features]\n\"hooks\" = true\n")
+        XCTAssertNil(CodexHookConfig.enableHooks(in: "['features']\n'hooks' = true # active\n"))
+    }
+
+    func testUnsupportedFeaturesLayoutsAreLeftUntouched() {
+        for source in [
+            "features = { hooks = false }\n",
+            "features.hooks = false\n",
+            "description = '''\n[features]\nhooks = false\n'''\n",
+            "[features]\nhooks = 'custom'\n",
+        ] {
+            XCTAssertNil(CodexHookConfig.enableHooks(in: source))
+        }
+    }
+
     func testCommentedFlagIsNotTreatedAsEnabled() {
         XCTAssertFalse(CodexHookConfig.alreadyEnabled("# hooks = true\n"))
     }
