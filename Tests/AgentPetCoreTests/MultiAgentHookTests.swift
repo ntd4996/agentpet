@@ -220,6 +220,20 @@ final class MultiAgentHookTests: XCTestCase {
         XCTAssertFalse(StateMapper.isSessionEnd(for: .codex, eventName: "Stop"))
     }
 
+    // MARK: - Codex SessionEnd / Interrupt (issue #95)
+
+    func testCodexSessionEndAndInterruptMapping() {
+        XCTAssertTrue(StateMapper.isSessionEnd(for: .codex, eventName: "SessionEnd"))
+        XCTAssertEqual(StateMapper.state(for: .codex, eventName: "Interrupt"), .idle)
+        XCTAssertEqual(StateMapper.state(for: .codex, eventName: "Stop"), .done)
+    }
+
+    func testCodexSpecRegistersSessionEndAndInterrupt() {
+        let events = AgentHooks.spec(for: .codex)!.events
+        XCTAssertTrue(events.contains("SessionEnd"))
+        XCTAssertTrue(events.contains("Interrupt"))
+    }
+
     // MARK: - Disk round-trip for each new style
 
     func testDiskRoundTripAllStyles() throws {
