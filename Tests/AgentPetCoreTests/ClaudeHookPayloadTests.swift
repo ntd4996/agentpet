@@ -147,6 +147,23 @@ final class ClaudeHookPayloadTests: XCTestCase {
         XCTAssertNil(droidEvent?.toolName)
         XCTAssertNil(droidEvent?.toolSummary)
     }
+
+    func testClaudePreToolUseWithLiteralTheme() {
+        ActivityFormatter.currentTheme = .literal
+        defer { ActivityFormatter.currentTheme = .chef }
+
+        let readJson = #"{"session_id":"s","hook_event_name":"PreToolUse","tool_name":"Read","tool_input":{"file_path":"Sources/App/PetView.swift"}}"#
+        let readEvent = payload(readJson)?.makeEvent(now: now)
+        XCTAssertEqual(readEvent?.message, "Reading PetView.swift")
+
+        let editJson = #"{"session_id":"s","hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{"file_path":"Sources/App/PetView.swift"}}"#
+        let editEvent = payload(editJson)?.makeEvent(now: now)
+        XCTAssertEqual(editEvent?.message, "Editing PetView.swift")
+
+        let bashJson = #"{"session_id":"s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"npm run build"}}"#
+        let bashEvent = payload(bashJson)?.makeEvent(now: now)
+        XCTAssertEqual(bashEvent?.message, "Running: npm run build")
+    }
 }
 
 // MARK: - ApprovalGateConfig (opt-in whitelist file)

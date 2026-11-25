@@ -155,4 +155,87 @@ final class ActivityFormatterTests: XCTestCase {
         let second = ActivityFormatter.stateMessage(for: .done)
         XCTAssertNotEqual(first, second, "done phrases should rotate")
     }
+
+    // MARK: - Literal theme & action formatting
+
+    override func setUp() {
+        super.setUp()
+        ActivityFormatter.currentTheme = .chef
+    }
+
+    override func tearDown() {
+        super.tearDown()
+        ActivityFormatter.currentTheme = .chef
+    }
+
+    func test_literalAction_descriptionSummaryWins() {
+        let input = ToolActivityInput(
+            filePath: "Sources/App/PetView.swift",
+            command: "swift test",
+            description: "Run unit test suite"
+        )
+        let result = ActivityFormatter.literalAction(toolName: "run_command", toolInput: input)
+        XCTAssertEqual(result, "Run unit test suite")
+    }
+
+    func test_literalAction_filePathEditing() {
+        let input = ToolActivityInput(filePath: "Sources/App/PetView.swift")
+        let result = ActivityFormatter.literalAction(toolName: "edit_file", toolInput: input)
+        XCTAssertEqual(result, "Editing PetView.swift")
+    }
+
+    func test_literalAction_filePathReading() {
+        let input = ToolActivityInput(filePath: "Sources/App/PetView.swift")
+        let result = ActivityFormatter.literalAction(toolName: "read_file", toolInput: input)
+        XCTAssertEqual(result, "Reading PetView.swift")
+    }
+
+    func test_literalAction_commandRunning() {
+        let input = ToolActivityInput(command: "swift build -c release")
+        let result = ActivityFormatter.literalAction(toolName: "run_command", toolInput: input)
+        XCTAssertEqual(result, "Running: swift build -c release")
+    }
+
+    func test_literalAction_searchQuery() {
+        let input = ToolActivityInput(query: "ActivityFormatter")
+        let result = ActivityFormatter.literalAction(toolName: "search_web", toolInput: input)
+        XCTAssertEqual(result, "Searching: \"ActivityFormatter\"")
+    }
+
+    func test_literalAction_subagentPrompt() {
+        let input = ToolActivityInput(prompt: "Analyze architecture and security")
+        let result = ActivityFormatter.literalAction(toolName: "invoke_subagent", toolInput: input)
+        XCTAssertEqual(result, "Subagent: Analyze architecture and se…")
+    }
+
+    func test_literalAction_fallbackFormattedToolName() {
+        let result = ActivityFormatter.literalAction(toolName: "run_command", toolInput: nil)
+        XCTAssertEqual(result, "Running command…")
+
+        let result2 = ActivityFormatter.literalAction(toolName: "custom_mcp_tool", toolInput: nil)
+        XCTAssertEqual(result2, "Using custom_mcp_tool…")
+    }
+
+    func test_themeLiteral_integratesWithActivityMessage() {
+        ActivityFormatter.currentTheme = .literal
+        let input = ToolActivityInput(
+            filePath: "Sources/App/PetView.swift",
+            command: "git status",
+            description: "Check working directory status"
+        )
+        let msg = ActivityFormatter.activityMessage(
+            eventName: "PreToolUse", sessionId: "lit1",
+            toolName: "run_command", toolInput: input, explicitMessage: nil
+        )
+        XCTAssertEqual(msg, "Check working directory status")
+    }
+
+    func test_thinking_eventNameWorkingWithoutTool_returnsThinking() {
+        ActivityFormatter.currentTheme = .literal
+        let msg = ActivityFormatter.activityMessage(
+            eventName: "working", sessionId: "think1",
+            toolName: nil, toolInput: nil, explicitMessage: nil
+        )
+        XCTAssertTrue(ActivityTheme.literal.thinking.contains(msg ?? ""), "got \(msg ?? "nil")")
+    }
 }
