@@ -118,10 +118,14 @@ fn is_ours(cmd: &str) -> bool {
     l.contains("agentpet") && l.contains("hook")
 }
 
-fn read_json(path: &std::path::Path) -> Value {
-    std::fs::read_to_string(path).ok()
-        .and_then(|s| if s.trim().is_empty() { None } else { serde_json::from_str(&s).ok() })
-        .unwrap_or_else(|| json!({}))
+fn read_json(path: &std::path::Path) -> std::io::Result<Value> {
+    let text = match std::fs::read_to_string(path) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(json!({})),
+        Err(e) => return Err(e),
+    };
+    serde_json::from_str(&text).map_err(|e| std::io::Error::new(
+        std::io::ErrorKind::InvalidData, format!("{}: {e}", path.display())))
 }
 fn write_json(path: &std::path::Path, v: &Value) -> std::io::Result<()> {
     if let Some(dir) = path.parent() { std::fs::create_dir_all(dir)?; }
@@ -182,7 +186,7 @@ fn is_installed_at(kind: &str, home: &std::path::Path) -> bool {
     if s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
         return std::fs::read_to_string(&path).map(|c| is_ours(&c)).unwrap_or(false);
     }
-    let v = read_json(&path);
+    let Ok(v) = read_json(&path) else { return false };
     let Some(map) = v.get(container_key(s.style)).and_then(|h| h.as_object()) else { return false };
     s.events.iter().any(|event| {
         map.get(*event).and_then(|a| a.as_array())
@@ -225,7 +229,7 @@ fn install_at(kind: &str, home: &std::path::Path, path: &std::path::Path) -> std
         return std::fs::write(&path, pi_extension(&binary_from(&cmd)));
     }
 
-    let mut v = read_json(&path);
+    let mut v = read_json(path)?;
     let Some(obj) = v.as_object_mut() else {
         return Err(std::io::Error::new(std::io::ErrorKind::InvalidData,
             format!("{} is not a JSON object; fix or remove it and try again", path.display())));
@@ -302,13 +306,18 @@ fn migrate_installed_hooks_for(home: &std::path::Path, kinds: &[&str]) {
 
 fn uninstall(kind: &str) -> std::io::Result<()> {
     if kind == "jcode" { return jcode_uninstall(); }
-    let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else { return Ok(()) };
+    let Some(path) = config_path(kind) else { return Ok(()) };
+    uninstall_at(kind, &path)
+}
+
+fn uninstall_at(kind: &str, path: &std::path::Path) -> std::io::Result<()> {
+    let Some(s) = spec(kind) else { return Ok(()) };
     // Files we own outright: just delete.
     if kind == "copilot" || s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
-        let _ = std::fs::remove_file(&path);
+        let _ = std::fs::remove_file(path);
         return Ok(());
     }
-    let mut v = read_json(&path);
+    let mut v = read_json(path)?;
     let Some(obj) = v.as_object_mut() else { return Ok(()) };
     let key = container_key(s.style);
     if let Some(map) = obj.get_mut(key).and_then(|h| h.as_object_mut()) {
@@ -320,7 +329,7 @@ fn uninstall(kind: &str) -> std::io::Result<()> {
         }
         if map.is_empty() { obj.remove(key); }
     }
-    write_json(&path, &v)
+    write_json(path, &v)
 }
 
 /// Extracts the quoted binary path from a hook command for the opencode plugin.
@@ -612,6 +621,30 @@ mod read_config_tests {
     use super::*;
 
     #[test]
+    fn json_install_aborts_without_overwriting_invalid_config() {
+        let home = migration_tests::temp_home();
+        let path = config_path_for("claude", &home).unwrap();
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        for bytes in [b"{\"permissions\": [".as_slice(), b"", &[0xff, 0xfe]] {
+            std::fs::write(&path, bytes).unwrap();
+            assert!(install_at("claude", &home, &path).is_err());
+            assert_eq!(std::fs::read(&path).unwrap(), bytes);
+            assert!(uninstall_at("claude", &path).is_err());
+            assert_eq!(std::fs::read(&path).unwrap(), bytes);
+            assert!(!is_installed_at("claude", &home));
+        }
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        assert!(install_at("claude", &home, &path).is_err());
+        assert!(uninstall_at("claude", &path).is_err());
+        std::fs::remove_dir(&path).unwrap();
+        assert_eq!(read_json(&path).unwrap(), json!({}));
+        install_at("claude", &home, &path).unwrap();
+        assert!(is_installed_at("claude", &home));
+        std::fs::remove_dir_all(home).unwrap();
+    }
+
+    #[test]
     fn missing_file_is_empty_but_other_errors_abort() {
         let dir = std::env::temp_dir().join(format!("ap-readcfg-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
@@ -675,7 +708,7 @@ mod migration_tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn temp_home() -> PathBuf {
+    pub(super) fn temp_home() -> PathBuf {
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);
         let suffix = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -718,7 +751,7 @@ mod migration_tests {
         let kinds: Vec<_> = home_migration_kinds().collect();
         migrate_installed_hooks_for(&home, &kinds);
 
-        let migrated = read_json(&codex);
+        let migrated = read_json(&codex).unwrap();
         let codex_hooks = migrated.get("hooks").unwrap();
         for event in spec("codex").unwrap().events {
             assert!(codex_hooks.get(event).and_then(Value::as_array).is_some(), "missing {event}");
@@ -731,7 +764,7 @@ mod migration_tests {
         assert!(!home.join(".gemini/settings.json").exists());
         migrate_installed_hooks_for(&home, &kinds);
         assert_eq!(
-            read_json(&codex).get("hooks").unwrap().get("SessionEnd").unwrap().as_array().unwrap().len(),
+            read_json(&codex).unwrap().get("hooks").unwrap().get("SessionEnd").unwrap().as_array().unwrap().len(),
             2
         );
         std::fs::remove_dir_all(home).unwrap();
