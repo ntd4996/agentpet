@@ -119,7 +119,7 @@ final class MultiAgentHookTests: XCTestCase {
         XCTAssertTrue(js.contains("session.created"))
         XCTAssertTrue(js.contains("--agent"))
         XCTAssertTrue(js.contains("opencode"))
-        XCTAssertTrue(HookInstaller.isOurs(js.replacingOccurrences(of: "\n", with: " ")))
+        XCTAssertTrue(HookInstaller.pluginIsOurs(js))
     }
 
     // MARK: - Payload parsing
