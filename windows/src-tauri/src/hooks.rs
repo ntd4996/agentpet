@@ -247,7 +247,7 @@ fn install_at(kind: &str, home: &std::path::Path, path: &std::path::Path) -> std
         map.insert((*event).to_string(), Value::Array(kept));
     }
     write_json(&path, &v)?;
-    if kind == "codex" { enable_codex_hooks_at(home); }
+    if kind == "codex" { enable_codex_hooks_at(home)?; }
     Ok(())
 }
 
@@ -375,26 +375,22 @@ fn pi_extension(binary: &str) -> String {
 
 /// Ensure `[features] hooks = true` in ~/.codex/config.toml (modern key; the
 /// `codex_hooks` alias is ignored by recent Codex).
-fn enable_codex_hooks_at(home: &std::path::Path) {
+fn enable_codex_hooks_at(home: &std::path::Path) -> std::io::Result<()> {
     let path = home.join(".codex").join("config.toml");
-    let text = std::fs::read_to_string(&path).unwrap_or_default();
-    let already = text.lines().any(|l| {
-        let c = l.trim().replace(' ', "");
-        !c.starts_with('#') && c.starts_with("hooks=true")
-    });
-    if already { return; }
-    let updated = if let Some(idx) = text.lines().position(|l| l.trim() == "[features]") {
-        let mut lines: Vec<String> = text.lines().map(|s| s.to_string()).collect();
-        lines.insert(idx + 1, "hooks = true".into());
-        lines.join("\n")
-    } else {
-        let mut t = text;
-        if !t.is_empty() && !t.ends_with('\n') { t.push('\n'); }
-        t.push_str("\n[features]\nhooks = true\n");
-        t
-    };
-    if let Some(dir) = path.parent() { let _ = std::fs::create_dir_all(dir); }
-    let _ = std::fs::write(&path, updated);
+    let text = read_config(&path)?;
+    let mut doc = text.parse::<toml_edit::DocumentMut>().map_err(|e| {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, format!("{}: {e}", path.display()))
+    })?;
+    if !doc.contains_key("features") {
+        doc["features"] = toml_edit::Item::Table(toml_edit::Table::new());
+    }
+    let features = doc["features"].as_table_like_mut().ok_or_else(|| {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, "Codex features must be a TOML table")
+    })?;
+    if features.get("hooks").and_then(toml_edit::Item::as_bool) == Some(true) { return Ok(()); }
+    features.insert("hooks", toml_edit::value(true));
+    if let Some(dir) = path.parent() { std::fs::create_dir_all(dir)?; }
+    std::fs::write(&path, doc.to_string())
 }
 
 // ----- jcode (TOML [hooks], usually inside WSL) -----------------------------
@@ -662,6 +658,50 @@ mod codex_spec_tests {
     use super::*;
 
     #[test]
+    fn enabling_codex_replaces_false_in_features_only() {
+        let home = migration_tests::temp_home();
+        let path = home.join(".codex/config.toml");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        for text in [
+            "[features]\nhooks = false\n",
+            "[other]\nhooks = true\n[features]\nhooks = false # user setting\nkeep = true\n",
+            "# user config\n[features] # feature flags\n'hooks' = false\n[other]\nhooks = false\n",
+            "features = { hooks = false, keep = true }\n",
+            "[features]\nkeep = true\n[other]\nhooks = false\n",
+            "",
+        ] {
+            std::fs::write(&path, text).unwrap();
+            enable_codex_hooks_at(&home).unwrap();
+            let updated = std::fs::read_to_string(&path).unwrap();
+            let parsed = updated.parse::<toml_edit::DocumentMut>().expect("enabled config must be valid TOML");
+            assert_eq!(parsed["features"]["hooks"].as_bool(), Some(true));
+            let original = text.parse::<toml_edit::DocumentMut>().unwrap();
+            if original.get("other").is_some() {
+                assert_eq!(parsed["other"].to_string(), original["other"].to_string());
+            }
+            enable_codex_hooks_at(&home).unwrap();
+            assert_eq!(std::fs::read_to_string(&path).unwrap(), updated);
+        }
+        std::fs::remove_dir_all(home).unwrap();
+    }
+
+    #[test]
+    fn enabling_codex_does_not_overwrite_invalid_or_unreadable_toml() {
+        let home = migration_tests::temp_home();
+        let path = home.join(".codex/config.toml");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        for bytes in [b"[features\nhooks=false".as_slice(), b"features = false", &[0xff]] {
+            std::fs::write(&path, bytes).unwrap();
+            assert!(enable_codex_hooks_at(&home).is_err());
+            assert_eq!(std::fs::read(&path).unwrap(), bytes);
+        }
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        assert!(enable_codex_hooks_at(&home).is_err());
+        std::fs::remove_dir_all(home).unwrap();
+    }
+
+    #[test]
     fn codex_registers_session_end_and_interrupt() {
         let events = spec("codex").unwrap().events;
         assert!(events.contains(&"SessionEnd"));
@@ -675,7 +715,7 @@ mod migration_tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn temp_home() -> PathBuf {
+    pub(super) fn temp_home() -> PathBuf {
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);
         let suffix = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
