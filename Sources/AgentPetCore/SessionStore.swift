@@ -106,6 +106,7 @@ public final class SessionStore {
             existing.updatedAt = now
             if let project = event.project { existing.project = project }
             if let model = event.model { existing.model = model }
+            if let title = event.title { existing.title = title }
             if let program = event.terminalProgram { existing.terminalProgram = program }
             if let tty = event.terminalTTY { existing.terminalTTY = tty }
             if let focusURL = event.terminalFocusURL { existing.terminalFocusURL = focusURL }
@@ -119,6 +120,7 @@ public final class SessionStore {
             id: event.sessionId,
             agentKind: event.agentKind,
             project: event.project,
+            title: event.title,
             state: state,
             message: event.message,
             model: event.model,

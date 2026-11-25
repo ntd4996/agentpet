@@ -30,6 +30,8 @@ public enum AgentKind: String, Codable, Sendable {
     case droid
     /// Pi Coding Agent (pi.dev).
     case pi
+    /// Oh My Pi Coding Agent (omp.sh).
+    case omp
     /// xAI Grok Build CLI (`grok`). Hook payload is camelCase keys + snake_case
     /// event values, via `~/.grok/hooks/agentpet.json`.
     case grok

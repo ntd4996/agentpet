@@ -23,6 +23,9 @@ public enum HookStyle: Sendable {
     /// `~/.pi/agent/extensions/`. Like opencode, the extension hardcodes its own
     /// `pi.on(...)` handlers and reports state through the `agentpet hook` CLI.
     case piExtension
+    /// Oh My Pi (omp.sh): a TypeScript extension file dropped in
+    /// `~/.omp/agent/extensions/`. Reports state, tool approvals, and session logs.
+    case ompExtension
     /// jcode `~/.jcode/config.toml`: one key per event in the `[hooks]` table,
     /// value a command string or an array of them.
     case jcodeToml
@@ -120,6 +123,14 @@ public enum AgentHooks {
                 kind: .pi, style: .piExtension,
                 events: [],
                 settingsPath: home + "/.pi/agent/extensions/agentpet.ts")
+        case .omp:
+            // Oh My Pi (omp.sh) native mechanism is a TS extension auto-discovered
+            // in ~/.omp/agent/extensions/. Unlike vanilla Pi, OMP fires
+            // tool_approval_requested / tool_approval_resolved for approval gates.
+            return AgentHookSpec(
+                kind: .omp, style: .ompExtension,
+                events: [],
+                settingsPath: home + "/.omp/agent/extensions/agentpet.ts")
         case .grok:
             // xAI Grok Build: ~/.grok/hooks/*.json, Claude-compatible nested shape,
             // registered with PascalCase event names (Grok also accepts these).
