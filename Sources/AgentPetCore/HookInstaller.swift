@@ -5,11 +5,14 @@ import Foundation
 /// AgentPet's hooks, so install/uninstall refuse instead.
 public enum HookInstallerError: LocalizedError, Equatable {
     case unreadableSettings(path: String)
+    case conflictingPlugin(path: String)
 
     public var errorDescription: String? {
         switch self {
         case .unreadableSettings(let path):
             return "\(path) is not valid JSON; fix or remove it and try again."
+        case .conflictingPlugin(let path):
+            return "\(path) contains a foreign plugin; move it before installing AgentPet."
         }
     }
 }
@@ -32,7 +35,9 @@ public enum HookInstaller {
     }
 
     static func isOurs(_ command: String) -> Bool {
-        command.contains("agentpet") && command.contains("hook")
+        // Match the executable and subcommand, not words in a foreign command.
+        command.range(of: #"^\s*(?:"(?:[^"\n]*/)?agentpet"|'(?:[^'\n]*/)?agentpet'|(?:[^\s"']*/)?agentpet)\s+hook(?:\s|$)"#,
+                      options: .regularExpression) != nil
     }
 
     // MARK: - Claude-nested shape (Claude / Codex / Gemini)
@@ -50,7 +55,7 @@ public enum HookInstaller {
         var settings = settings
         var hooks = settings["hooks"] as? [String: Any] ?? [:]
         for event in events {
-            var groups = (hooks[event] as? [[String: Any]] ?? []).filter { !groupIsOurs($0) }
+            var groups = (hooks[event] as? [[String: Any]] ?? []).compactMap(removingOurHandlers)
             groups.append(["hooks": [["type": "command", "command": command]]])
             hooks[event] = groups
         }
@@ -63,11 +68,20 @@ public enum HookInstaller {
         guard var hooks = settings["hooks"] as? [String: Any] else { return settings }
         for event in events {
             guard let groups = hooks[event] as? [[String: Any]] else { continue }
-            let kept = groups.filter { !groupIsOurs($0) }
+            let kept = groups.compactMap(removingOurHandlers)
             if kept.isEmpty { hooks.removeValue(forKey: event) } else { hooks[event] = kept }
         }
         if hooks.isEmpty { settings.removeValue(forKey: "hooks") } else { settings["hooks"] = hooks }
         return settings
+    }
+
+    private static func removingOurHandlers(_ group: [String: Any]) -> [String: Any]? {
+        guard let handlers = group["hooks"] as? [[String: Any]], groupIsOurs(group) else { return group }
+        let kept = handlers.filter { !handlerIsOurs($0) }
+        guard !kept.isEmpty else { return nil }
+        var group = group
+        group["hooks"] = kept
+        return group
     }
 
     private static func groupIsOurs(_ group: [String: Any]) -> Bool {
@@ -101,7 +115,9 @@ public enum HookInstaller {
         var settings = settings
         var group = settings[antigravityGroup] as? [String: Any] ?? [:]
         for event in events {
-            var entries = (group[event] as? [[String: Any]] ?? []).filter { !antigravityEntryIsOurs(event, $0) }
+            var entries = (group[event] as? [[String: Any]] ?? []).compactMap { entry in
+                antigravityMatcherEvents.contains(event) ? removingOurHandlers(entry) : (handlerIsOurs(entry) ? nil : entry)
+            }
             if antigravityMatcherEvents.contains(event) {
                 entries.append(["matcher": "*", "hooks": [["type": "command", "command": command]]])
             } else {
@@ -118,7 +134,9 @@ public enum HookInstaller {
         guard var group = settings[antigravityGroup] as? [String: Any] else { return settings }
         for event in events {
             guard let entries = group[event] as? [[String: Any]] else { continue }
-            let kept = entries.filter { !antigravityEntryIsOurs(event, $0) }
+            let kept = entries.compactMap { entry in
+                antigravityMatcherEvents.contains(event) ? removingOurHandlers(entry) : (handlerIsOurs(entry) ? nil : entry)
+            }
             if kept.isEmpty { group.removeValue(forKey: event) } else { group[event] = kept }
         }
         if group.isEmpty { settings.removeValue(forKey: antigravityGroup) } else { settings[antigravityGroup] = group }
@@ -253,6 +271,10 @@ public enum HookInstaller {
         return "\"\(s)\""
     }
 
+    static func pluginIsOurs(_ source: String) -> Bool {
+        source.hasPrefix("// AgentPet integration (auto-generated, safe to delete to uninstall).")
+    }
+
     // MARK: - Disk IO
 
     /// Reads an agent's settings file. A missing or empty file is an empty
@@ -290,6 +312,11 @@ public enum HookInstaller {
         case .antigravityNested:
             try writeSettings(installAntigravity(into: readSettings(path: path), command: command, events: events), path: path)
         case .opencodePlugin, .piExtension:
+            if FileManager.default.fileExists(atPath: path) {
+                guard let existing = try? String(contentsOfFile: path, encoding: .utf8), pluginIsOurs(existing) else {
+                    throw HookInstallerError.conflictingPlugin(path: path)
+                }
+            }
             let dir = (path as NSString).deletingLastPathComponent
             try FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
             let bin = binaryPath(fromCommand: command)
@@ -329,7 +356,7 @@ public enum HookInstaller {
             return isInstalledAntigravity(in: (try? readSettings(path: path)) ?? [:], events: events)
         case .opencodePlugin, .piExtension:
             guard let s = try? String(contentsOfFile: path, encoding: .utf8) else { return false }
-            return isOurs(s)
+            return pluginIsOurs(s)
         case .jcodeToml:
             return JcodeHookConfig.isInstalled(in: JcodeHookConfig.read(path: path), events: events)
         }

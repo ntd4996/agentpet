@@ -52,9 +52,8 @@ public enum JcodeHookConfigError: LocalizedError, Equatable {
 /// `~/.jcode/config.toml` with line edits, so comments and every other key are
 /// left byte-for-byte intact. Pure string transforms (tested) plus disk IO.
 ///
-/// simplify: a key already set to a foreign command is refused, not merged.
-/// jcode accepts an array value (`key = ["a", "b"]`), so merging is the upgrade
-/// path if anyone needs to share a hook with AgentPet.
+/// simplify: only single-line strings and string arrays are edited. Unsupported
+/// values are refused on install and left untouched on uninstall.
 /// Not detected: hooks set outside a `[hooks]` table (root-level
 /// `hooks = { ... }` or dotted `hooks.turn_end = ...`).
 public enum JcodeHookConfig {
@@ -98,11 +97,74 @@ public enum JcodeHookConfig {
         return "\"\(escaped)\""
     }
 
+    private struct HookValue {
+        var entries: [(source: String, command: String)]
+        var isArray: Bool
+        var comment: String
+
+        var hasOurs: Bool { entries.contains { HookInstaller.isOurs($0.command) } }
+
+        func removingOurs(adding command: String? = nil) -> String? {
+            var kept = entries.filter { !HookInstaller.isOurs($0.command) }.map(\.source)
+            if let command { kept.append(tomlString(command)) }
+            guard !kept.isEmpty else { return nil }
+            let value = isArray ? "[" + kept.joined(separator: ", ") + "]" : kept[0]
+            return value + (comment.isEmpty ? "" : " " + comment)
+        }
+    }
+
+    /// A deliberately bounded TOML value reader. Never guess ownership from
+    /// a whole line, since a foreign array entry or comment may mention us.
+    private static func hookValue(_ line: String) -> HookValue? {
+        guard let equal = line.firstIndex(of: "=") else { return nil }
+        var text = line[line.index(after: equal)...]
+        func skipSpace() { text = text.drop(while: { $0.isWhitespace }) }
+        skipSpace()
+        let array = text.first == "["
+        if array { text = text.dropFirst() }
+        var entries: [(source: String, command: String)] = []
+        while true {
+            skipSpace()
+            if array, text.first == "]" { text = text.dropFirst(); break }
+            guard let quote = text.first, quote == "'" || quote == "\"" else { return nil }
+            let start = text.startIndex
+            var end = text.index(after: start)
+            var escaped = false
+            while end < text.endIndex {
+                let character = text[end]
+                if character == quote && !escaped { break }
+                if quote == "\"", character == "\\", !escaped { escaped = true } else { escaped = false }
+                end = text.index(after: end)
+            }
+            guard end < text.endIndex else { return nil }
+            let after = text.index(after: end)
+            let source = String(text[start..<after])
+            let command: String
+            if quote == "'" {
+                command = String(text[text.index(after: start)..<end])
+            } else {
+                guard let decoded = try? JSONDecoder().decode(String.self, from: Data(source.utf8)) else { return nil }
+                command = decoded
+            }
+            entries.append((source, command))
+            text = text[after...]
+            skipSpace()
+            if !array { break }
+            if text.first == "," { text = text.dropFirst(); continue }
+            guard text.first == "]" else { return nil }
+            text = text.dropFirst()
+            break
+        }
+        skipSpace()
+        guard text.isEmpty || text.first == "#" else { return nil }
+        return HookValue(entries: entries, isArray: array, comment: String(text))
+    }
+
     public static func isInstalled(in toml: String, events: [String]) -> Bool {
         let lines = toml.components(separatedBy: "\n")
         guard let body = hooksBody(lines) else { return false }
         return events.contains { event in
-            keyLine(event, in: lines, body: body).map { HookInstaller.isOurs(lines[$0]) } ?? false
+            keyLine(event, in: lines, body: body).map { hookValue(lines[$0])?.hasOurs ?? false } ?? false
         }
     }
 
@@ -117,7 +179,7 @@ public enum JcodeHookConfig {
         let body = hooksBody(lines)!
         // Validate every key before editing so a conflict never half-installs.
         for event in events {
-            if let i = keyLine(event, in: lines, body: body), !HookInstaller.isOurs(lines[i]) {
+            if let i = keyLine(event, in: lines, body: body), hookValue(lines[i])?.hasOurs != true {
                 throw JcodeHookConfigError.conflictingHook(event: event, path: path)
             }
         }
@@ -127,7 +189,9 @@ public enum JcodeHookConfig {
         var missing: [String] = []
         for event in events {
             let entry = "\(event) = \(value)"
-            if let i = keyLine(event, in: lines, body: body) { lines[i] = entry } else { missing.append(entry) }
+            if let i = keyLine(event, in: lines, body: body), let existing = hookValue(lines[i]) {
+                lines[i] = "\(event) = \(existing.removingOurs(adding: command)!)"
+            } else { missing.append(entry) }
         }
         lines.insert(contentsOf: missing, at: body.header + 1)
         return lines.joined(separator: "\n")
@@ -139,8 +203,8 @@ public enum JcodeHookConfig {
         for event in events {
             guard let body = hooksBody(lines),
                   let i = keyLine(event, in: lines, body: body),
-                  HookInstaller.isOurs(lines[i]) else { continue }
-            lines.remove(at: i)
+                  let value = hookValue(lines[i]), value.hasOurs else { continue }
+            if let kept = value.removingOurs() { lines[i] = "\(event) = \(kept)" } else { lines.remove(at: i) }
         }
         return lines.joined(separator: "\n")
     }

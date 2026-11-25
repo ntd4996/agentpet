@@ -27,7 +27,7 @@ final class PiHookTests: XCTestCase {
         XCTAssertTrue(ts.contains("--agent"))
         XCTAssertTrue(ts.contains("pi"))
         // Must look "ours" so isInstalled detection works.
-        XCTAssertTrue(HookInstaller.isOurs(ts.replacingOccurrences(of: "\n", with: " ")))
+        XCTAssertTrue(HookInstaller.pluginIsOurs(ts))
     }
 
     func testPiExtensionInstallRoundTrip() throws {
