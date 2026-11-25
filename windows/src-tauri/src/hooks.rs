@@ -150,6 +150,26 @@ fn entry_is_ours(style: Style, event: &str, entry: &Value) -> bool {
         _ => flat_is_ours(entry),
     }
 }
+/// Strip only our commands. A shared matcher group belongs to the user.
+fn without_our_entries(style: Style, event: &str, entries: &[Value]) -> Vec<Value> {
+    let nested = style == Style::ClaudeNested ||
+        (style == Style::AntigravityNested && antigravity_matcher(event));
+    entries.iter().filter_map(|entry| {
+        if nested {
+            let mut kept = entry.clone();
+            if let Some(hooks) = kept.get_mut("hooks").and_then(Value::as_array_mut) {
+                let before = hooks.len();
+                hooks.retain(|hook| !flat_is_ours(hook));
+                if before != hooks.len() && hooks.is_empty() { return None; }
+            }
+            Some(kept)
+        } else if flat_is_ours(entry) {
+            None
+        } else {
+            Some(entry.clone())
+        }
+    }).collect()
+}
 fn make_entry(style: Style, event: &str, cmd: &str) -> Value {
     match style {
         Style::ClaudeNested => json!({ "hooks": [{ "type": "command", "command": cmd }] }),
@@ -241,7 +261,7 @@ fn install_at(kind: &str, home: &std::path::Path, path: &std::path::Path) -> std
     let map = obj.get_mut(key).and_then(|h| h.as_object_mut()).unwrap();
     for event in s.events {
         let mut kept: Vec<Value> = map.get(*event).and_then(|a| a.as_array())
-            .map(|a| a.iter().filter(|e| !entry_is_ours(s.style, event, e)).cloned().collect())
+            .map(|a| without_our_entries(s.style, event, a))
             .unwrap_or_default();
         kept.push(make_entry(s.style, event, &cmd));
         map.insert((*event).to_string(), Value::Array(kept));
@@ -302,10 +322,15 @@ fn migrate_installed_hooks_for(home: &std::path::Path, kinds: &[&str]) {
 
 fn uninstall(kind: &str) -> std::io::Result<()> {
     if kind == "jcode" { return jcode_uninstall(); }
-    let (Some(path), Some(s)) = (config_path(kind), spec(kind)) else { return Ok(()) };
-    // Files we own outright: just delete.
-    if kind == "copilot" || s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
-        let _ = std::fs::remove_file(&path);
+    let Some(path) = config_path(kind) else { return Ok(()) };
+    uninstall_at(kind, &path)
+}
+
+fn uninstall_at(kind: &str, path: &std::path::Path) -> std::io::Result<()> {
+    let Some(s) = spec(kind) else { return Ok(()) };
+    // Generated source files we own outright: just delete.
+    if s.style == Style::OpencodePlugin || s.style == Style::PiExtension {
+        let _ = std::fs::remove_file(path);
         return Ok(());
     }
     let mut v = read_json(&path);
@@ -314,7 +339,7 @@ fn uninstall(kind: &str) -> std::io::Result<()> {
     if let Some(map) = obj.get_mut(key).and_then(|h| h.as_object_mut()) {
         for event in s.events {
             if let Some(arr) = map.get(*event).and_then(|a| a.as_array()) {
-                let kept: Vec<Value> = arr.iter().filter(|e| !entry_is_ours(s.style, event, e)).cloned().collect();
+                let kept = without_our_entries(s.style, event, arr);
                 if kept.is_empty() { map.remove(*event); } else { map.insert((*event).to_string(), Value::Array(kept)); }
             }
         }
@@ -608,6 +633,58 @@ fn wsl_default_home() -> Option<(String, String)> {
 }
 
 #[cfg(test)]
+mod ownership_tests {
+    use super::*;
+
+    fn check_foreign_entries(install: bool) {
+        let home = migration_tests::temp_home();
+        for kind in home_migration_kinds() {
+            let s = spec(kind).unwrap();
+            if matches!(s.style, Style::OpencodePlugin | Style::PiExtension) { continue; }
+            let path = config_path_for(kind, &home).unwrap();
+            for event in s.events {
+                let nested = s.style == Style::ClaudeNested ||
+                    (s.style == Style::AntigravityNested && antigravity_matcher(event));
+                let foreign = json!({"type": "command", "command": "foreign-user-notify"});
+                let prompt = json!({"type": "prompt", "prompt": "Keep this prompt"});
+                let kept = if nested {
+                    json!({"matcher": "Read", "timeout": 42, "hooks": [foreign, prompt]})
+                } else { foreign.clone() };
+                let mixed = if nested {
+                    let mut group = kept.clone();
+                    group["hooks"].as_array_mut().unwrap().push(json!({"command": "agentpet hook --agent old"}));
+                    group
+                } else { foreign.clone() };
+                let own = make_entry(s.style, event, "agentpet hook --agent old");
+                let key = container_key(s.style);
+                let fixture = json!({"unrelated": true, key: {(*event): [mixed, own], "CustomEvent": [foreign]}});
+                write_json(&path, &fixture).unwrap();
+                if install {
+                    install_at(kind, &home, &path).unwrap();
+                    // Reinstall/migration must be idempotent, too.
+                    install_at(kind, &home, &path).unwrap();
+                } else {
+                    uninstall_at(kind, &path).unwrap();
+                }
+                let actual = read_json(&path);
+                let entries = actual[key][event].as_array().unwrap();
+                assert_eq!(entries[0], kept, "{kind}/{event}: foreign entry or group metadata lost");
+                assert_eq!(entries.len(), if install { 2 } else { 1 }, "{kind}/{event}");
+                assert_eq!(actual[key]["CustomEvent"], fixture[key]["CustomEvent"]);
+                assert_eq!(actual["unrelated"], true);
+            }
+        }
+        std::fs::remove_dir_all(home).unwrap();
+    }
+
+    #[test]
+    fn install_preserves_foreign_entries_in_all_json_styles() { check_foreign_entries(true); }
+
+    #[test]
+    fn uninstall_preserves_foreign_entries_in_all_json_styles() { check_foreign_entries(false); }
+}
+
+#[cfg(test)]
 mod read_config_tests {
     use super::*;
 
@@ -675,7 +752,7 @@ mod migration_tests {
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn temp_home() -> PathBuf {
+    pub(super) fn temp_home() -> PathBuf {
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);
         let suffix = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos();
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
