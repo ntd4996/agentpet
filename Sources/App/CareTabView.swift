@@ -222,40 +222,42 @@ struct CareTabView: View {
                     Spacer()
                     Text("Active").font(.caption).bold().foregroundStyle(.green)
                 }
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Subscription limits")
-                        Text(probe.providers.isEmpty
-                             ? "Read directly from your Claude Code / Codex sign-ins. None found yet."
-                             : "Read directly from your Claude Code / Codex sign-ins.")
-                            .font(.caption).foregroundStyle(.secondary)
-                        // Inside this row, not a row of its own: a Form row added or
-                        // removed when `lost` flips kept its old height and drew over
-                        // the toggle below it.
-                        if usage.lost {
-                            Label("OpenUsage isn't responding, so the providers only it supplies are hidden.",
-                                  systemImage: "exclamationmark.triangle")
-                                .font(.caption).foregroundStyle(.orange)
-                                .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Subscription limits")
+                            Text(probe.providers.isEmpty
+                                 ? "Read directly from your Claude Code / Codex sign-ins. None found yet."
+                                 : "Read directly from your Claude Code / Codex sign-ins.")
+                                .font(.caption).foregroundStyle(.secondary)
+                            // Inside this row, not a row of its own: a Form row added or
+                            // removed when `lost` flips kept its old height and drew over
+                            // the toggle below it.
+                            if usage.lost {
+                                Label("OpenUsage isn't responding, so the providers only it supplies are hidden.",
+                                      systemImage: "exclamationmark.triangle")
+                                    .font(.caption).foregroundStyle(.orange)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        Spacer()
+                        if !probe.providers.isEmpty {
+                            Text("Active").font(.caption).bold().foregroundStyle(.green)
                         }
                     }
-                    Spacer()
-                    if !probe.providers.isEmpty {
-                        Text("Active").font(.caption).bold().foregroundStyle(.green)
-                    }
-                }
-                ForEach(NativeUsageProbe.combined()) { p in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Toggle(isOn: visibility.binding(for: p.id)) {
-                            Text(String(format: NSLocalizedString("Show %@ in Limits", comment: "per-provider toggle"), p.displayName))
-                                .font(.caption)
+                    ForEach(NativeUsageProbe.combined()) { p in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Toggle(isOn: visibility.binding(for: p.id)) {
+                                Text(String(format: NSLocalizedString("Show %@ in Limits", comment: "per-provider toggle"), p.displayName))
+                                    .font(.caption)
+                            }
+                            .toggleStyle(.switch).controlSize(.mini)
+                            if visibility.isVisible(p.id) {
+                                LimitWindowsView(provider: p, tint: stageColor, compact: false)
+                            }
                         }
-                        .toggleStyle(.switch).controlSize(.mini)
-                        if visibility.isVisible(p.id) {
-                            LimitWindowsView(provider: p, tint: stageColor, compact: false)
-                        }
+                        .padding(.vertical, 2)
                     }
-                    .padding(.vertical, 2)
                 }
             } header: {
                 Text("Food sources")

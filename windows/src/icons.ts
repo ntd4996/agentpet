@@ -30,10 +30,15 @@ export const AGENT_ICONS: Record<string, string> = {
       <circle cx="9.6" cy="10.4" r="1.3" fill="#ffffff"/>
       <circle cx="14.4" cy="10.4" r="1.3" fill="#ffffff"/>
     </svg>`,
+  // Light disc behind the black mark so it stays visible on the dark bubble
+  // (port of macOS 540c249).
   grok: `<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <path fill="#111111" d="M3 21 15.4 3h3.4L6.4 21H3Z"/>
-      <path fill="#111111" d="M13.9 21l3.3-4.8 1.7 2.4L21.5 21h-7.6Z"/>
-      <path fill="#111111" d="M18.1 13.1 21.5 8l-1.7-2.5-3.4 5.1 1.7 2.5Z"/>
+      <circle cx="12" cy="12" r="12" fill="#F5F5F5"/>
+      <g transform="translate(2.4 2.4) scale(0.8)">
+        <path fill="#000000" d="M3 21 15.4 3h3.4L6.4 21H3Z"/>
+        <path fill="#000000" d="M13.9 21l3.3-4.8 1.7 2.4L21.5 21h-7.6Z"/>
+        <path fill="#000000" d="M18.1 13.1 21.5 8l-1.7-2.5-3.4 5.1 1.7 2.5Z"/>
+      </g>
     </svg>`,
   // jcode app icon (github.com/1jehuang/jcode, MIT), same asset as the macOS
   // AgentIconsJcode.swift: 64x64 on a light disc.
