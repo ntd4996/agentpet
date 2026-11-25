@@ -48,4 +48,6 @@ public enum AgentSource: String, Codable, Sendable {
     case hook
     /// Inferred by passively observing processes (running / not running only).
     case passive
+    /// Reported from a remote server / VPS.
+    case remote
 }

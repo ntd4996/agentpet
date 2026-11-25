@@ -40,6 +40,9 @@ public struct AgentEvent: Codable, Sendable, Equatable {
     /// Lets distinct custom agents keep their own identity instead of all
     /// collapsing into one `.unknown` row (issue #56). `nil` for known kinds.
     public var agentName: String?
+    /// Hostname or label of the machine emitting this event (e.g. "vps-ubuntu").
+    /// `nil` when emitted locally.
+    public var host: String?
     public var timestamp: Date
 
     public init(
@@ -58,6 +61,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         terminalTTY: String? = nil,
         terminalFocusURL: String? = nil,
         agentName: String? = nil,
+        host: String? = nil,
         timestamp: Date
     ) {
         self.sessionId = sessionId
@@ -75,6 +79,7 @@ public struct AgentEvent: Codable, Sendable, Equatable {
         self.terminalTTY = terminalTTY
         self.terminalFocusURL = terminalFocusURL
         self.agentName = agentName
+        self.host = host
         self.timestamp = timestamp
     }
 }
