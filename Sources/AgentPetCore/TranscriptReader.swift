@@ -15,6 +15,8 @@ public enum TranscriptReader {
     // Summary-based titles are final — once cached, never re-read.
     // Provisional titles (first user message) are not cached: a later summary
     // event should supersede them on the next call.
+    // A separate cache lock keeps transcript title IO independent of usage scans.
+    private static let cacheLock = NSLock()
     nonisolated(unsafe) private static var summaryCache: [String: String] = [:]
     nonisolated(unsafe) private static var recapCache: [String: String] = [:]
     // Byte offset already consumed by `newUsageTokens` per transcript path.
@@ -49,6 +51,8 @@ public enum TranscriptReader {
 
     /// Returns the title for the transcript at `path`, or `nil` if unreadable.
     public static func title(at path: String) -> String? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
         if let hit = summaryCache[path] { return hit }
         guard let (result, isSummary) = read(path) else { return nil }
         if isSummary { summaryCache[path] = result }
@@ -58,6 +62,8 @@ public enum TranscriptReader {
     /// Returns the latest Claude assistant recap from the transcript, collapsed
     /// to one display line, or `nil` when the transcript has no recap marker.
     public static func latestAssistantRecap(at path: String) -> String? {
+        cacheLock.lock()
+        defer { cacheLock.unlock() }
         if let hit = recapCache[path] { return hit }
         guard let result = readLatestAssistantRecap(path) else { return nil }
         recapCache[path] = result
@@ -106,10 +112,13 @@ public enum TranscriptReader {
 
     /// Clears cached titles — useful after fixing the extraction logic at runtime.
     public static func clearCache() {
-        stateLock.lock()
-        defer { stateLock.unlock() }
+        cacheLock.lock()
         summaryCache.removeAll()
         recapCache.removeAll()
+        cacheLock.unlock()
+
+        stateLock.lock()
+        defer { stateLock.unlock() }
         usageOffsets.removeAll()
         countedIDs.removeAll()
         countedOrder.removeAll()
