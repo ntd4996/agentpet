@@ -33,7 +33,7 @@ export const ROLES: Record<string, string> = {
   "aiexkwan": "Achievements, reactive bubbles & perf",
   "23092003e": "Windows hooks",
   "hhoangg": "Per-project pets, break reminder & CPU perf",
-  "hoangdq08": "jcode, usage limits, project names & stats card",
+  "hoangdq08": "jcode, usage limits, Codex sessions & security fixes",
   "hocdo278": "Usage dashboard & Windows parity",
   "htdangkhoa": "Multi-device streak sync",
   "svcrashh": "Accurate token counting",
